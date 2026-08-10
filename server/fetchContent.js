@@ -1,5 +1,6 @@
 // server/fetchContent.js — جلب المقالات والمواقع واستخراج النص الأساسي
 const cheerio = require('cheerio');
+const { validatePublicUrl } = require('./ssrf'); // حماية SSRF قبل أي جلب
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -10,6 +11,9 @@ async function fetchArticleContent(url) {
     err.code = 'invalid-url';
     throw err;
   }
+
+  // حماية SSRF: ارفض العناوين الداخلية/المحظورة قبل أي اتصال (blocked-url / invalid-url)
+  await validatePublicUrl(url);
 
   let res;
   try {

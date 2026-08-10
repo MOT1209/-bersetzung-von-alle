@@ -15,6 +15,8 @@ const ERROR_STATUS = {
   'audio-empty': 422,
   'content-empty': 422,
   'pdf-unsupported': 422,
+  'blocked-url': 400,
+  'rate-limited': 429,
   'translate-failed': 502,
   'server-error': 500,
 };

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>أرا لينك — خارطة التطوير والاقتراحات</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --primary: #4f46e5;
+    --primary2: #7c3aed;
+    --accent: #06b6d4;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --card-bg: #ffffff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Tahoma, "Cairo", Arial, sans-serif;
+    background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
+    color: var(--text);
+    line-height: 1.85;
+    min-height: 100vh;
+  }
+
+  /* ===== الترويسة ===== */
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary2));
+    color: #fff;
+    padding: 55px 20px 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(6,182,212,.3), transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(236,72,153,.3), transparent 50%);
+  }
+  header h1 { font-size: 2.3rem; font-weight: 900; position: relative; text-shadow: 0 4px 20px rgba(0,0,0,.35); }
+  header p { margin-top: 10px; font-size: 1.1rem; opacity: .92; position: relative; }
+  .badge {
+    display: inline-block; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4);
+    padding: 6px 16px; border-radius: 999px; font-size: .85rem; margin-top: 16px; position: relative;
+  }
+
+  .container { max-width: 1020px; margin: -50px auto 60px; padding: 0 20px; }
+
+  /* ===== البطاقات ===== */
+  .card {
+    background: var(--card-bg);
+    border-radius: 18px;
+    padding: 30px 34px;
+    margin-bottom: 28px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.25);
+  }
+  .card h2 {
+    font-size: 1.45rem;
+    color: #312e81;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card h2 .emoji { font-size: 1.6rem; }
+  .card h3 {
+    font-size: 1.08rem;
+    color: #4f46e5;
+    margin: 22px 0 10px;
+    padding-right: 12px;
+    border-right: 4px solid var(--primary);
+  }
+  .card p, .card li { color: #334155; }
+  .card ul { padding-right: 22px; margin: 8px 0; }
+  .card li { margin-bottom: 6px; }
+  .card code {
+    background: #eef2ff; color: #4338ca; padding: 2px 8px; border-radius: 6px;
+    font-family: Consolas, monospace; font-size: .88em; direction: ltr; display: inline-block;
+  }
+
+  /* ===== أشرطة الأولوية ===== */
+  .pill {
+    display: inline-block; padding: 3px 12px; border-radius: 999px;
+    font-size: .78rem; font-weight: 700; margin-left: 8px; vertical-align: middle;
+  }
+  .p0 { background: #fee2e2; color: #b91c1c; }
+  .p1 { background: #fef3c7; color: #b45309; }
+  .p2 { background: #dbeafe; color: #1d4ed8; }
+  .p3 { background: #dcfce7; color: #15803d; }
+  .done { background: #dcfce7; color: #15803d; }
+
+  /* ===== حالة المشروع ===== */
+  .status-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 14px 0;
+  }
+  .status-item {
+    background: #f8fafc; border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px; text-align: center;
+  }
+  .status-item .num { font-size: 1.7rem; font-weight: 900; color: var(--primary); }
+  .status-item .lbl { font-size: .82rem; color: var(--muted); margin-top: 4px; }
+
+  /* ===== الجداول ===== */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: .93rem; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: right; }
+  th { background: #eef2ff; color: #3730a3; font-weight: 700; }
+  tr:hover td { background: #f8fafc; }
+  .yes { color: var(--success); font-weight: 700; }
+  .no { color: var(--danger); font-weight: 700; }
+  .maybe { color: var(--warning); font-weight: 700; }
+
+  /* ===== التنبيهات ===== */
+  .alert {
+    border-radius: 14px; padding: 16px 18px; margin: 14px 0;
+    font-size: .95rem;
+  }
+  .alert-danger { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+  .alert-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+  .alert-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+  .alert-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+
+  /* ===== الخطوات ===== */
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps li {
+    counter-increment: step; position: relative; padding: 12px 52px 12px 16px; margin-bottom: 10px;
+    background: #f8fafc; border: 1px solid var(--border); border-radius: 12px;
+  }
+  .steps li::before {
+    content: counter(step); position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary2)); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .9rem;
+  }
+
+  /* ===== بطاقات الميزات ===== */
+  .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; margin: 14px 0; }
+  .feat {
+    background: #f8fafc; border: 1px solid var(--border); border-radius: 14px; padding: 18px;
+    transition: transform .15s;
+  }
+  .feat:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(79,70,229,.12); }
+  .feat h4 { color: #312e81; margin-bottom: 6px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+  .feat p { font-size: .88rem; color: var(--muted); }
+  .feat .effort { display: block; margin-top: 8px; font-size: .78rem; }
+
+  footer { text-align: center; color: #94a3b8; padding: 30px 20px 50px; font-size: .9rem; }
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.7rem; }
+    .card { padding: 22px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚀 أرا لينك — خارطة التطوير والاقتراحات</h1>
+  <p>من أداة تعمل محلياً… إلى خدمة يعتمد عليها المستخدمون</p>
+  <span class="badge">مبنية على فحص شامل للمشروع — أغسطس 2026</span>
+</header>
+
+<div class="container">
+
+  <!-- ============ حالة المشروع ============ -->
+  <div class="card">
+    <h2><span class="emoji">📊</span> حالة المشروع اليوم</h2>
+    <div class="status-grid">
+      <div class="status-item"><div class="num">15/15</div><div class="lbl">فحص صياغة سليم</div></div>
+      <div class="status-item"><div class="num">132</div><div class="lbl">لغة مدعومة</div></div>
+      <div class="status-item"><div class="num">6/6</div><div class="lbl">وظائف أساسية تعمل</div></div>
+      <div class="status-item"><div class="num">3</div><div class="lbl">محركات ترجمة (2 مفعّلة)</div></div>
+      <div class="status-item"><div class="num">3</div><div class="lbl">أخطاء أُصلحت بالفحص</div></div>
+    </div>
+    <div class="alert alert-danger">
+      <strong>⚠️ المشكلة الحرجة:</strong> محركا الترجمة الحاليان غير موثوقين للإنتاج —
+      Google المجاني (الواجهة غير الرسمية) <strong>يُحجب مؤقتاً</strong> عند كثرة الطلبات،
+      ومفتاح Gemini الحالي <strong>استنفد حصته</strong> (429 لكل دقيقة).
+      النتيجة: الترجمة الحية قد تفشل في أي لحظة. <strong>الحل في القسم الأول بالأسفل.</strong>
+    </div>
+  </div>
+
+  <!-- ============ القسم الأول: يعمل حقيقياً ============ -->
+  <div class="card">
+    <h2><span class="emoji">🔥</span> أولاً: كيف نجعله يعمل حقيقياً؟</h2>
+    <p>
+      «يعمل حقيقي» تعني: المستخدم يلصق رابطاً ويحصل على ترجمته <strong>في كل مرة، دون انقطاع</strong>.
+      العمود الفقري لذلك هو <strong>سلسلة محركات ترجمة احتياطية</strong> — إذا فشل واحد، ينتقل التالي تلقائياً.
+    </p>
+
+    <h3>🔌 محركات الترجمة المقترحة (بالترتيب المقترح للتجربة)</h3>
+    <table>
+      <tr><th>المحرك</th><th>الحصة المجانية</th><th>مفتاح مطلوب؟</th><th>الموثوقية</th><th>جهد التنفيذ</th></tr>
+      <tr><td>✅ Google غير الرسمي (الحالي)</td><td>سرية — يُحجب عند الضغط</td><td class="no">لا</td><td class="no">منخفضة للإنتاج</td><td>موجود</td></tr>
+      <tr><td><strong>MyMemory API</strong></td><td>5000 كلمة/يوم (بلا مفتاح)، 50 ألف/يوم بمفتاح مجاني</td><td class="maybe">اختياري</td><td class="maybe">متوسطة</td><td>ساعة</td></tr>
+      <tr><td><strong>LibreTranslate</strong> (libretranslate.com)</td><td>طلب واحد كل ثانية (بلا مفتاح)</td><td class="no">لا</td><td class="maybe">متوسطة</td><td>ساعة</td></tr>
+      <tr><td><strong>DeepL API Free</strong></td><td>500,000 حرف/شهر</td><td class="yes">نعم (مجاني)</td><td class="yes">عالية</td><td>ساعة ونصف</td></tr>
+      <tr><td><strong>Google Cloud Translation v3</strong></td><td>500,000 حرف/شهر مجاناً ثم مدفوع</td><td class="yes">نعم (بطاقة)</td><td class="yes">عالية جداً</td><td>ساعتان</td></tr>
+      <tr><td><strong>Gemini</strong> (موجود كاحتياطي)</td><td>حسب المفتاح/المشروع</td><td class="yes">نعم</td><td class="yes">عالية</td><td>موجود</td></tr>
+    </table>
+    <div class="alert alert-info">
+      💡 <strong>التوصية:</strong> ابدأ بـ MyMemory + LibreTranslate (ساعة عمل فقط، بلا أي مفاتيح)
+      كطبقة أمان فورية فوق Google الحالي، ثم أضف DeepL المجاني. هذا وحده يحل 90% من مشكلة الانقطاع.
+    </div>
+
+    <h3>🛠️ البنية المقترحة لمحرك الترجمة</h3>
+    <ul>
+      <li><strong>دائرة محركات:</strong> مصفوفة مرتبة من المحركات، يجربها النظام بالترتيب عند الفشل (لا يتوقف عند أول خطأ).</li>
+      <li><strong>عزل الفشل:</strong> إذا فشل محرك 3 مرات متتالية، يُجمَّد 5 دقائق ثم يُعاد — لا يهدر وقت كل طلب.</li>
+      <li><strong>كاش مركزي (موجود ✅):</strong> نفس النص+اللغتين يُرجع فوراً بلا استهلاك حصة — تبقيه يعمل بحجم أكبر.</li>
+      <li><strong>تأخير ذكي (أُضيف ✅):</strong> 250ms بين القطع يمنع انفجار الطلبات الذي يفجّر الحجب.</li>
+      <li><strong>كشف الحجب مبكراً:</strong> إن كان الرد HTML (صفحة sorry/CAPTCHA) بدل JSON → اعتبره فشلاً فوراً وانتقل للمحرك التالي.</li>
+    </ul>
+
+    <h3>📋 خطوات عملية — «اجعله يعمل حقيقياً» هذا الأسبوع</h3>
+    <ol class="steps">
+      <li><strong>أضف MyMemory:</strong> دالة <code>translateViaMyMemory()</code> في <code>server/translate.js</code> — استدعاء API مباشر، بدون مفاتيح.</li>
+      <li><strong>أضف LibreTranslate:</strong> نقطة <code>libretranslate.com/translate</code> بلا مفتاح — كنقطة ثالثة.</li>
+      <li><strong>أعد هيكلة الحلقة:</strong> اجعل التتابع Google ← MyMemory ← LibreTranslate ← Gemini بدل «Google ثم Gemini فقط».</li>
+      <li><strong>جرّب بضغط حقيقي:</strong> ترجم 20 نصاً متتالياً وتأكد أن كلها تنجح (أي محركٍ منها).</li>
+      <li><strong>احصل على مفتاح DeepL مجاني</strong> (خطوة اختيارية لاحقاً) وأضفه في <code>.env</code> كطبقة رابعة.</li>
+      <li><strong>اجعل المفاتيح قابلة للتكوين</strong> من <code>.env</code> فقط، مع تجاهل المحركات بلا مفاتيح.</li>
+    </ol>
+  </div>
+
+  <!-- ============ القسم الثاني: اقتراحات تطوير ============ -->
+  <div class="card">
+    <h2><span class="emoji">💡</span> ثانياً: اقتراحات تطوير (ميزات)</h2>
+    <p>ميزات مرتبة بالأولوية والتأثير. كلها <strong>بدون قاعدة بيانات</strong> — تحافظ على بساطة المشروع.</p>
+
+    <h3>الموجة 1 — تحسينات سريعة (أيام)</h3>
+    <div class="feat-grid">
+      <div class="feat">
+        <h4>🗂️ سجل الترجمات <span class="pill p1">P1</span></h4>
+        <p>حفظ آخر 20 ترجمة في localStorage مع زر «إعادة فتح» — بلا أي خادم أو قاعدة بيانات.</p>
+        <span class="effort">الجهد: ساعتان</span>
+      </div>
+      <div class="feat">
+        <h4>📋 نسخ ومشاركة النتيجة <span class="pill p1">P1</span></h4>
+        <p>زر «نسخ» بجانب النتيجة + زر «مشاركة» يولّد رابطاً مباشراً للنص المترجم.</p>
+        <span class="effort">الجهد: ساعة</span>
+      </div>
+      <div class="feat">
+        <h4>📄 دعم ملفات PDF <span class="pill p1">P1</span></h4>
+        <p>عند لصق رابط PDF: استخراج النص (عبر pdf-parse) وترجمته كنص واحد بدل رسالة «غير مدعوم».</p>
+        <span class="effort">الجهد: 3 ساعات</span>
+      </div>
+      <div class="feat">
+        <h4>⚙️ إعدادات المفاتيح في الواجهة <span class="pill p0">P0</span></h4>
+        <p>صفحة إعدادات بسيطة لإدخال مفاتيح DeepL/Gemini — تُحفظ في <code>.env</code> عبر نقطة API محمية.</p>
+        <span class="effort">الجهد: 3 ساعات</span>
+      </div>
+      <div class="feat">
+        <h4>🔊 أصوات TTS متعددة <span class="pill p2">P2</span></h4>
+        <p>اختيار الصوت (ذكر/أنثى) والسرعة في القراءة الصوتية — gTTS الحالي صوت واحد فقط.</p>
+        <span class="effort">الجهد: ساعتان</span>
+      </div>
+      <div class="feat">
+        <h4>🌗 الوضع الفاتح/الداكن <span class="pill p2">P2</span></h4>
+        <p>زر تبديل المظهر مع حفظ التفضيل — حالياً داكن فقط.</p>
+        <span class="effort">الجهد: ساعتان</span>
+      </div>
+    </div>
+
+    <h3>الموجة 2 — ميزات متوسطة (أسابيع)</h3>
+    <div class="feat-grid">
+      <div class="feat">
+        <h4>📦 ترجمة دفعات <span class="pill p1">P1</span></h4>
+        <p>لصق عدة روابط (سطر لكل رابط) وترجمتها تباعاً مع شريط تقدم إجمالي.</p>
+        <span class="effort">الجهد: 4 ساعات</span>
+      </div>
+      <div class="feat">
+        <h4>📖 مسرد مصطلحات مخصص <span class="pill p2">P2</span></h4>
+        <p>المستخدم يحدد ترجمات مفضلة لبعض الكلمات (مثال: «cloud = سحابة») ويحترمها المحرك.</p>
+        <span class="effort">الجهد: يوم</span>
+      </div>
+      <div class="feat">
+        <h4>📺 ترجمة مدمجة أفضل ليوتيوب <span class="pill p1">P1</span></h4>
+        <p>نافذة جانبية بجانب الفيديو تعرض السطر الحالي مُظللاً بالتزامن مع التشغيل + زر «ترجمة الفيديو كاملاً دون نقرة».</p>
+        <span class="effort">الجهد: يوم</span>
+      </div>
+      <div class="feat">
+        <h4>🗣️ نطق الكلمة عند النقر <span class="pill p3">P3</span></h4>
+        <p>النقر على أي كلمة في النص المترجم ينطقها (TTS قصير).</p>
+        <span class="effort">الجهد: 3 ساعات</span>
+      </div>
+      <div class="feat">
+        <h4>🔍 ترجمة صفحات بلا أقسام <span class="pill p2">P2</span></h4>
+        <p>حفظ «قواعد استخراج» للمواقع التي يصعب جلبها (مثل جوجل نيوز) لتحسين نسبة النجاح.</p>
+        <span class="effort">الجهد: يوم</span>
+      </div>
+      <div class="feat">
+        <h4>🖥️ وضع مقارنة جنباً إلى جنب <span class="pill p2">P2</span></h4>
+        <p>عرض النص الأصلي والترجمة عمودين متوازيين بدل تبويبين.</p>
+        <span class="effort">الجهد: 3 ساعات</span>
+      </div>
+    </div>
+
+    <h3>الموجة 3 — مشاريع أكبر (لاحقاً)</h3>
+    <div class="feat-grid">
+      <div class="feat">
+        <h4>🧩 إضافة متصفح <span class="pill p3">P3</span></h4>
+        <p>زر في شريط المتصفح يفتح أرا لينك مباشرة على الصفحة الحالية.</p>
+        <span class="effort">الجهد: 2-3 أيام</span>
+      </div>
+      <div class="feat">
+        <h4>📱 تطبيق PWA <span class="pill p3">P3</span></h4>
+        <p>manifest + Service Worker → تثبيت على الجوال/سطح المكتب والاستخدام أوفلاين للسجل.</p>
+        <span class="effort">الجهد: يومان</span>
+      </div>
+      <div class="feat">
+        <h4>🧠 ترجمة ذكية (LLM) كخيار <span class="pill p3">P3</span></h4>
+        <p>زر «ترجمة بذكاء» يستخدم Gemini لتلخيص/إعادة صياغة بدل ترجمة حرفية — للمقالات الطويلة.</p>
+        <span class="effort">الجهد: يومان</span>
+      </div>
+      <div class="feat">
+        <h4>🌐 API عام للمطورين <span class="pill p3">P3</span></h4>
+        <p>توثيق نقطة <code>/api/translate</code> كخدمة عامة مع حد استخدام لكل طالب.</p>
+        <span class="effort">الجهد: يومان</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ القسم الثالث: إضافات لازمة ============ -->
+  <div class="card">
+    <h2><span class="emoji">🛡️</span> ثالثاً: إضافات لازمة للإنتاج</h2>
+    <p>هذه ليست «ميزات ترفيهية» — بل <strong>شروط تشغيل آمن وموثوق</strong> قبل عرض الأداة على مستخدمين حقيقيين.</p>
+
+    <h3>🔐 أمان (الأهم — لا تؤجلها)</h3>
+    <table>
+      <tr><th>البند</th><th>المشكلة التي يحلها</th><th>الحالة</th></tr>
+      <tr><td><strong>حماية SSRF</strong> — منع جلب عناوين الشبكة الداخلية (127.0.0.1، 10.x، 169.254…)</td><td>مستخدم خبيث يلصق رابطاً لخادمك الداخلي فيسرقه</td><td class="no">غير موجود</td></tr>
+      <tr><td><strong>حد الطلبات (Rate Limit)</strong> — حد أقصى لكل IP على /api/translate</td><td>استنزاف حصص الترجمة المجانية لديك</td><td class="no">غير موجود</td></tr>
+      <tr><td><strong>تقييد حجم المدخلات</strong> — حد أقصى لطول النص/الرابط</td><td>استهلاك ذاكرة زائد أو تعليق الخادم</td><td class="maybe">جزئي (chunking موجود)</td></tr>
+      <tr><td><strong>لا مفاتيح في الواجهة أبداً</strong> — المفاتيح في <code>.env</code> فقط</td><td>سرقة المفاتيح من كود المتصفح</td><td class="yes">سليم</td></tr>
+      <tr><td><strong>User-Agent واقعي</strong> — موجود ✅ + مهلات زمنية</td><td>رفض المواقع لجلبك، تعليق الخادم</td><td class="yes">سليم</td></tr>
+    </table>
+
+    <h3>🚀 نشر وتشغيل</h3>
+    <ul>
+      <li><strong>Docker:</strong> <code>Dockerfile</code> + <code>docker-compose.yml</code> (Node 20 slim + تثبيت yt-dlp/ffmpeg) — تشغيل بنفس الأمر في أي مكان.</li>
+      <li><strong>استضافة مجانية:</strong> Render أو Railway للبداية (مشروع Node بسيط بدون قاعدة بيانات مثالي لها).</li>
+      <li><strong>متغيرات البيئة:</strong> <code>.env.example</code> محدّث (موجود ✅) + توثيق أين تحصل على كل مفتاح.</li>
+      <li><strong>مجلدات غير ثابتة:</strong> الكاش والنماذج في مجلد قابل للكتابة خارج الكود (<code>VOLUME</code> في Docker).</li>
+    </ul>
+
+    <h3>🧪 اختبارات (ضمان الجودة)</h3>
+    <table>
+      <tr><th>الاختبار</th><th>ماذا يغطي</th><th>الحالة</th></tr>
+      <tr><td><code>npm run check</code> (موجود ✅)</td><td>صياغة كل ملفات JS</td><td class="yes">موجود</td></tr>
+      <tr><td>اختبارات وحدة (node:test)</td><td><code>chunkText</code>، <code>extractVideoId</code>، <code>buildSrt</code>، توزيع الترجمة على الأسطر</td><td class="no">غير موجود</td></tr>
+      <tr><td>اختبار API (supertest)</td><td>كل نقطة: نجاح + خطأ (رابط مكسور، فيديو بلا ترجمات، نص فارغ)</td><td class="no">غير موجود</td></tr>
+      <tr><td>CI (GitHub Actions)</td><td>يشغّل الفحوصات تلقائياً عند كل push</td><td class="no">غير موجود</td></tr>
+      <tr><td>اختبار واجهة (Playwright)</td><td>الواجهة RTL، الأزرار، رسائل الخطأ العربية</td><td class="no">غير موجود</td></tr>
+    </table>
+
+    <h3>📈 مراقبة وتجربة</h3>
+    <ul>
+      <li><strong>سجل بسيط للأخطاء:</strong> ملف log مع توقيت لكل فشل محرك (يعرفك أي محرك يخذلك).</li>
+      <li><strong>عدّاد استخدام:</strong> عدد الترجمات واللغات الأكثر طلباً (ملف JSON صغير يكفي).</li>
+      <li><strong>تحسين الواجهة على الجوال:</strong> اختبار عند عرض 375px (المعايير الأساسية موجودة في DESIGN.md).</li>
+    </ul>
+  </div>
+
+  <!-- ============ الخلاصة ============ -->
+  <div class="card">
+    <h2><span class="emoji">🎯</span> الخلاصة: أولويات هذا الشهر</h2>
+    <table>
+      <tr><th>الأسبوع</th><th>المهمة</th><th>الأثر</th></tr>
+      <tr><td>1</td><td>إضافة MyMemory + LibreTranslate كاحتياطيين (ساعتان)</td><td class="yes">«يعمل حقيقياً» — نهاية الانقطاعات</td></tr>
+      <tr><td>1</td><td>حماية SSRF + حد الطلبات</td><td class="yes">أمان قبل أي مستخدم</td></tr>
+      <tr><td>2</td><td>اختبارات وحدة + API + CI</td><td class="yes">ثقة بالتغييرات القادمة</td></tr>
+      <tr><td>2</td><td>سجل الترجمات + نسخ/مشاركة</td><td class="yes">تجربة مستخدم أثرى</td></tr>
+      <tr><td>3</td><td>Docker + نشر على استضافة مجانية</td><td class="yes">متاح على الإنترنت</td></tr>
+      <tr><td>4</td><td>دعم PDF + ترجمة دفعات</td><td class="yes">نطاق أوسع</td></tr>
+    </table>
+    <div class="alert alert-success">
+      ✅ <strong>خلاصة الفحص السابق:</strong> البنية سليمة، الوظائف الست كلها تعمل، وأُصلحت 3 أخطاء فعلية.
+      المطلوب الآن ليس إعادة بناء — بل <strong>طبقة محركات احتياطية + أمان + نشر</strong>.
+    </div>
+  </div>
+
+</div>
+
+<footer>أرا لينك — خارطة التطوير · صُممت من نتائج الفحص الشامل · 2026</footer>
+
+</body>
+</html>

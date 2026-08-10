@@ -4,7 +4,34 @@ const { get: cacheGet, set: cacheSet } = require('./cache');
 
 const GOOGLE_URL = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=:tl&dt=t';
 const MAX_CHUNK = 4500;
-const MAX_RETRIES = 3;
+
+// تتبّع إخفاقات المحركات: بعد 3 إخفاقات متتالية يُجمَّد المحرك 60 ثانية
+// (يحمي حصة Google المجانية وحصص MyMemory/Libre المحدودة)
+const ENGINE_COOLDOWN_FAILS = 3;
+const ENGINE_COOLDOWN_MS = 60000;
+const engineFails = {}; // { name: { consecutive, cooldownUntil } }
+
+function engineOnCooldown(name) {
+  const s = engineFails[name];
+  if (!s) return false;
+  if (s.cooldownUntil && Date.now() < s.cooldownUntil) return true;
+  delete engineFails[name]; // انتهت مدة التجميد: عودة للخدمة
+  return false;
+}
+
+function engineSucceeded(name) {
+  delete engineFails[name];
+}
+
+function engineFailed(name) {
+  const s = engineFails[name] || (engineFails[name] = { consecutive: 0, cooldownUntil: 0 });
+  if (Date.now() < s.cooldownUntil) return; // ما زال مجمدًا
+  s.consecutive = (s.consecutive || 0) + 1;
+  if (s.consecutive >= ENGINE_COOLDOWN_FAILS) {
+    s.cooldownUntil = Date.now() + ENGINE_COOLDOWN_MS;
+    s.consecutive = 0;
+  }
+}
 
 // ===== الأدوات المساعدة =====
 
@@ -53,9 +80,63 @@ async function translateViaGoogle(text, targetLang, sourceLang) {
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
-  const data = await res.json();
-  const translated = data[0].map((seg) => seg[0]).join('');
+  // فحص سريع لصفحات الحجب (مثل /sorry): قد يعيد Google 200 بنص HTML بدل JSON
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.toLowerCase().includes('application/json')) throw new Error('Google blocked');
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error('Google blocked');
+  }
+  if (!Array.isArray(data) || !Array.isArray(data[0])) throw new Error('Google blocked');
+  const translated = data[0].map((seg) => (seg ? seg[0] : '')).join('');
   return translated;
+}
+
+// ===== الترجمة عبر MyMemory (احتياطي مجاني) =====
+async function translateViaMyMemory(text, targetLang, sourceLang) {
+  // MyMemory لا يقبل 'auto' — نستخدم الإنجليزية كافتراض عند عدم المعرفة
+  const src = (sourceLang || 'auto') === 'auto' ? 'en' : sourceLang;
+  let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|${targetLang}`;
+  // بريد اختياري يرفع الحصة اليومية المجانية
+  if (config.MYMEMORY_EMAIL) url += `&Email=${encodeURIComponent(config.MYMEMORY_EMAIL)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`MyMemory HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data || data.responseStatus !== 200) {
+    throw new Error(`MyMemory status ${data ? data.responseStatus : 'unknown'}`);
+  }
+  const out = data.responseData && data.responseData.translatedText;
+  // رسالة 'MYMEMORY WARNING' تعني تجاوز الحصة اليومية
+  if (!out || /MYMEMORY WARNING/i.test(out)) {
+    throw new Error('MyMemory: تجاوز الحصة أو استجابة فارغة');
+  }
+  return out;
+}
+
+// ===== الترجمة عبر LibreTranslate (احتياطي مجاني) =====
+async function translateViaLibre(text, targetLang, sourceLang) {
+  const base = config.LIBRE_URL || 'https://libretranslate.com';
+  const res = await fetch(base + '/translate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q: text, source: sourceLang || 'auto', target: targetLang, format: 'text' }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`Libre HTTP ${res.status}`);
+  // بعض الخوادم تعيد صفحة HTML بدل JSON (أو خادم وسيط) — لا نتعامل معها
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.toLowerCase().includes('application/json')) throw new Error('Libre: استجابة غير JSON');
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error('Libre: استجابة غير JSON');
+  }
+  const out = data && data.translatedText;
+  if (!out) throw new Error('Libre: استجابة فارغة');
+  return out;
 }
 
 // ===== الترجمة عبر Gemini (احتياطي) =====
@@ -76,6 +157,14 @@ async function translateViaGemini(text, targetLang) {
   if (!out) throw new Error('Gemini: استجابة فارغة');
   return out.trim();
 }
+
+// ترتيب المحركات: Google (الأسرع) → MyMemory → Libre → Gemini (احتياطي المفتاح)
+const TRANSLATION_ENGINES = [
+  { name: 'google', run: translateViaGoogle },
+  { name: 'mymemory', run: translateViaMyMemory },
+  { name: 'libre', run: translateViaLibre },
+  { name: 'gemini', run: translateViaGemini },
+];
 
 // ===== الترجمة مع محاولات وتقسيم =====
 async function translateText(text, targetLang, sourceLang) {
@@ -101,25 +190,28 @@ async function translateTextWithMeta(text, targetLang, sourceLang) {
     }
 
     let out = null;
-    for (let attempt = 0; attempt < MAX_RETRIES && !out; attempt++) {
+    let lastErr = null;
+    // جرّب المحركات بالترتيب مرة واحدة لكل منها: Google → MyMemory → Libre → Gemini
+    // المحركات المجمّدة (3 إخفاقات متتالية خلال 60 ثانية) تُتخطى مؤقتًا
+    for (const engine of TRANSLATION_ENGINES) {
+      if (engineOnCooldown(engine.name)) continue;
       try {
-        out = await translateViaGoogle(chunk, targetLang, sourceLang);
+        out = await engine.run(chunk, targetLang, sourceLang);
+        engineSucceeded(engine.name);
+        break;
       } catch (e) {
-        if (attempt < MAX_RETRIES - 1) {
-          await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
-        }
+        lastErr = e;
+        engineFailed(engine.name);
+        // فاصل قصير بين المحركات لتجنّب حجب سريع
+        await new Promise((r) => setTimeout(r, 300));
       }
     }
     if (!out) {
-      try {
-        out = await translateViaGemini(chunk, targetLang);
-      } catch (e) {
-        // كل الخدمات فشلت: خطأ واضح بدل إرجاع النص الأصلي بصمت (واجهة مضللة)
-        const err = new Error('translate-failed');
-        err.code = 'translate-failed';
-        err.cause = e;
-        throw err;
-      }
+      // كل الخدمات فشلت: خطأ واضح بدل إرجاع النص الأصلي بصمت (واجهة مضللة)
+      const err = new Error('translate-failed');
+      err.code = 'translate-failed';
+      err.cause = lastErr;
+      throw err;
     }
     // الحفظ في الكاش بعد نجاح فقط — الأخطاء (429 مثلًا) لا تُخزَّن أبدًا
     cacheSet(chunk, sourceLang, targetLang, out);
