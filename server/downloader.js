@@ -4,9 +4,31 @@
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const path = require('path');
+const fs = require('fs');
 
 const execFileAsync = promisify(execFile);
-const YTDLP_BIN = path.join(__dirname, '..', 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp.exe');
+
+// ===== تحديد ثنائي yt-dlp حسب البيئة =====
+// كان المسار ثابتًا على yt-dlp.exe، فتفشل صورة Docker على لينكس بـ ENOENT في كل
+// مسار يوتيوب. الترتيب هنا: متغير بيئة صريح ← ثنائي محلي داخل node_modules
+// (باسم المنصة الصحيح) ← الاعتماد على PATH (صورة Docker تثبّته عبر pip3).
+// يُحسب كسولًا ويُخزَّن، حتى يعمل تغيير YTDLP_PATH بعد التحميل وتبقى الوحدة
+// قابلة للتحميل حتى لو غاب الثنائي.
+let cachedBin = null;
+
+function resolveYtDlp() {
+  if (process.env.YTDLP_PATH) return process.env.YTDLP_PATH;
+  const localName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+  const local = path.join(__dirname, '..', 'node_modules', 'youtube-dl-exec', 'bin', localName);
+  if (fs.existsSync(local)) return local;
+  return 'yt-dlp'; // من PATH
+}
+
+function ytDlpBin() {
+  if (process.env.YTDLP_PATH) return process.env.YTDLP_PATH; // يتقدّم دائمًا على المخزَّن
+  if (!cachedBin) cachedBin = resolveYtDlp();
+  return cachedBin;
+}
 
 /**
  * تنزيل من يوتيوب إلى مسار مطلق (Windows: لا /tmp/x — استخدم path.join(os.tmpdir(),'aralink',...))
@@ -17,7 +39,19 @@ const YTDLP_BIN = path.join(__dirname, '..', 'node_modules', 'youtube-dl-exec', 
  */
 async function ytDownload(url, outPath, extraArgs = [], timeoutMs = 180000) {
   const args = ['--no-warnings', '--no-playlist', '--no-cache-dir', '-o', outPath, ...extraArgs, url];
-  await execFileAsync(YTDLP_BIN, args, { timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 });
+  try {
+    await execFileAsync(ytDlpBin(), args, { timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 });
+  } catch (e) {
+    // ثنائي مفقود: رسالة صريحة بدل ENOENT غامض من execFile
+    if (e && e.code === 'ENOENT') {
+      const err = new Error(
+        `لم يُعثر على yt-dlp (جُرِّب: ${ytDlpBin()}). ثبّته أو اضبط YTDLP_PATH.`
+      );
+      err.code = 'ytdlp-missing';
+      throw err;
+    }
+    throw e;
+  }
 }
 
 /** تنزيل الصوت فقط (bestaudio — أصغر وأسرع) */
@@ -30,4 +64,4 @@ async function downloadVideo(url, outPath, timeoutMs = 300000) {
   await ytDownload(url, outPath, ['-f', '22/18/best'], timeoutMs);
 }
 
-module.exports = { ytDownload, downloadAudio, downloadVideo, YTDLP_BIN };
+module.exports = { ytDownload, downloadAudio, downloadVideo, resolveYtDlp, ytDlpBin };

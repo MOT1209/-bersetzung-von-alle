@@ -5,20 +5,28 @@ FROM node:22-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip curl ca-certificates \
     && pip3 install --no-cache-dir --break-system-packages yt-dlp \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    # تحقّق وقت البناء: لو تغيّر مسار التثبيت يفشل البناء هنا بوضوح
+    # بدل أن يفشل كل مسار يوتيوب وقت التشغيل بـ ENOENT غامض
+    && /usr/local/bin/yt-dlp --version
 
 WORKDIR /app
 
 # تثبيت الاعتماديات أولاً (استفادة من كاش الطبقات)
 COPY package*.json ./
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
+# --omit=optional يتخطّى youtube-dl-exec عمدًا: postinstall الخاص به ينزّل الثنائي
+# من GitHub API (60 طلبًا/ساعة لكل IP بلا مصادقة)، وعلى بنية Render بعناوين IP
+# مشتركة يفشل البناء بشكل متقطّع. الصورة تستخدم yt-dlp المثبَّت عبر pip3 أعلاه
+# عبر YTDLP_PATH، فلا حاجة إلى الثنائي المنزَّل.
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev --omit=optional; else npm install --omit=dev --omit=optional; fi
 
 # بقية الكود
 COPY . .
 
 ENV NODE_ENV=production \
     PORT=3000 \
-    STT_ENGINE=sherpa
+    STT_ENGINE=sherpa \
+    YTDLP_PATH=/usr/local/bin/yt-dlp
 
 # الكاش والنماذج تعيش خارج الكود (تُسحب كوحدة تخزين عند التشغيل)
 VOLUME /app/cache
