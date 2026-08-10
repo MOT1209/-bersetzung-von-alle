@@ -13,6 +13,8 @@ const app = express();
 
 // ===== وسيطات عامة =====
 app.use(cors());
+// مسارات الملفات (استيراد/تصدير) — قبل express.json العام لأن لها حد جسم 15mb خاصًا بها
+app.use('/api', require('./routes-file'));
 app.use(express.json({ limit: '2mb' }));
 
 // ===== مفتاح API اختياري للطلاب (ARALINK_API_KEY في .env) =====

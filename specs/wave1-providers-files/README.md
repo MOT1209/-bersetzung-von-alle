@@ -51,9 +51,9 @@ graph TD
 ## Task Status
 
 ### Wave 1
-- [ ] [task-01-provider-registry](./tasks/task-01-provider-registry.md) — سجل مزوّدين موحّد + DeepL/OpenAI-compatible + /api/providers
-- [ ] [task-02-file-import-export](./tasks/task-02-file-import-export.md) — استيراد/تصدير 11 صيغة ملف + /api/translate-file + /api/export
-- [ ] [task-03-frontend-files-providers](./tasks/task-03-frontend-files-providers.md) — واجهة: وضع ملف + أزرار تصدير + اختيار المزوّد
+- [x] [task-01-provider-registry](./tasks/task-01-provider-registry.md) — سجل مزوّدين موحّد + DeepL/OpenAI-compatible + /api/providers
+- [x] [task-02-file-import-export](./tasks/task-02-file-import-export.md) — استيراد/تصدير 11 صيغة ملف + /api/translate-file + /api/export
+- [x] [task-03-frontend-files-providers](./tasks/task-03-frontend-files-providers.md) — واجهة: وضع ملف + أزرار تصدير + اختيار المزوّد
 
 ### Wave 2
 - [ ] [task-04-integration-docs](./tasks/task-04-integration-docs.md) — npm test كامل + إصلاح + README/CHANGELOG + فحص يدوي

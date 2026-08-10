@@ -43,6 +43,7 @@
     <div class="mode-toggle" role="tablist" aria-label="اختر وضع الترجمة">
       <button type="button" class="mode-btn active" data-mode="url" role="tab" aria-selected="true">ترجمة رابط</button>
       <button type="button" class="mode-btn" data-mode="text" role="tab" aria-selected="false">ترجمة نص سريع</button>
+      <button type="button" class="mode-btn" data-mode="file" role="tab" aria-selected="false">📄 ترجمة ملف</button>
     </div>
 
     <!-- بطاقة الإدخال -->
@@ -56,6 +57,16 @@
       <div id="text-mode" class="field" hidden>
         <label class="field-label" for="text-input">النص المراد ترجمته</label>
         <textarea id="text-input" class="input textarea" rows="5" placeholder="اكتب أو الصق النص هنا…"></textarea>
+      </div>
+
+      <div id="file-mode" class="field" hidden>
+        <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="اضغط أو أسقط ملفاً هنا">
+          <input type="file" id="file-input" class="file-input" hidden
+                 accept=".txt,.md,.docx,.xlsx,.csv,.srt,.vtt,.json,.xml,.epub,.pptx">
+          <p id="drop-text" class="drop-text">📄 اسحب الملف هنا أو اضغط للاختيار</p>
+          <p id="file-meta" class="file-meta" hidden></p>
+        </div>
+        <p id="file-format-line" class="file-format-line" hidden></p>
       </div>
 
       <div class="lang-row">
@@ -134,6 +145,10 @@
       <p id="meta-line" class="meta-line"></p>
       <p id="source-notice" class="source-notice" hidden></p>
       <div id="result-body" class="result-body"></div>
+      <div id="export-row" class="export-row" hidden>
+        <span class="export-label">⬇️ تحميل النتيجة:</span>
+        <div id="export-buttons" class="export-buttons"></div>
+      </div>
     </section>
 
     <!-- عرض المشاركة: نص مترجم وصل عبر رابط #share=... -->
@@ -195,6 +210,37 @@
         <div class="field">
           <label class="field-label" for="settings-libre-url">عنوان خادم LibreTranslate (اختياري)</label>
           <input type="url" id="settings-libre-url" class="input" dir="ltr" placeholder="https://libretranslate.com" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="field-label" for="preferred-provider">المحرك المفضّل</label>
+          <select id="preferred-provider" class="input select" aria-label="اختر محرك الترجمة المفضّل">
+            <option value="">تلقائي (سلسلة الاحتياط)</option>
+          </select>
+          <small class="field-hint">يُرسل المزوّد المختار مع كل طلب ترجمة؛ «تلقائي» = سلسلة الاحتياط الحالية</small>
+        </div>
+        <div class="field">
+          <label class="field-label" for="settings-deepl-key">مفتاح DeepL API (اختياري)</label>
+          <input type="password" id="settings-deepl-key" class="input" dir="ltr" placeholder="أدخل مفتاح DeepL API" autocomplete="off" spellcheck="false">
+          <small class="field-hint">مفتاح مجاني اختياري — يمنح جودة ترجمة أعلى، ويظهر «مضبوط ✓» عند وجوده</small>
+        </div>
+        <div class="field">
+          <label class="field-label" for="settings-openai-key">مفتاح OpenAI API (اختياري)</label>
+          <input type="password" id="settings-openai-key" class="input" dir="ltr" placeholder="أدخل مفتاح OpenAI API" autocomplete="off" spellcheck="false">
+          <small class="field-hint">اختياري — للخدمات المتوافقة مثل OpenRouter/Groq</small>
+        </div>
+        <div class="field">
+          <label class="field-label" for="settings-openai-base-url">عنوان خادم متوافق OpenAI (اختياري)</label>
+          <input type="text" id="settings-openai-base-url" class="input" dir="ltr" placeholder="http://localhost:11434/v1" autocomplete="off" spellcheck="false">
+          <small class="field-hint">مثل Ollama أو LM Studio محليًا (بلا مفتاح)</small>
+        </div>
+        <div class="field">
+          <label class="field-label" for="settings-openai-model">اسم الموديل (اختياري)</label>
+          <input type="text" id="settings-openai-model" class="input" dir="ltr" placeholder="qwen2.5:7b" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="field-label" for="settings-provider-order">ترتيب سلسلة الاحتياط (اختياري)</label>
+          <input type="text" id="settings-provider-order" class="input" dir="ltr" placeholder="google,mymemory,libre,gemini" autocomplete="off" spellcheck="false">
+          <small class="field-hint">أولوية المزوّدين عند الفشل — مفصولة بفواصل</small>
         </div>
         <hr class="modal-sep">
         <h3 class="modal-subtitle">📖 مسرد المصطلحات</h3>

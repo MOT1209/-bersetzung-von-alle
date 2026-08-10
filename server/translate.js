@@ -159,21 +159,148 @@ async function translateViaGemini(text, targetLang) {
   return out.trim();
 }
 
-// ترتيب المحركات: Google (الأسرع) → MyMemory → Libre → Gemini (احتياطي المفتاح)
-const TRANSLATION_ENGINES = [
-  { name: 'google', run: translateViaGoogle },
-  { name: 'mymemory', run: translateViaMyMemory },
-  { name: 'libre', run: translateViaLibre },
-  { name: 'gemini', run: translateViaGemini },
-];
+// ===== سجل المزوّدين الموحّد =====
+// كل محرك ترجمة أصبح مزوّدًا بواجهة موحدة:
+// { id, label, requiresKey, isAvailable(), translate(text, targetLang, sourceLang) }
+// إضافة مزوّد جديد = استدعاء registerProvider() واحد فقط.
+const providers = [];      // المزوّدون المسجّلون بالترتيب
+const providerById = {};   // id → كائن المزوّد
+
+function registerProvider(p) {
+  providers.push(p);
+  providerById[p.id] = p;
+}
+function getProviders() { return providers.slice(); }
+function getProvider(id) { return providerById[id]; }
+// المزوّدات المتاحة فعلاً (isAvailable) — تُستخدم للسلسلة الافتراضية
+function getAvailableProviders() { return providers.filter((p) => p.isAvailable()); }
+
+// ترتيب السلسلة: فرض من الطلب (provider/providers) ثم PROVIDER_ORDER ثم الافتراضي.
+// المزوّدات غير المتوفرة تُتخطى تلقائيًا.
+function resolveProviders(opts) {
+  // opts: { provider?: string, providers?: string[] } (اختياري — من جسم الطلب)
+  if (opts && opts.provider) {
+    const p = getProvider(opts.provider);
+    return p && p.isAvailable() ? [p] : getAvailableProviders();
+  }
+  if (opts && Array.isArray(opts.providers) && opts.providers.length) {
+    const order = [];
+    for (const id of opts.providers) {
+      const p = getProvider(id);
+      if (p && p.isAvailable()) order.push(p);
+    }
+    return order.length ? order : getAvailableProviders();
+  }
+  const configured = (config.PROVIDER_ORDER || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (configured.length) {
+    const order = [];
+    for (const id of configured) {
+      const p = getProvider(id);
+      if (p && p.isAvailable()) order.push(p);
+    }
+    return order.length ? order : getAvailableProviders();
+  }
+  return getAvailableProviders();
+}
+
+// تسجيل المحركات الحالية كمزوّدين (الترتيب: Google الأسرع → MyMemory → Libre → Gemini)
+registerProvider({
+  id: 'google',
+  label: 'Google (مجاني)',
+  requiresKey: false,
+  isAvailable: () => true,
+  translate: translateViaGoogle,
+});
+registerProvider({
+  id: 'mymemory',
+  label: 'MyMemory (مجاني)',
+  requiresKey: false,
+  isAvailable: () => true,
+  translate: translateViaMyMemory,
+});
+registerProvider({
+  id: 'libre',
+  label: 'LibreTranslate (مجاني)',
+  requiresKey: false,
+  isAvailable: () => true,
+  translate: translateViaLibre,
+});
+registerProvider({
+  id: 'gemini',
+  label: 'Gemini (مفتاح مجاني)',
+  requiresKey: true,
+  isAvailable: () => Boolean(config.GEMINI_API_KEY),
+  translate: translateViaGemini,
+});
+
+// ===== المزوّد الجديد 1: DeepL (مجاني اختياري) =====
+// DeepL Free API: https://api-free.deepl.com/v2/translate — مفتاح مجاني اختياري
+registerProvider({
+  id: 'deepl',
+  label: 'DeepL (مجاني)',
+  requiresKey: true,
+  isAvailable: () => Boolean(config.DEEPL_API_KEY),
+  translate: async (text, targetLang, sourceLang) => {
+    const url = config.DEEPL_URL + '/v2/translate';
+    const body = { text: [text], target_lang: targetLang.toUpperCase() };
+    if (sourceLang && sourceLang !== 'auto') body.source_lang = sourceLang.toUpperCase();
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `DeepL-Auth-Key ${config.DEEPL_API_KEY}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) throw new Error(`DeepL HTTP ${res.status}`);
+    const data = await res.json();
+    const out = data?.translations?.[0]?.text;
+    if (!out) throw new Error('DeepL: استجابة فارغة');
+    return out;
+  },
+});
+
+// ===== المزوّد الجديد 2: متوافق OpenAI (محلي مجاني — Ollama / LM Studio) =====
+// يغطي أي خادم chat/completions: Ollama (http://localhost:11434/v1)،
+// LM Studio (http://localhost:1234/v1)، OpenRouter، Groq… مجاني أو بمفتاح مجاني.
+registerProvider({
+  id: 'openai',
+  label: 'AI محلي/متوافق OpenAI',
+  requiresKey: false,
+  isAvailable: () => Boolean(config.OPENAI_BASE_URL),
+  translate: async (text, targetLang, sourceLang) => {
+    const url = config.OPENAI_BASE_URL.replace(/\/+$/, '') + '/chat/completions';
+    const headers = { 'Content-Type': 'application/json' };
+    if (config.OPENAI_API_KEY) headers.Authorization = `Bearer ${config.OPENAI_API_KEY}`;
+    const prompt = `Translate the following text to ${targetLang}. Return only the translation, no explanations:\n\n${text}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      signal: AbortSignal.timeout(30000),
+      body: JSON.stringify({
+        model: config.OPENAI_MODEL || 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+      }),
+    });
+    if (!res.ok) throw new Error(`OpenAI-compatible HTTP ${res.status}`);
+    const data = await res.json();
+    const out = data?.choices?.[0]?.message?.content;
+    if (!out) throw new Error('OpenAI-compatible: استجابة فارغة');
+    return out.trim();
+  },
+});
 
 // ===== الترجمة مع محاولات وتقسيم =====
-async function translateText(text, targetLang, sourceLang) {
-  return (await translateTextWithMeta(text, targetLang, sourceLang)).translated;
+// opts اختياري: { provider?: string, providers?: string[] } — فرض مزوّد/ترتيب معين
+async function translateText(text, targetLang, sourceLang, opts) {
+  return (await translateTextWithMeta(text, targetLang, sourceLang, opts)).translated;
 }
 
 // مثل translateText لكن مع إحصائيات الكاش — تُرجع { translated, chunksFromCache, chunksTotal }
-async function translateTextWithMeta(text, targetLang, sourceLang) {
+// opts اختياري ويُمرَّر إلى resolveProviders لتحديد سلسلة المزوّدين
+async function translateTextWithMeta(text, targetLang, sourceLang, opts) {
   if (!text || !text.trim()) return { translated: '', chunksFromCache: 0, chunksTotal: 0 };
 
   const chunks = chunkText(text);
@@ -192,20 +319,20 @@ async function translateTextWithMeta(text, targetLang, sourceLang) {
 
     let out = null;
     let lastErr = null;
-    // جرّب المحركات بالترتيب مرة واحدة لكل منها: Google → MyMemory → Libre → Gemini
-    // المحركات المجمّدة (3 إخفاقات متتالية خلال 60 ثانية) تُتخطى مؤقتًا
-    for (const engine of TRANSLATION_ENGINES) {
-      if (engineOnCooldown(engine.name)) continue;
+    // جرّب المزوّدين بالترتيب (resolveProviders: فرض الطلب أو PROVIDER_ORDER أو الافتراضي)
+    // المزوّدون المجمّدون (3 إخفاقات متتالية خلال 60 ثانية) يُتخطون مؤقتًا
+    for (const engine of resolveProviders(opts)) {
+      if (engineOnCooldown(engine.id)) continue;
       try {
-        out = await engine.run(chunk, targetLang, sourceLang);
-        engineSucceeded(engine.name);
+        out = await engine.translate(chunk, targetLang, sourceLang);
+        engineSucceeded(engine.id);
         break;
       } catch (e) {
         lastErr = e;
-        engineFailed(engine.name);
+        engineFailed(engine.id);
         // سجّل الفشل (غير متزامن — لا يؤخر الاستجابة)
-        logError('engine:' + engine.name, e.message || e);
-        // فاصل قصير بين المحركات لتجنّب حجب سريع
+        logError('engine:' + engine.id, e.message || e);
+        // فاصل قصير بين المزوّدين لتجنّب حجب سريع
         await new Promise((r) => setTimeout(r, 300));
       }
     }
@@ -299,4 +426,17 @@ function applyGlossary(text, glossary) {
   return out.replace(/\u0000L(\d+)\u0000/g, (m, i) => links[Number(i)] || m);
 }
 
-module.exports = { translateText, translateTextWithMeta, detectLanguage, chunkText, isUntranslatable, applyGlossary };
+module.exports = {
+  translateText,
+  translateTextWithMeta,
+  detectLanguage,
+  chunkText,
+  isUntranslatable,
+  applyGlossary,
+  // ===== سجل المزوّدين =====
+  registerProvider,
+  getProviders,
+  getProvider,
+  getAvailableProviders,
+  resolveProviders,
+};

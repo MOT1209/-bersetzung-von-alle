@@ -11,6 +11,14 @@ const retryBtn = document.getElementById('retry-btn');
 const modeBtns = document.querySelectorAll('.mode-btn');
 const urlModeEl = document.getElementById('url-mode');
 const textModeEl = document.getElementById('text-mode');
+const fileModeEl = document.getElementById('file-mode');
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const dropText = document.getElementById('drop-text');
+const fileMeta = document.getElementById('file-meta');
+const fileFormatLine = document.getElementById('file-format-line');
+const exportRow = document.getElementById('export-row');
+const preferredProvider = document.getElementById('preferred-provider');
 const progress = document.getElementById('progress');
 const progressLabel = document.getElementById('progress-label');
 const result = document.getElementById('result');
@@ -48,6 +56,11 @@ const settingsForm = document.getElementById('settings-form');
 const settingsGeminiKey = document.getElementById('settings-gemini-key');
 const settingsMyMemoryEmail = document.getElementById('settings-mymemory-email');
 const settingsLibreUrl = document.getElementById('settings-libre-url');
+const settingsDeeplKey = document.getElementById('settings-deepl-key');
+const settingsOpenaiKey = document.getElementById('settings-openai-key');
+const settingsOpenaiBaseUrl = document.getElementById('settings-openai-base-url');
+const settingsOpenaiModel = document.getElementById('settings-openai-model');
+const settingsProviderOrder = document.getElementById('settings-provider-order');
 const settingsCancelBtn = document.getElementById('settings-cancel-btn');
 const settingsCloseBtn = document.getElementById('settings-close-btn');
 const glossaryListEl = document.getElementById('glossary-list');
@@ -66,12 +79,14 @@ const batchResults = document.getElementById('batch-results');
 
 /* ---------- الحالة (آلة الحالات: idle → fetching → translating → done | error) ---------- */
 const state = {
-  mode: 'url',            // 'url' | 'text'
+  mode: 'url',            // 'url' | 'text' | 'file'
   running: false,         // حارس ضد الضغط المزدوج
   current: null,          // آخر نتيجة معروضة
   activeTab: 'translated',// 'translated' | 'original'
   compare: false,         // وضع المقارنة جنبًا إلى جنب
-  batchRunning: false     // حارس ترجمة الدفعات
+  batchRunning: false,    // حارس ترجمة الدفعات
+  file: null,             // { name, ext, base64 } — الملف المختار في وضع الملف
+  resultForExport: null   // آخر نتيجة ترجمة ملف (لأزرار التصدير)
 };
 
 /* ---------- أسماء اللغات (الرمز → الاسم العربي) ---------- */
@@ -113,7 +128,10 @@ const ERROR_MESSAGES = {
   'server-error': 'حدث خطأ غير متوقع',
   'tts-failed': 'تعذر توليد الصوت — حاول مجددًا بعد قليل',
   'text-too-long': 'النص طويل جدًا للقراءة الصوتية',
-  'video-download-failed': 'تعذر تنزيل الفيديو — جرّب العرض المضمّن بدلاً منه'
+  'video-download-failed': 'تعذر تنزيل الفيديو — جرّب العرض المضمّن بدلاً منه',
+  'invalid-format': 'صيغة الملف غير مدعومة',
+  'invalid-file': 'تعذر قراءة الملف — قد يكون تالفًا أو كبيرًا جدًا',
+  'invalid-export': 'تعذر تصدير النتيجة بهذه الصيغة'
 };
 
 /* ---------- خريطة الخطأ ---------- */
@@ -137,6 +155,23 @@ const HISTORY_KEY = 'aralink-history';
 const GLOSSARY_KEY = 'aralink-glossary';
 const HISTORY_MAX = 20;
 const TYPE_NAMES = { text: 'نص', youtube: 'يوتيوب', article: 'مقال' };
+
+/* ---------- وضع الملف: أسماء الصيغ المدعومة + صيغ التصدير ---------- */
+const FILE_FORMAT_NAMES = {
+  txt: 'نص TXT', md: 'ماركداون MD', docx: 'مستند Word DOCX', xlsx: 'جدول Excel XLSX',
+  csv: 'CSV', srt: 'ترجمات SRT', vtt: 'ترجمات VTT', json: 'JSON', xml: 'XML',
+  epub: 'كتاب EPUB', pptx: 'عرض PowerPoint PPTX'
+};
+const EXPORT_FORMATS = [
+  { fmt: 'txt', label: 'TXT' },
+  { fmt: 'md', label: 'MD' },
+  { fmt: 'docx', label: 'DOCX' },
+  { fmt: 'srt', label: 'SRT' },
+  { fmt: 'vtt', label: 'VTT' },
+  { fmt: 'json', label: 'JSON' },
+  { fmt: 'csv', label: 'CSV' },
+  { fmt: 'xml', label: 'XML' }
+];
 
 function safeGet(key) {
   try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -499,17 +534,49 @@ function toggleTheme() {
 /* ---------- نافذة الإعدادات (GET/POST /api/settings) ---------- */
 let settingsLoaded = false; // هل نجح جلب الإعدادات الحالية؟ (يقرر ما إذا كان إرسال حقل فارغ يعني مسحه)
 
+/* ---------- قائمة المزوّدين المتاحين (GET /api/providers) ---------- */
+async function loadProviders() {
+  try {
+    const res = await fetch('/api/providers', { signal: AbortSignal.timeout(10000) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || !Array.isArray(data.providers)) return;
+    const cur = preferredProvider.value || safeGet('preferredProvider') || '';
+    preferredProvider.innerHTML = '<option value="">تلقائي (سلسلة الاحتياط)</option>';
+    for (const p of data.providers) {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      const stateTxt = p.available ? '✓ متاح' : 'يتطلب مفتاحاً';
+      opt.textContent = p.label + ' — ' + stateTxt;
+      preferredProvider.appendChild(opt);
+    }
+    // استعادة اختيار المستخدم المحفوظ إن ما يزال موجودًا
+    if (cur && Array.from(preferredProvider.options).some((o) => o.value === cur)) {
+      preferredProvider.value = cur;
+    }
+  } catch (e) {
+    /* الخادم غير متاح — تبقى القائمة الافتراضية */
+  }
+}
+
 async function openSettings() {
   // إعادة تعيين الحقول عند كل فتح
   settingsGeminiKey.value = '';
   settingsMyMemoryEmail.value = '';
   settingsLibreUrl.value = '';
+  settingsDeeplKey.value = '';
+  settingsOpenaiKey.value = '';
+  settingsOpenaiBaseUrl.value = '';
+  settingsOpenaiModel.value = '';
+  settingsProviderOrder.value = '';
   settingsGeminiKey.placeholder = 'أدخل مفتاح Gemini API';
+  settingsDeeplKey.placeholder = 'أدخل مفتاح DeepL API';
+  settingsOpenaiKey.placeholder = 'أدخل مفتاح OpenAI API';
   settingsLoaded = false;
 
   settingsModal.hidden = false;
   renderGlossaryList();
   loadRules().then(renderRules);
+  loadProviders();
   try {
     const res = await fetch('/api/settings', { signal: AbortSignal.timeout(10000) });
     const data = await res.json().catch(() => null);
@@ -518,6 +585,11 @@ async function openSettings() {
       settingsGeminiKey.placeholder = data.hasGeminiKey ? 'مضبوط ✓' : 'أدخل مفتاح Gemini API';
       settingsMyMemoryEmail.value = data.myMemoryEmail || '';
       settingsLibreUrl.value = data.libreUrl || '';
+      settingsDeeplKey.placeholder = data.hasDeeplKey ? 'مضبوط ✓' : 'أدخل مفتاح DeepL API';
+      settingsOpenaiKey.placeholder = data.hasOpenaiKey ? 'مضبوط ✓' : 'أدخل مفتاح OpenAI API';
+      settingsOpenaiBaseUrl.value = data.openaiBaseUrl || '';
+      settingsOpenaiModel.value = data.openaiModel || '';
+      settingsProviderOrder.value = data.providerOrder || '';
     }
   } catch (e) {
     /* الخادم غير متاح (أو الإعدادات غير مفعّلة) — تبقى الحقول فارغة، الحفظ سيُحاول مجددًا */
@@ -532,15 +604,34 @@ function closeSettings() {
 async function saveSettings(e) {
   e.preventDefault();
   const payload = {};
-  if (settingsGeminiKey.value.trim()) payload.geminiKey = settingsGeminiKey.value.trim();
+  // ملاحظة: الخادم يقبل أسماء المفاتيح الكبيرة فقط (GEMINI_API_KEY …) —
+  // كانت الواجهة ترسل camelCase سابقًا فكان الحفظ يُتجاهل صامتًا.
+  if (settingsGeminiKey.value.trim()) payload.GEMINI_API_KEY = settingsGeminiKey.value.trim();
 
   // الحقول غير الأساسية: تُرسل فقط لو كتب المستخدم قيمة، أو لو حمّلنا الإعدادات الحالية (حتى يمكن مسحها)
   if (settingsLoaded) {
-    payload.myMemoryEmail = settingsMyMemoryEmail.value.trim();
-    payload.libreUrl = settingsLibreUrl.value.trim();
+    payload.MYMEMORY_EMAIL = settingsMyMemoryEmail.value.trim();
+    payload.LIBRE_URL = settingsLibreUrl.value.trim();
   } else {
-    if (settingsMyMemoryEmail.value.trim()) payload.myMemoryEmail = settingsMyMemoryEmail.value.trim();
-    if (settingsLibreUrl.value.trim()) payload.libreUrl = settingsLibreUrl.value.trim();
+    if (settingsMyMemoryEmail.value.trim()) payload.MYMEMORY_EMAIL = settingsMyMemoryEmail.value.trim();
+    if (settingsLibreUrl.value.trim()) payload.LIBRE_URL = settingsLibreUrl.value.trim();
+  }
+
+  // المزوّد المفضّل: يُحفظ محليًا في المتصفح ويُرسل مع كل طلب ترجمة
+  if (preferredProvider.value) safeSet('preferredProvider', preferredProvider.value);
+  else safeRemove('preferredProvider');
+
+  // حقول المزوّدين الجديدة (DeepL / OpenAI / ترتيب الاحتياط) — بأسماء المفاتيح الكبيرة
+  if (settingsDeeplKey.value.trim()) payload.DEEPL_API_KEY = settingsDeeplKey.value.trim();
+  if (settingsOpenaiKey.value.trim()) payload.OPENAI_API_KEY = settingsOpenaiKey.value.trim();
+  if (settingsLoaded) {
+    payload.OPENAI_BASE_URL = settingsOpenaiBaseUrl.value.trim();
+    payload.OPENAI_MODEL = settingsOpenaiModel.value.trim();
+    payload.PROVIDER_ORDER = settingsProviderOrder.value.trim();
+  } else {
+    if (settingsOpenaiBaseUrl.value.trim()) payload.OPENAI_BASE_URL = settingsOpenaiBaseUrl.value.trim();
+    if (settingsOpenaiModel.value.trim()) payload.OPENAI_MODEL = settingsOpenaiModel.value.trim();
+    if (settingsProviderOrder.value.trim()) payload.PROVIDER_ORDER = settingsProviderOrder.value.trim();
   }
 
   const saveBtn = document.getElementById('settings-save-btn');
@@ -607,8 +698,11 @@ async function runTranslate() {
   shareView.hidden = true;
 
   const target = targetLang.value;
-  let payload;
   const glossary = getGlossary();
+  const provider = safeGet('preferredProvider') || undefined; // المزوّد المفضّل (إن وُجد)
+
+  let payload;
+  let endpoint;
 
   if (state.mode === 'url') {
     const url = urlInput.value.trim();
@@ -616,14 +710,29 @@ async function runTranslate() {
       showError('invalid-url', 400);
       return;
     }
-    payload = { url, targetLang: target, glossary };
-  } else {
+    payload = { url, targetLang: target, glossary, provider };
+    endpoint = '/api/translate';
+  } else if (state.mode === 'text') {
     const text = textInput.value.trim();
     if (!text) {
       showError('invalid-text', 400);
       return;
     }
-    payload = { text, targetLang: target, glossary };
+    payload = { text, targetLang: target, glossary, provider };
+    endpoint = '/api/translate-text';
+  } else {
+    // وضع الملف: يجب اختيار ملف وقراءته أولاً (base64)
+    if (!state.file || !state.file.base64) {
+      showToast('اختر ملفاً أولاً');
+      return;
+    }
+    payload = {
+      format: state.file.ext,
+      content: state.file.base64,
+      targetLang: target,
+      provider
+    };
+    endpoint = '/api/translate-file';
   }
 
   // تشغيل آلة الحالات
@@ -632,6 +741,11 @@ async function runTranslate() {
 
   if (state.mode === 'text') {
     showProgress('جاري الترجمة…');
+  } else if (state.mode === 'file') {
+    showProgress('جاري فتح الملف…');
+    setTimeout(() => {
+      if (state.running) showProgress('جاري الترجمة…');
+    }, 2500);
   } else {
     showProgress('جاري جلب المحتوى…');
     // بعد قليل انتقل إلى مرحلة الترجمة (الخادم يجلب ثم يترجم في طلب واحد)
@@ -645,15 +759,10 @@ async function runTranslate() {
   }
 
   try {
-    const endpoint = state.mode === 'url' ? '/api/translate' : '/api/translate-text';
     const { status, data } = await postJson(endpoint, payload);
 
     if (data && data.error) {
       showError(data.error, status);
-      return;
-    }
-    if (!data || !data.type) {
-      showError('server-error', 500);
       return;
     }
 
@@ -662,10 +771,21 @@ async function runTranslate() {
     state.current = data;
     state.activeTab = 'translated';
 
-    // حفظ الترجمة الناجحة في السجل (آخر 20)
-    saveToHistory(data, target);
-
-    renderResult(data);
+    if (state.mode === 'file') {
+      if (!data || !data.translated) {
+        showError('server-error', 500);
+        return;
+      }
+      renderFileResult(data);
+    } else {
+      if (!data || !data.type) {
+        showError('server-error', 500);
+        return;
+      }
+      // حفظ الترجمة الناجحة في السجل (آخر 20)
+      saveToHistory(data, target);
+      renderResult(data);
+    }
   } catch (e) {
     showError('server-error', 500);
   } finally {
@@ -680,6 +800,7 @@ function renderResult(data) {
   // عنوان / ملخص
   metaTitle.textContent = (data.meta && data.meta.title) ? data.meta.title : '';
   cacheBadge.hidden = !(data.meta && data.meta.cached === true);
+  exportRow.hidden = true; // أزرار التصدير تظهر في وضع الملف فقط
   metaLine.textContent = 'تمت الترجمة من ' + langName(data.sourceLang) + ' إلى ' + langName(targetLang.value);
 
   // مشغل يوتيوب + شريط الترجمة المتزامن
@@ -722,6 +843,7 @@ function renderResult(data) {
   // التبويبات
   tabs.forEach((t) => {
     const active = t.dataset.tab === 'translated';
+    t.hidden = false; // إظهار تبويب «النص الأصلي» (يُخفى في وضع الملف فقط)
     t.classList.toggle('active', active);
     t.setAttribute('aria-selected', String(active));
   });
@@ -811,6 +933,193 @@ function renderBlocks(blocks) {
 /* ---------- عرض نص عادي (فقرات) ---------- */
 function renderParagraphs(text) {
   appendParagraphs(resultBody, text);
+}
+
+/* ---------- وضع الملف: اختيار/إفلات + ترجمة + تصدير ---------- */
+function formatSize(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return bytes + ' بايت';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' كيلوبايت';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' ميغابايت';
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!FILE_FORMAT_NAMES[ext]) {
+    showToast('صيغة الملف غير مدعومة');
+    return;
+  }
+  state.file = { name: file.name, ext, base64: '' };
+  // قراءة الملف كـ base64 (DataURL → الجزء بعد الفاصلة)
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.file.base64 = String(reader.result).split(',')[1] || '';
+    fileMeta.textContent = file.name + ' (' + formatSize(file.size) + ')';
+    fileMeta.hidden = false;
+    fileFormatLine.textContent = 'الصيغة المكتشفة: ' + FILE_FORMAT_NAMES[ext];
+    fileFormatLine.hidden = false;
+    dropText.hidden = true;
+  };
+  reader.onerror = () => showToast('تعذر قراءة الملف');
+  reader.readAsDataURL(file);
+}
+
+function setupFileMode() {
+  // نقر على منطقة الإفلات يفتح اختيار الملف (ودعم لوحة المفاتيح: Enter/Space)
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+  // سحب/إفلات: تمييز بصري أثناء السحب + استقبال الملف عند الإفلات
+  ['dragenter', 'dragover'].forEach((ev) => {
+    dropZone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach((ev) => {
+    dropZone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+    });
+  });
+  dropZone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (f) handleFile(f);
+    fileInput.value = ''; // يتيح إعادة اختيار الملف نفسه مرة أخرى
+  });
+}
+
+/* ---------- عرض نتيجة ترجمة ملف + صف أزرار التصدير ---------- */
+function renderFileResult(data) {
+  // وضع الملف لا يعيد «نصًا أصليًا» منفصلًا — نخفي تبويبه
+  const origTab = document.querySelector('.tab[data-tab="original"]');
+  if (origTab) origTab.hidden = true;
+
+  // العنوان والملخص
+  const fname = (state.file && state.file.name) ? state.file.name : '';
+  metaTitle.textContent = fname ? ('📄 ' + fname) : 'الملف المترجم';
+  cacheBadge.hidden = !(data.stats && data.stats.fromCache === true);
+  const fmtName = (state.file && FILE_FORMAT_NAMES[state.file.ext]) || String(data.format || '').toUpperCase();
+  let line = 'تمت ترجمة الملف' + (fmtName ? ' (' + fmtName + ')' : '') + ' إلى ' + langName(targetLang.value);
+  if (data.stats && data.stats.items) line += ' · ' + data.stats.items + ' قطعة';
+  metaLine.textContent = line;
+  sourceNotice.hidden = true;
+
+  // أزرار: وضع الملف لا يملك فيديو/مقارنة/استماع، ويحتفظ بالنسخ والمشاركة
+  srtBtn.hidden = true;
+  localBtn.hidden = true;
+  listenBtn.hidden = true;
+  compareBtn.hidden = true;
+  state.compare = false;
+  compareBtn.classList.remove('active');
+  copyBtn.hidden = false;
+  shareBtn.hidden = false;
+
+  // التبويبات: الترجمة نشطة
+  tabs.forEach((t) => {
+    const active = t.dataset.tab === 'translated';
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', String(active));
+  });
+  state.activeTab = 'translated';
+
+  // المحتوى: مقاطع مترجمة (SRT/VTT) بتوقيتاتها، أو نص عادي
+  resultBody.innerHTML = '';
+  if (Array.isArray(data.segments) && data.segments.length) {
+    for (const seg of data.segments) {
+      const row = document.createElement('div');
+      row.className = 'cap';
+      const time = document.createElement('span');
+      time.className = 'cap-time';
+      time.textContent = '[' + formatTime(seg.start || 0) + ']';
+      const text = document.createElement('span');
+      text.className = 'cap-text';
+      text.textContent = seg.text || '';
+      row.appendChild(time);
+      row.appendChild(text);
+      resultBody.appendChild(row);
+    }
+  } else {
+    renderParagraphs(String(data.translated || ''));
+  }
+
+  // تخزين النتيجة لأزرار التصدير + بناء الأزرار المناسبة
+  state.resultForExport = data;
+  renderExportRow(data);
+
+  result.hidden = false;
+  result.classList.remove('reveal');
+  void result.offsetWidth; // إعادة تشغيل حركة الظهور
+  result.classList.add('reveal');
+  result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function renderExportRow(data) {
+  const buttons = document.getElementById('export-buttons');
+  buttons.innerHTML = '';
+  const hasSegs = Array.isArray(data.segments) && data.segments.length > 0;
+  const hasStruct = !!data.structure;
+  for (const f of EXPORT_FORMATS) {
+    // SRT/VTT فقط عند وجود مقاطع؛ JSON/XML فقط عند وجود بنية
+    if ((f.fmt === 'srt' || f.fmt === 'vtt') && !hasSegs) continue;
+    if ((f.fmt === 'json' || f.fmt === 'xml') && !hasStruct) continue;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn-action';
+    b.textContent = f.label;
+    b.setAttribute('aria-label', 'تنزيل النتيجة بصيغة ' + f.label);
+    b.addEventListener('click', () => exportResult(f.fmt));
+    buttons.appendChild(b);
+  }
+  exportRow.hidden = buttons.childElementCount === 0;
+}
+
+/* ---------- تصدير النتيجة (POST /api/export → تنزيل ملف) ---------- */
+async function exportResult(fmt) {
+  const r = state.resultForExport;
+  if (!r || !r.translated) return;
+  const body = { format: fmt };
+  if (r.segments && (fmt === 'srt' || fmt === 'vtt')) body.segments = r.segments;
+  else if (r.structure && (fmt === 'json' || fmt === 'xml')) body.structure = r.structure;
+  else body.text = r.translated;
+  // اسم الملف: اسم المصدر (بدون الامتداد) + الصيغة الجديدة
+  let base = 'translated';
+  if (state.file && state.file.name) {
+    base = state.file.name.replace(/\.[^.]+$/, '') || 'translated';
+  }
+  body.filename = base + '.' + fmt;
+  try {
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60000)
+    });
+    if (!res.ok) {
+      showToast('تعذر تصدير الملف — حاول مجددًا');
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = body.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    showToast('تم تنزيل الملف ✓');
+  } catch (e) {
+    showToast('تعذر تصدير الملف — تحقق من اتصال الخادم');
+  }
 }
 
 /* ---------- أدوات الوقت وSRT ---------- */
@@ -1158,6 +1467,7 @@ async function runBatch() {
   batchResults.innerHTML = '';
   const target = targetLang.value;
   const glossary = getGlossary();
+  const provider = safeGet('preferredProvider') || undefined;
 
   for (let i = 0; i < lines.length; i++) {
     batchStatus.textContent = 'جاري الترجمة (' + (i + 1) + '/' + lines.length + '): ' + lines[i];
@@ -1176,7 +1486,7 @@ async function runBatch() {
     batchResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     try {
-      const { status, data } = await postJson('/api/translate', { url: lines[i], targetLang: target, glossary });
+      const { status, data } = await postJson('/api/translate', { url: lines[i], targetLang: target, glossary, provider });
       if (data && data.error) {
         bodyEl.textContent = '❌ ' + mapError(data.error, status);
         bodyEl.classList.add('batch-err');
@@ -1449,6 +1759,7 @@ modeBtns.forEach((btn) => {
     });
     urlModeEl.hidden = state.mode !== 'url';
     textModeEl.hidden = state.mode !== 'text';
+    fileModeEl.hidden = state.mode !== 'file';
     smartBtn.hidden = state.mode !== 'text'; // الترجمة الذكية لنص سريع فقط
     // إخفاء النتائج والأخطاء عند تغيير الوضع
     result.hidden = true;
@@ -1463,6 +1774,8 @@ modeBtns.forEach((btn) => {
     shareView.hidden = true;
     sourceNotice.hidden = true;
     cacheBadge.hidden = true;
+    exportRow.hidden = true;
+    state.resultForExport = null;
     stopCaptionSync();
     capBar.hidden = true;
     capBar.textContent = '';
@@ -1512,6 +1825,9 @@ document.addEventListener('keydown', (e) => {
 
 // تحميل قائمة اللغات الكاملة عند فتح الصفحة
 loadLanguages();
+
+// تهيئة وضع الملف (سحب/إفلات + اختيار ملف)
+setupFileMode();
 
 // عرض سجل الترجمات + معالجة رابط المشاركة (#share=…) عند فتح الصفحة
 renderHistory();

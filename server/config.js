@@ -13,6 +13,18 @@ module.exports = {
   // محركات الترجمة الاحتياطية المجانية (تُستخدم عند حجب Google أو استنفاد حصته)
   LIBRE_URL: process.env.LIBRE_URL || 'https://libretranslate.com', // خادم LibreTranslate (اختياري)
   MYMEMORY_EMAIL: process.env.MYMEMORY_EMAIL || '', // بريد اختياري يرفع حصة MyMemory اليومية
+
+  // ===== مزوّدات ترجمة اختيارية (مجانية) =====
+  // DeepL المجاني — مفتاح اختياري من deeple.com/pro-api (مجاني)؛ الخادم الافتراضي api-free
+  DEEPL_API_KEY: process.env.DEEPL_API_KEY || '',
+  DEEPL_URL: process.env.DEEPL_URL || 'https://api-free.deepl.com',
+  // أي خادم متوافق مع OpenAI (Ollama محلي مجاني: http://localhost:11434/v1 —
+  // LM Studio: http://localhost:1234/v1 — أو OpenRouter/Groq بمفتاح مجاني)
+  OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || '', // مثال: http://localhost:11434/v1
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  OPENAI_MODEL: process.env.OPENAI_MODEL || '',
+  // ترتيب المزوّدين المفضّل (فاصلة) — تُتخطى المزوّدات غير المتوفرة تلقائيًا
+  PROVIDER_ORDER: process.env.PROVIDER_ORDER || '', // مثل: 'google,mymemory,libre,gemini'
   WHISPER_MODEL: process.env.WHISPER_MODEL || 'Xenova/whisper-tiny', // whisper-tiny: سريع؛ whisper-base أدق لكنه أبطأ بكثير
 
   // محرك التفريغ الصوتي: 'sherpa' (أسرع بكثير، sherpa-onnx) أو 'transformers' (الاحتياطي Xenova)

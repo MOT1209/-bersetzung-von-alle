@@ -12,7 +12,17 @@ function getEnvFilePath() {
 }
 
 // المفاتيح المسموح بعرضها/حفظها من الإعدادات
-const SETTING_KEYS = ['GEMINI_API_KEY', 'MYMEMORY_EMAIL', 'LIBRE_URL'];
+const SETTING_KEYS = [
+  'GEMINI_API_KEY',
+  'MYMEMORY_EMAIL',
+  'LIBRE_URL',
+  // ===== المزوّدات الاختيارية (مجانية) =====
+  'DEEPL_API_KEY',
+  'OPENAI_API_KEY',
+  'OPENAI_BASE_URL',
+  'OPENAI_MODEL',
+  'PROVIDER_ORDER',
+];
 
 // ===== قراءة ملف .env: يعيد المحتوى الخام + خريطة المفاتيح =====
 async function readEnvFile() {
@@ -40,6 +50,8 @@ function maskKey(key) {
 async function getSettings() {
   const { map } = await readEnvFile();
   const gemini = map.GEMINI_API_KEY || '';
+  const deepl = map.DEEPL_API_KEY || '';
+  const openaiKey = map.OPENAI_API_KEY || '';
   return {
     geminiKey: gemini ? maskKey(gemini) : '',
     hasGeminiKey: Boolean(gemini),
@@ -47,6 +59,14 @@ async function getSettings() {
     libreUrl: map.LIBRE_URL || 'https://libretranslate.com',
     geminiModel: map.GEMINI_MODEL || config.GEMINI_MODEL || '',
     rateLimitMax: Number(map.RATE_LIMIT_MAX) || config.RATE_LIMIT_MAX,
+    // ===== المزوّدات الاختيارية (المفاتيح مقنّعة) =====
+    deeplKey: deepl ? maskKey(deepl) : '',
+    hasDeeplKey: Boolean(deepl),
+    openaiKey: openaiKey ? maskKey(openaiKey) : '',
+    hasOpenaiKey: Boolean(openaiKey),
+    openaiBaseUrl: map.OPENAI_BASE_URL || '',
+    openaiModel: map.OPENAI_MODEL || '',
+    providerOrder: map.PROVIDER_ORDER || '',
   };
 }
 
@@ -85,6 +105,18 @@ async function saveSettings(body) {
       err.code = 'invalid-settings';
       throw err;
     }
+    // تحقق من صيغة عنوان خادم OpenAI المتوافق (Ollama / LM Studio…)
+    if (key === 'OPENAI_BASE_URL' && !/^https?:\/\//i.test(value)) {
+      const err = new Error('invalid-settings');
+      err.code = 'invalid-settings';
+      throw err;
+    }
+    // ترتيب المزوّدين: حروف/أرقام/فواصل/شرطات فقط (لا رموز ولا مسافات)
+    if (key === 'PROVIDER_ORDER' && !/^[a-z0-9_,-]+$/i.test(value)) {
+      const err = new Error('invalid-settings');
+      err.code = 'invalid-settings';
+      throw err;
+    }
     allowed[key] = value;
   }
 
@@ -102,6 +134,12 @@ async function saveSettings(body) {
     if (key === 'GEMINI_API_KEY') config.GEMINI_API_KEY = value;
     if (key === 'MYMEMORY_EMAIL') config.MYMEMORY_EMAIL = value;
     if (key === 'LIBRE_URL') config.LIBRE_URL = value;
+    // ===== المزوّدات الاختيارية — تطبيق فوري على config =====
+    if (key === 'DEEPL_API_KEY') config.DEEPL_API_KEY = value;
+    if (key === 'OPENAI_API_KEY') config.OPENAI_API_KEY = value;
+    if (key === 'OPENAI_BASE_URL') config.OPENAI_BASE_URL = value;
+    if (key === 'OPENAI_MODEL') config.OPENAI_MODEL = value;
+    if (key === 'PROVIDER_ORDER') config.PROVIDER_ORDER = value;
   }
 
   return { ok: true };

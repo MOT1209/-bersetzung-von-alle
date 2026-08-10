@@ -1,8 +1,10 @@
 # Task 01: سجل المزوّدين الموحّد (Provider Registry)
 
+
 ## Status
 
-pending
+complete
+
 
 ## Wave
 

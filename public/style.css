@@ -26,6 +26,9 @@
   --shadow-card: 0 12px 40px rgba(0, 0, 0, .35);
   --shadow-lift: 0 8px 24px rgba(99, 102, 241, .35);
   --font: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+  /* أسماء مستعارة يستخدمها كود سابق (دفعات/لوحة الترجمة) — تُحل من المتغيرات الموثقة */
+  --card-bg: var(--bg-card);
+  --text-dim: var(--text-muted);
   color-scheme: dark;
 }
 
@@ -1087,4 +1090,79 @@ body {
   .cap-bar { font-size: .82rem; padding: 8px 10px; }
   .glossary-form, .batch-body { grid-template-columns: 1fr; }
   .input-url, .input, .textarea { font-size: 15px; } /* يمنع تكبير iOS تلقائيًا */
+}
+
+/* ===== وضع الملف: منطقة الإفلات + سطر الصيغة + صف التصدير ===== */
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 34px 20px;
+  border: 2px dashed var(--primary);
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, .06);
+  cursor: pointer;
+  text-align: center;
+  transition: background .18s ease, border-color .18s ease;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+  background: rgba(99, 102, 241, .12);
+  border-color: var(--accent);
+}
+
+.drop-zone:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.drop-text {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.file-meta {
+  margin: 0;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--accent);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.file-format-line {
+  margin: 2px 0 0;
+  font-size: .82rem;
+  color: var(--text-muted);
+}
+
+.export-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.export-label {
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.export-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.export-buttons .btn-action {
+  font-size: .8rem;
+  padding: 6px 14px;
 }

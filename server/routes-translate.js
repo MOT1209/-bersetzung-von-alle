@@ -1,8 +1,9 @@
 // server/routes-translate.js — مسارات API للترجمة
 const express = require('express');
+const config = require('./config');
 const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript, buildSrt } = require('./youtube');
-const { translateText, translateTextWithMeta, detectLanguage, applyGlossary } = require('./translate');
+const { translateText, translateTextWithMeta, detectLanguage, applyGlossary, getProviders } = require('./translate');
 const { transcribeVideoAudio } = require('./audio');
 const { trackUsage, getUsage } = require('./usage'); // عدّاد استخدام بسيط
 const { logInfo } = require('./logger');
@@ -35,10 +36,21 @@ function sendError(res, e) {
   return res.status(status).json({ error: code });
 }
 
+// ===== GET /api/providers — قائمة المزوّدين وحالتهم (للواجهة) =====
+router.get('/providers', (req, res) => {
+  const list = getProviders().map((p) => ({
+    id: p.id,
+    label: p.label,
+    requiresKey: p.requiresKey,
+    available: p.isAvailable(),
+  }));
+  res.json({ providers: list, defaultOrder: (config.PROVIDER_ORDER || '').split(',').filter(Boolean) });
+});
+
 // ===== POST /api/translate — ترجمة رابط =====
-// body: { url, targetLang, videoLang?, glossary?: [{from,to}] }
+// body: { url, targetLang, videoLang?, glossary?: [{from,to}], provider?, providers?: [] }
 router.post('/translate', async (req, res) => {
-  const { url, targetLang = 'ar', videoLang, glossary } = req.body || {};
+  const { url, targetLang = 'ar', videoLang, glossary, provider, providers } = req.body || {};
 
   if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) {
     return res.status(400).json({ error: 'invalid-url' });
@@ -50,25 +62,27 @@ router.post('/translate', async (req, res) => {
   }
   // مسرد اختياري: مصفوفة {from,to} — تُطبَّق بعد الترجمة على النص النهائي فقط
   const g = Array.isArray(glossary) ? glossary : [];
+  // فرض المزوّد/الترتيب اختياريًا (مُمرَّر كـ opts إلى سلسلة المزوّدين)
+  const tOpts = { provider, providers };
 
   try {
     // 1) يوتيوب؟
     const videoId = extractVideoId(cleanUrl);
     if (videoId) {
-      return await handleYouTube(res, videoId, targetLang, videoLang, g);
+      return await handleYouTube(res, videoId, targetLang, videoLang, g, tOpts);
     }
 
     // 2) مقال / موقع
-    return await handleArticle(res, cleanUrl, targetLang, g);
+    return await handleArticle(res, cleanUrl, targetLang, g, tOpts);
   } catch (e) {
     return sendError(res, e);
   }
 });
 
 // ===== POST /api/translate-text — ترجمة نص مباشر =====
-// body: { text, targetLang?, glossary?: [{from,to}] }
+// body: { text, targetLang?, glossary?: [{from,to}], provider?, providers?: [] }
 router.post('/translate-text', async (req, res) => {
-  const { text, targetLang = 'ar', glossary } = req.body || {};
+  const { text, targetLang = 'ar', glossary, provider, providers } = req.body || {};
   if (!text || !String(text).trim()) {
     return res.status(400).json({ error: 'invalid-text' });
   }
@@ -78,7 +92,7 @@ router.post('/translate-text', async (req, res) => {
   }
   try {
     const sourceLang = await detectLanguage(text);
-    const raw = await translateText(String(text), targetLang, sourceLang);
+    const raw = await translateText(String(text), targetLang, sourceLang, { provider, providers });
     const translated = applyGlossary(raw, Array.isArray(glossary) ? glossary : []);
     trackUsage({ type: 'text', sourceLang, targetLang }); // لا يُنتظر — احتياطي
     res.json({ type: 'text', sourceLang, translated, original: String(text) });
@@ -166,7 +180,8 @@ function distributeByRatio(translated, lines) {
 }
 
 // ===== معالجة يوتيوب =====
-async function handleYouTube(res, videoId, targetLang, videoLang, glossary) {
+// opts اختياري: { provider?, providers? } — يُمرَّر إلى سلسلة المزوّدين
+async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts) {
   try {
     // محاولة جلب الترجمات النصية أولًا
     let metaSource = 'captions';
@@ -225,7 +240,7 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary) {
       // ضم الأسطر بـ \n\n حتى يُعامل كل سطر كقطعة مستقلة في chunkText
       // (يضمن محاذاة الترجمة 1:1 مع الأسطر بدل فقدان المطابقة)
       const joined = batch.map((l) => l.original).join('\n\n');
-      const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(joined, targetLang, sourceLang);
+      const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(joined, targetLang, sourceLang, opts);
       totalChunks += chunksTotal;
       cachedChunks += chunksFromCache;
       const parts = distributeByRatio(translated, batch);
@@ -251,7 +266,8 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary) {
 }
 
 // ===== معالجة مقال =====
-async function handleArticle(res, url, targetLang, glossary) {
+// opts اختياري: { provider?, providers? } — يُمرَّر إلى سلسلة المزوّدين
+async function handleArticle(res, url, targetLang, glossary, opts) {
   const { title, blocks } = await fetchArticleContent(url);
 
   // كشف لغة المصدر من أول 5 كتل
@@ -267,7 +283,7 @@ async function handleArticle(res, url, targetLang, glossary) {
     const slice = blocks.slice(i, i + chunkSize);
     const results = await Promise.all(
       slice.map(async (b) => {
-        const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(b.content, targetLang, sourceLang);
+        const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(b.content, targetLang, sourceLang, opts);
         totalChunks += chunksTotal;
         cachedChunks += chunksFromCache;
         return translated;
