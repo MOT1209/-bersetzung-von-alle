@@ -3,7 +3,8 @@ const express = require('express');
 const config = require('./config');
 const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript, buildSrt } = require('./youtube');
-const { translateText, translateTextWithMeta, detectLanguage, applyGlossary, getProviders } = require('./translate');
+const { translateText, detectLanguage, applyGlossary, getProviders } = require('./translate');
+const translate = require('./translate'); // وصول وقت التنفيذ — يسمح بتزييف translateTextWithMeta في الاختبارات
 const { transcribeVideoAudio } = require('./audio');
 const { trackUsage, getUsage } = require('./usage'); // عدّاد استخدام بسيط
 const { logInfo } = require('./logger');
@@ -26,6 +27,7 @@ const ERROR_STATUS = {
   'invalid-text': 400,
   'smart-unavailable': 503,
   'input-too-large': 413,
+  'alignment-failed': 502,
 };
 
 // ===== استجابة خطأ موحدة =====
@@ -156,34 +158,53 @@ router.post('/srt', (req, res) => {
   res.send(srt);
 });
 
-// ===== توزيع الترجمة على أسطر الدفعة بنسبة طول كل سطر أصلي =====
-// المثالي: عدد الأجزاء = عدد الأسطر (مطابقة 1:1). وإلا نوزع الكلمات نسبيًا
-// بحيث يبقى كل سطر متناسبًا مع مدته الأصلية بدل حشر كل شيء في السطر الأول.
-function distributeByRatio(translated, lines) {
-  // الفاصل هو \n\n (فاصل القطع في translateTextWithMeta) حتى لا تُكسر الأسطر
-  // التي تحوي سطرًا جديدًا مدمجًا من الترجمة الأصلية
-  const parts = translated.split('\n\n').map((p) => p.trim()).filter((p) => p.length);
-  if (parts.length === lines.length) return parts;
+// ===== تقسيم ناتج الترجمة إلى أجزاء بمحاذاة صارمة =====
+// الفاصل \n\n هو فاصل القطع في translateTextWithMeta.
+// لا «إنقاذ» ولا توزيع تقريبي: إمّا مطابقة 1:1 أو لا شيء.
+function splitParts(translated) {
+  return String(translated).split('\n\n').map((p) => p.trim()).filter((p) => p.length);
+}
 
-  const totalLen = lines.reduce((s, l) => s + String(l.original || '').length, 0) || 1;
-  const words = translated.split(/\s+/).filter(Boolean);
-  const out = [];
-  let idx = 0;
-  for (let i = 0; i < lines.length; i++) {
-    const ratio = String(lines[i].original || '').length / totalLen;
-    let count = Math.round(words.length * ratio);
-    if (i === lines.length - 1) count = Math.max(0, words.length - idx);
-    out.push(words.slice(idx, idx + count).join(' '));
-    idx += count;
+function alignmentError(count, expected) {
+  const e = new Error(`عدد أجزاء الترجمة ${count} لا يطابق عدد الأسطر ${expected}`);
+  e.code = 'alignment-failed';
+  return e;
+}
+
+// ===== ترجمة دفعة أسطر مع محاذاة 1:1 مضمونة =====
+// عند عدم تطابق العدد نقسم الدفعة إلى نصفين ونعيد المحاولة (تكراريًا حتى سطر واحد).
+// إن فشل سطر منفرد نرفع alignment-failed → 502، لأن الفشل الصريح أفضل من
+// ترجمة تبدو سليمة ومعناها محطّم (التوزيع النسبي القديم كان ينتج ذلك بالضبط).
+async function translateBatch(lines, targetLang, sourceLang, opts) {
+  const joined = lines.map((l) => l.original).join('\n\n');
+  const { translated, chunksFromCache, chunksTotal } = await translate.translateTextWithMeta(joined, targetLang, sourceLang, opts);
+  const parts = splitParts(translated);
+
+  if (parts.length === lines.length) {
+    return { parts, chunksTotal, chunksFromCache };
   }
-  return out;
+
+  // سطر واحد ولا يزال غير مطابق ⇒ لا مجال لتقسيم آخر
+  if (lines.length === 1) {
+    throw alignmentError(parts.length, 1);
+  }
+
+  // تقسيم إلى نصفين وإعادة المحاولة
+  const mid = Math.floor(lines.length / 2);
+  const left = await translateBatch(lines.slice(0, mid), targetLang, sourceLang, opts);
+  const right = await translateBatch(lines.slice(mid), targetLang, sourceLang, opts);
+  return {
+    parts: left.parts.concat(right.parts),
+    chunksTotal: chunksTotal + left.chunksTotal + right.chunksTotal,
+    chunksFromCache: chunksFromCache + left.chunksFromCache + right.chunksFromCache,
+  };
 }
 
 // ===== معالجة يوتيوب =====
 // opts اختياري: { provider?, providers? } — يُمرَّر إلى سلسلة المزوّدين
 // ===== ترجمة أسطر زمنية (مقاطع يوتيوب/فيديو محلي) =====
 // lines: [{ start, duration, original }] → { sourceLang, captions: [{start,duration,original,translated}], cached }
-// منطق مشترك: دفعات ≤4000 حرف + كشف لغة من الدفعة الأولى + محاذاة 1:1 عبر distributeByRatio
+// منطق مشترك: دفعات ≤4000 حرف + كشف لغة من الدفعة الأولى + محاذاة 1:1 صارمة (translateBatch)
 async function translateLines(lines, targetLang, opts, glossary) {
   // تجميع الأسطر في دفعات ≤ 4000 حرف مع الحفاظ على المطابقة 1:1
   const batches = [];
@@ -216,15 +237,12 @@ async function translateLines(lines, targetLang, opts, glossary) {
   for (const batch of batches) {
     // ضم الأسطر بـ \n\n حتى يُعامل كل سطر كقطعة مستقلة في chunkText
     // (يضمن محاذاة الترجمة 1:1 مع الأسطر بدل فقدان المطابقة)
-    const joined = batch.map((l) => l.original).join('\n\n');
-    const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(joined, targetLang, sourceLang, opts);
+    // محاذاة 1:1 صارمة — ترمي alignment-failed بدل إنتاج سطور محشوّة/فارغة
+    const { parts, chunksTotal, chunksFromCache } = await translateBatch(batch, targetLang, sourceLang, opts);
     totalChunks += chunksTotal;
     cachedChunks += chunksFromCache;
-    const parts = distributeByRatio(translated, batch);
-    // توزيع: مطابقة 1:1 إن أمكن، وإلا توزيع نسبي على كل الأسطر
     batch.forEach((line, i) => {
-      line.translated = parts[i] !== undefined ? parts[i] : line.original;
-      line.translated = applyGlossary(line.translated, glossary || []);
+      line.translated = applyGlossary(parts[i], glossary || []);
     });
     translatedAll.push(...batch);
   }
@@ -311,5 +329,5 @@ async function handleArticle(res, url, targetLang, glossary, opts) {
 }
 
 module.exports = router;
-module.exports.distributeByRatio = distributeByRatio;
+module.exports.translateBatch = translateBatch; // اختبارات المحاذاة
 module.exports.translateLines = translateLines; // فيديو محلي — تُستدعى وقت التنفيذ

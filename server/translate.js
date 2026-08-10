@@ -45,8 +45,34 @@ function isUntranslatable(line) {
   if (/^\d{1,2}:\d{2}(:\d{2})?([,.]\d+)?\s*$/.test(t)) return true;
   // وسم موسيقى / تصفيق
   if (/^\[(music|applause|laughter|music playing|♪|♫)\]/i.test(t)) return true;
-  // كود أو مسار تقني
-  if (/^[<\w\/.\\-]+$/i.test(t) && t.length < 60 && !/[أ-يa-zA-Z]{4,}/.test(t)) return false;
+  // كود / JSON / سطر تقني خالص — لا يُترجم
+  if (isCodeLine(t)) return true;
+  return false;
+}
+
+// هل السطر كود/JSON/مسار تقني خالص؟ (لا تمسّ الجمل العادية)
+function isCodeLine(t) {
+  if (!t) return false;
+  // وسم HTML/XML مثل <div> أو <a href="...">
+  if (/<\/?[a-zA-Z][^>]*>/.test(t)) return true;
+  // JSON/كائن/مصفوفة تُغلق بالقوسين وتحمل ':' أو '='
+  if ((/^\{.*\}$/.test(t) || /^\[.*\]$/.test(t)) && /[:=]/.test(t)) return true;
+  // أمر برمجي أو أداة CLI تبدأ بكلمة محجوزة
+  if (/^(const|let|var|import|export|require|function|class|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|npm|yarn|pnpm|git|npx|curl|sudo|apt)\b/.test(t)) return true;
+  // عبارة تعيين تنتهي بفاصلة منقوطة
+  if (t.includes('=') && /;\s*$/.test(t)) return true;
+  // مسار/اسم ملف تقني — بلا مسافات، ويحتوي فاصل مسار أو امتدادًا حقيقيًا.
+  // لا يكفي وجود '.' وحدها: أسطر مثل "Yes." و"Okay." و"No." شائعة جدًا في
+  // الترجمات وكانت تُصنَّف كودًا فتبقى إنجليزية. الشرط أن يتبع النقطةَ الأخيرة
+  // امتداد فعلي (file.txt) أو أن يوجد فاصل مسار (/usr/bin) — والنقطة الطرفية
+  // وحدها لا تكفي.
+  if (
+    /^[\w\/.\\\-]+$/.test(t) &&
+    t.length < 80 &&
+    (/[\/\\]/.test(t) || /\.[A-Za-z0-9]{1,8}$/.test(t))
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -419,7 +445,8 @@ function applyGlossary(text, glossary) {
     // كلمات أبجدية رقمية فقط (مع عربية) — منع حقن regex برموز خاصة
     if (!/^[\w\u0600-\u06FF' -]+$/u.test(from)) continue;
     const re = new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'giu');
-    out = out.replace(re, to);
+    // دالة بديل لا نص — حتى لا يفسّر المتصفح '$1'/'$&' في نص المسرد كمرجع
+    out = out.replace(re, () => to);
   }
 
   // إعادة الروابط

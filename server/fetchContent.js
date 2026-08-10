@@ -6,6 +6,63 @@ const { getRuleForUrl } = require('./extractionRules'); // قواعد استخر
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+// Redirect-safe fetch: walk each redirect hop manually and re-validate it against
+// the same SSRF rules as the original URL, so a public URL cannot bounce us onto
+// an internal / private / link-local / cloud-metadata address.
+const REDIRECT_STATUSES = [301, 302, 303, 307, 308];
+const MAX_REDIRECTS = 5;
+const FETCH_HEADERS = {
+  'User-Agent': UA,
+  'Accept': 'text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+};
+
+async function fetchWithSafeRedirects(startUrl, timeoutMs = 15000) {
+  let currentUrl = startUrl;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    let res;
+    try {
+      res = await fetch(currentUrl, {
+        headers: FETCH_HEADERS,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      const err = new Error('fetch-failed');
+      err.code = 'fetch-failed';
+      throw err;
+    }
+
+    if (!REDIRECT_STATUSES.includes(res.status)) return res;
+
+    const location = res.headers.get('location');
+    if (!location) {
+      // Redirect status without a Location header — treat as a failed fetch (matches old behavior)
+      const err = new Error('fetch-failed');
+      err.code = 'fetch-failed';
+      throw err;
+    }
+
+    let nextUrl;
+    try {
+      nextUrl = new URL(location, currentUrl).href;
+    } catch (e) {
+      const err = new Error('fetch-failed');
+      err.code = 'fetch-failed';
+      throw err;
+    }
+
+    // Re-validate the redirect target before fetching it (throws invalid-url / blocked-url)
+    await validatePublicUrl(nextUrl);
+    currentUrl = nextUrl;
+  }
+
+  // Too many redirects — fail closed
+  const err = new Error('fetch-failed');
+  err.code = 'fetch-failed';
+  throw err;
+}
+
 // ===== جلب المقال من رابط =====
 async function fetchArticleContent(url) {
   if (!/^https?:\/\//i.test(url)) {
@@ -17,22 +74,8 @@ async function fetchArticleContent(url) {
   // حماية SSRF: ارفض العناوين الداخلية/المحظورة قبل أي اتصال (blocked-url / invalid-url)
   await validatePublicUrl(url);
 
-  let res;
-  try {
-    res = await fetch(url, {
-      headers: {
-        'User-Agent': UA,
-        'Accept': 'text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(15000),
-    });
-  } catch (e) {
-    const err = new Error('fetch-failed');
-    err.code = 'fetch-failed';
-    throw err;
-  }
+  // SSRF-safe fetch: every redirect hop is validated before it is fetched (blocked-url / invalid-url / fetch-failed)
+  const res = await fetchWithSafeRedirects(url);
 
   if (!res.ok) {
     const err = new Error('fetch-failed');

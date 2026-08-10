@@ -2,20 +2,18 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 const config = require('./config');
 const translateRouter = require('./routes-translate');
 const ttsRouter = require('./routes-tts');
 const videoRouter = require('./routes-video');
-const settingsRouter = require('./routes-settings'); // إعدادات المفاتيح (.env) — بدون حد طلبات
+const settingsRouter = require('./routes-settings'); // إعدادات المفاتيح (.env) — محمي بـ ADMIN_TOKEN
 const { getAllLanguages } = require('./languages');
 
 const app = express();
 
 // ===== وسيطات عامة =====
 app.use(cors());
-// مسارات الملفات (استيراد/تصدير) — قبل express.json العام لأن لها حد جسم 15mb خاصًا بها
-app.use('/api', require('./routes-file'));
-app.use(express.json({ limit: '2mb' }));
 
 // ===== مفتاح API اختياري للطلاب (ARALINK_API_KEY في .env) =====
 // إن ضُبط: الطلبات التي تحمل المفتاح الصحيح تحصل على حد أعلى (×3)
@@ -60,6 +58,19 @@ function createRateLimiter({ windowMs, max, keyedMultiplier = 3 }) {
 const translateLimiter = createRateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, max: config.RATE_LIMIT_MAX });
 const heavyLimiter = createRateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, max: config.RATE_LIMIT_MAX_HEAVY });
 
+// ===== خط الأساس: حد طلبات يغطي /api كاملًا =====
+// مهم: Express يطابق app.use على حدود المقاطع، لذا '/api/translate' لا يغطي
+// '/api/translate-smart'. هذا الأساس يغطي كل مسار تحت /api بلا استثناء،
+// والحدود الأشد أدناه تُركَّب فوقه (كلاهما يُحتسب).
+app.use('/api', translateLimiter);
+
+// مسارات الملفات (استيراد/تصدير) — قبل express.json العام لأن لها حد جسم 15mb خاصًا بها،
+// وبعد خط الأساس أعلاه حتى لا تفلت من حد الطلبات.
+app.use('/api/translate-file', heavyLimiter);
+app.use('/api/export', heavyLimiter);
+app.use('/api', require('./routes-file'));
+app.use(express.json({ limit: '2mb' }));
+
 // ===== الملفات الثابتة (الواجهة فقط — لا يُنشر جذر المشروع) =====
 const publicDir = path.join(__dirname, '..', 'public');
 app.use(express.static(publicDir));
@@ -74,12 +85,26 @@ app.get('/api/languages', (req, res) => {
   res.json({ languages: getAllLanguages() });
 });
 
-// ===== إعدادات المفاتيح (قراءة/حفظ .env — لا تُحصى ضمن حد الطلبات) =====
-app.use('/api/settings', settingsRouter);
+// ===== إعدادات المفاتيح (قراءة/حفظ .env) — محمية بـ ADMIN_TOKEN =====
+// الافتراضي الآمن: بلا ADMIN_TOKEN ⇒ المسار معطّل بالكامل (503).
+// يشمل GET أيضًا لأنه يكشف hasGeminiKey — استطلاع مفيد للمهاجم.
+// ملاحظة: ARALINK_API_KEY مفتاح حصص للطلاب ولا يصلح هنا — لا يجوز أن يمنح
+// مفتاحُ حصةٍ صلاحيةَ الكتابة في .env.
+function requireAdmin(req, res, next) {
+  const expected = process.env.ADMIN_TOKEN;
+  if (!expected) return res.status(503).json({ error: 'settings-disabled' });
+  const given = req.get('x-admin-token') || '';
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  // مقارنة ثابتة الزمن — timingSafeEqual يرمي عند اختلاف الطول، لذا نفحصه أولًا
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  next();
+}
+app.use('/api/settings', heavyLimiter, requireAdmin, settingsRouter);
 
-// ===== مسارات الترجمة (مع حد طلبات) =====
-app.use('/api/translate', translateLimiter);
-app.use('/api/translate-text', translateLimiter);
+// ===== مسارات الترجمة (حد أساسي مطبّق أعلاه على /api كامل) =====
 app.use('/api', translateRouter);
 
 // ===== مسارات تحويل النص إلى صوت (حد أثقل — طلبات مكلفة) =====

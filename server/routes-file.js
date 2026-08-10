@@ -7,8 +7,8 @@ const { translateFileContent, buildExport, sanitizeFilename, SUPPORTED_IMPORT, S
 
 const router = express.Router();
 
-// راوتر خاص بحد جسم أكبر (15mb) — يُركَّب قبل express.json العام في server.js
-router.use(express.json({ limit: '15mb' }));
+// حد الجسم 15mb خاص بمسارات الملفات فقط (يُركَّب كوسيط على المسار نفسه لا على الراوتر)،
+// لأن router.use كان يطبّق الحد على كل طلبات /api العابرة، متجاوزًا حد 2mb العام.
 
 // ===== خريطة رمز الخطأ → حالة HTTP (قالب موحد بسيط مثل routes-translate.js) =====
 const ERROR_STATUS = {
@@ -29,7 +29,7 @@ function sendError(res, e) {
 
 // ===== POST /api/translate-file — ترجمة ملف كامل =====
 // body: { format, content (base64), targetLang?, sourceLang?, provider?, providers? }
-router.post('/translate-file', async (req, res) => {
+router.post('/translate-file', express.json({ limit: '15mb' }), async (req, res) => {
   const { format, content, targetLang = 'ar', sourceLang, provider, providers } = req.body || {};
   const ext = String(format || '').toLowerCase();
 
@@ -54,7 +54,7 @@ router.post('/translate-file', async (req, res) => {
 
 // ===== POST /api/export — إرجاع ملف مترجم جاهز للتحميل =====
 // body: { format, text?, segments?, structure?, filename? }
-router.post('/export', async (req, res) => {
+router.post('/export', express.json({ limit: '15mb' }), async (req, res) => {
   const { format, text, segments, structure, filename } = req.body || {};
   const ext = String(format || '').toLowerCase();
 

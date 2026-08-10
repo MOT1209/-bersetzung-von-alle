@@ -20,6 +20,12 @@ const INITIAL = [
 ].join('\n') + '\n';
 fs.writeFileSync(tmpEnv, INITIAL);
 
+// /api/settings محمي بـ ADMIN_TOKEN (انظر tests/settingsAuth.test.js لاختبار الحماية نفسها).
+// هنا نضبط الرمز ونمرّره حتى تختبر هذه الملفات سلوك الإعدادات لا الحماية.
+const ADMIN_TOKEN = 'settings-test-token';
+process.env.ADMIN_TOKEN = ADMIN_TOKEN;
+const ADMIN_HEADER = { 'x-admin-token': ADMIN_TOKEN };
+
 const { getSettings, saveSettings } = require('../server/envSettings');
 const config = require('../server/config');
 
@@ -127,7 +133,7 @@ test('saveSettings: يرفض جسمًا غير صالح (invalid-settings)', asy
 // ===== نقطة API عبر HTTP =====
 
 test('GET /api/settings → 200 مع إعدادات مقنّعة', async () => {
-  const res = await fetch(`${baseUrl}/api/settings`);
+  const res = await fetch(`${baseUrl}/api/settings`, { headers: ADMIN_HEADER });
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(typeof body.hasGeminiKey, 'boolean');
@@ -138,7 +144,7 @@ test('GET /api/settings → 200 مع إعدادات مقنّعة', async () => {
 test('POST /api/settings → 200 { ok: true } ويطبّق فورًا', async () => {
   const res = await fetch(`${baseUrl}/api/settings`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...ADMIN_HEADER },
     body: JSON.stringify({ GEMINI_API_KEY: 'httpkey123456' }),
   });
   assert.equal(res.status, 200);
@@ -150,7 +156,7 @@ test('POST /api/settings → 200 { ok: true } ويطبّق فورًا', async ()
 test('POST /api/settings بجسم غير صالح → 400 invalid-settings', async () => {
   const res = await fetch(`${baseUrl}/api/settings`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...ADMIN_HEADER },
     body: JSON.stringify({ GEMINI_API_KEY: 'bad\nvalue' }),
   });
   assert.equal(res.status, 400);

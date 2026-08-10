@@ -65,3 +65,18 @@ test('isUntranslatable: نص عادي قابل للترجمة', () => {
   assert.equal(isUntranslatable('hello world'), false);
   assert.equal(isUntranslatable('مرحبا بالعالم'), false);
 });
+
+// ===== حماية من انحدار: كلمة واحدة تنتهي بنقطة ليست كودًا =====
+// أسطر مثل "Yes." و"Okay." من أكثر أسطر الترجمة شيوعًا. قاعدة «المسار التقني»
+// كانت تصنّفها كودًا (بلا مسافات + تحتوي '.') فتبقى إنجليزية داخل ترجمة عربية.
+test('isUntranslatable: كلمة مفردة تنتهي بنقطة تُترجَم', () => {
+  for (const s of ['Yes.', 'No.', 'Okay.', 'Hello.', 'Really.', 'Stop.', 'Mr.', 'U.S.']) {
+    assert.equal(isUntranslatable(s), false, `صُنّف كودًا خطأً: ${s}`);
+  }
+});
+
+test('isUntranslatable: مسار/ملف/كود حقيقي لا يُترجَم', () => {
+  for (const s of ['/usr/bin/env', 'file.txt', 'src\\index.js', '<div>', 'const x = 1;', 'npm install']) {
+    assert.equal(isUntranslatable(s), true, `كان يجب اعتباره كودًا: ${s}`);
+  }
+});
