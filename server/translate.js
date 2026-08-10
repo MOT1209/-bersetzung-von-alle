@@ -124,6 +124,12 @@ async function translateTextWithMeta(text, targetLang, sourceLang) {
     // الحفظ في الكاش بعد نجاح فقط — الأخطاء (429 مثلًا) لا تُخزَّن أبدًا
     cacheSet(chunk, sourceLang, targetLang, out);
     results.push(out);
+
+    // تأخير صغير بين القطع الشبكية لتجنّب انفجار الطلبات
+    // (يحمي من حجب Google المجاني وحصص Gemini في الدقيقة)
+    if (results.length + fromCacheCount < chunks.length) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
   }
   return { translated: results.join('\n\n'), chunksFromCache: fromCacheCount, chunksTotal: chunks.length };
 }

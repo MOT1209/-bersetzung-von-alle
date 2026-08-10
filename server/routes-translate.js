@@ -2,7 +2,7 @@
 const express = require('express');
 const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript, buildSrt } = require('./youtube');
-const { translateTextWithMeta, detectLanguage } = require('./translate');
+const { translateText, translateTextWithMeta, detectLanguage } = require('./translate');
 const { transcribeVideoAudio } = require('./audio');
 
 const router = express.Router();
@@ -78,6 +78,29 @@ router.post('/srt', (req, res) => {
   res.send(srt);
 });
 
+// ===== توزيع الترجمة على أسطر الدفعة بنسبة طول كل سطر أصلي =====
+// المثالي: عدد الأجزاء = عدد الأسطر (مطابقة 1:1). وإلا نوزع الكلمات نسبيًا
+// بحيث يبقى كل سطر متناسبًا مع مدته الأصلية بدل حشر كل شيء في السطر الأول.
+function distributeByRatio(translated, lines) {
+  // الفاصل هو \n\n (فاصل القطع في translateTextWithMeta) حتى لا تُكسر الأسطر
+  // التي تحوي سطرًا جديدًا مدمجًا من الترجمة الأصلية
+  const parts = translated.split('\n\n').map((p) => p.trim()).filter((p) => p.length);
+  if (parts.length === lines.length) return parts;
+
+  const totalLen = lines.reduce((s, l) => s + String(l.original || '').length, 0) || 1;
+  const words = translated.split(/\s+/).filter(Boolean);
+  const out = [];
+  let idx = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const ratio = String(lines[i].original || '').length / totalLen;
+    let count = Math.round(words.length * ratio);
+    if (i === lines.length - 1) count = Math.max(0, words.length - idx);
+    out.push(words.slice(idx, idx + count).join(' '));
+    idx += count;
+  }
+  return out;
+}
+
 // ===== معالجة يوتيوب =====
 async function handleYouTube(res, videoId, targetLang, videoLang) {
   try {
@@ -123,25 +146,28 @@ async function handleYouTube(res, videoId, targetLang, videoLang) {
     if (cur.length) batches.push(cur);
 
     // ترجمة كل دفعة ثم توزيع النص المترجم على الأسطر بنسبة الطول
+    // كشف لغة المصدر من أول دفعة فقط (تكراره لكل دفعة يهدر طلبات الشبكة)
     let sourceLang = 'en';
-    for (const batch of batches) {
-      const joined = batch.map((l) => l.original).join('\n');
-      const detected = await detectLanguage(joined);
-      if (detected && detected !== 'en' || !sourceLang) sourceLang = detected;
+    if (batches[0]) {
+      const sample = batches[0].map((l) => l.original).join(' ').slice(0, 500);
+      const detected = await detectLanguage(sample);
+      if (detected) sourceLang = detected;
     }
 
     const translatedAll = [];
     let totalChunks = 0;
     let cachedChunks = 0;
     for (const batch of batches) {
-      const joined = batch.map((l) => l.original).join('\n');
+      // ضم الأسطر بـ \n\n حتى يُعامل كل سطر كقطعة مستقلة في chunkText
+      // (يضمن محاذاة الترجمة 1:1 مع الأسطر بدل فقدان المطابقة)
+      const joined = batch.map((l) => l.original).join('\n\n');
       const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(joined, targetLang, sourceLang);
       totalChunks += chunksTotal;
       cachedChunks += chunksFromCache;
-      const parts = translated.split('\n');
-      // توزيع: إذا عدد الأجزاء يساوي عدد الأسطر نطابق 1:1، وإلا نضع الترجمة كاملة في أول سطر
+      const parts = distributeByRatio(translated, batch);
+      // توزيع: مطابقة 1:1 إن أمكن، وإلا توزيع نسبي على كل الأسطر
       batch.forEach((line, i) => {
-        line.translated = parts[i] !== undefined && parts.length === batch.length ? parts[i] : (i === 0 ? translated : line.original);
+        line.translated = parts[i] !== undefined ? parts[i] : line.original;
       });
       translatedAll.push(...batch);
     }
