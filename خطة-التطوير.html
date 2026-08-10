@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>خطة التطوير — AraLink: السرعة + الفيديو المترجم + كل اللغات</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg2: #1e293b;
+    --card: #ffffff;
+    --primary: #4f46e5;
+    --primary2: #7c3aed;
+    --accent: #06b6d4;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Tahoma, "Cairo", Arial, sans-serif;
+    background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
+    color: var(--text);
+    line-height: 1.8;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary2));
+    color: #fff;
+    padding: 60px 20px 70px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(6,182,212,.25), transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(236,72,153,.25), transparent 50%);
+  }
+  header h1 { font-size: 2.4rem; font-weight: 900; position: relative; text-shadow: 0 4px 20px rgba(0,0,0,.3); }
+  header p { margin-top: 12px; font-size: 1.15rem; opacity: .92; position: relative; }
+  .badge {
+    display: inline-block; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4);
+    padding: 6px 16px; border-radius: 999px; font-size: .85rem; margin-top: 18px; position: relative;
+  }
+
+  .container { max-width: 1000px; margin: -40px auto 60px; padding: 0 20px; }
+
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 30px 34px;
+    margin-bottom: 28px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.25);
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .card h2 {
+    font-size: 1.5rem; color: var(--primary);
+    margin-bottom: 18px; display: flex; align-items: center; gap: 12px;
+  }
+  .card h2 .num {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--primary), var(--primary2));
+    color: #fff; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; box-shadow: 0 6px 16px rgba(79,70,229,.4);
+  }
+  .card h3 { color: var(--primary2); margin: 18px 0 8px; font-size: 1.1rem; }
+  .card p, .card li { color: var(--muted); }
+  .card ul, .card ol { padding-right: 24px; }
+  .card li { margin-bottom: 8px; }
+  .card li strong { color: var(--text); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .chip {
+    background: #eef2ff; color: var(--primary); border: 1px solid #c7d2fe;
+    padding: 5px 14px; border-radius: 999px; font-size: .85rem; font-weight: 600;
+  }
+  .chip.green { background: #ecfdf5; color: #059669; border-color: #a7f3d0; }
+  .chip.cyan { background: #ecfeff; color: #0891b2; border-color: #a5f3fc; }
+  .chip.orange { background: #fffbeb; color: #d97706; border-color: #fde68a; }
+  .chip.pink { background: #fdf2f8; color: #db2777; border-color: #fbcfe8; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: .93rem; }
+  th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: right; vertical-align: top; }
+  th { background: #f1f5f9; color: var(--primary); font-weight: 700; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td .ver { color: var(--accent); font-weight: 700; font-size: .8rem; }
+
+  .flow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; margin-top: 16px; }
+  .flow-step {
+    background: linear-gradient(135deg, var(--bg2), #312e81);
+    color: #fff; padding: 14px 18px; border-radius: 14px; text-align: center;
+    min-width: 120px; font-size: .9rem; box-shadow: 0 8px 20px rgba(0,0,0,.25);
+  }
+  .flow-step small { display: block; color: #a5b4fc; font-size: .75rem; margin-bottom: 4px; }
+  .flow-arrow { color: var(--accent); font-size: 1.6rem; font-weight: 900; }
+
+  .timeline { list-style: none; padding-right: 0 !important; position: relative; }
+  .timeline li { padding-right: 28px; position: relative; margin-bottom: 18px; }
+  .timeline li::before {
+    content: ""; position: absolute; right: 0; top: 8px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--success); box-shadow: 0 0 0 4px rgba(16,185,129,.15);
+  }
+  .timeline li .phase { font-weight: 800; color: var(--primary2); }
+  .timeline li .est { color: var(--success); font-weight: 700; font-size: .85rem; }
+
+  .note {
+    background: #fffbeb; border-right: 5px solid var(--warning);
+    padding: 14px 18px; border-radius: 10px; margin-top: 14px; color: #92400e; font-size: .95rem;
+  }
+  .note.blue { background: #eff6ff; border-color: var(--primary); color: #1e40af; }
+  .note.green { background: #ecfdf5; border-color: var(--success); color: #065f46; }
+  .note.red { background: #fef2f2; border-color: var(--danger); color: #991b1b; }
+
+  .decision { background: #f5f3ff; border: 1px dashed #a78bfa; border-radius: 12px; padding: 14px 18px; margin-top: 14px; }
+  .decision h4 { color: var(--primary2); margin-bottom: 6px; }
+  .decision label { display: block; margin: 6px 0; cursor: pointer; font-size: .95rem; color: #4c1d95; }
+  .decision input[type="radio"] { margin-left: 8px; accent-color: var(--primary2); }
+
+  .vs { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .vs > div { flex: 1; min-width: 240px; background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .vs h4 { margin-bottom: 6px; font-size: .95rem; }
+  .vs .pro { color: var(--success); font-weight: 700; }
+  .vs .con { color: var(--danger); font-weight: 700; }
+  .vs li { font-size: .9rem; margin-bottom: 4px; }
+
+  footer { text-align: center; color: #94a3b8; padding: 20px; font-size: .9rem; }
+  .grad-text { background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  @media (max-width: 640px) {
+    header h1 { font-size: 1.7rem; }
+    .card { padding: 22px 18px; }
+    .flow-arrow { transform: rotate(90deg); }
+    table { font-size: .8rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= الهيدر ======================= -->
+<header>
+  <h1>⚡ خطة تطوير AraLink</h1>
+  <p>السرعة القصوى + تشغيل الفيديو مع الترجمة المترجمة + ترجمة كل لغات العالم</p>
+  <span class="badge">📋 وثيقة التخطيط — المرحلة الثانية (تطوير)</span>
+</header>
+
+<div class="container">
+
+  <!-- ======================= 1. الأهداف ======================= -->
+  <div class="card">
+    <h2><span class="num">١</span> أهداف هذه المرحلة</h2>
+    <div class="chips">
+      <span class="chip green">🚀 سرعة مضاعفة (تفريغ صوتي أسرع 4-8x)</span>
+      <span class="chip cyan">🎬 الفيديو يعمل + الترجمة المترجمة متزامنة</span>
+      <span class="chip pink">🌍 اختيار من ~130 لغة (كل لغات العالم)</span>
+      <span class="chip orange">💾 ذاكرة تخزين مؤقت = إعادة فتح فورية</span>
+      <span class="chip">🔊 قراءة صوتية (موجودة — تُحسّن)</span>
+    </div>
+    <p style="margin-top:14px">
+      المطلوب من المستخدم: لصق رابط فيديو يوتيوب → اختيار اللغة المطلوبة → <strong>الفيديو يشتغل داخل الصفحة
+      والترجمة باللغة المختارة تظهر متزامنة معه</strong> (وتسمعها بالعربية عند الطلب).
+    </p>
+  </div>
+
+  <!-- ======================= 2. أين البطء اليوم؟ ======================= -->
+  <div class="card">
+    <h2><span class="num">٢</span> تشخيص البطء الحالي (لماذا نطور؟)</h2>
+    <table>
+      <tr><th>الخطوة</th><th>الوضع الحالي</th><th>السرعة</th><th>الحل المقترح</th></tr>
+      <tr>
+        <td>تحميل صوت يوتيوب</td>
+        <td>yt-dlp + ffmpeg يكتب wav ضخم (حتى 350MB) ثم يحوله إلى f32</td>
+        <td>3-8 دقائق للفيديو العادي</td>
+        <td>تحويل <strong>m4a مباشرة إلى f32</strong> بدون ملف wav وسيط (يوفر خطوتين وقرصًا)</td>
+      </tr>
+      <tr>
+        <td>التفريغ الصوتي STT</td>
+        <td>@xenova/transformers (ONNX 1.14 قديم) — whisper-tiny</td>
+        <td>~5x مدة الفيديو (بطيء جدًا)</td>
+        <td><strong>sherpa-onnx</strong> (أسرع من الوقت الفعلي) أو ترقية onnxruntime</td>
+      </tr>
+      <tr>
+        <td>الترجمة النصية</td>
+        <td>Google مجاني + Gemini — لكن حصص يومية (429) وتُرجم بشكل تسلسلي</td>
+        <td>حسب الحصة</td>
+        <td><strong>كاش ترجمة دائم</strong> (لا إعادة ترجمة لنفس النص) + ترجمة موازية خفيفة</td>
+      </tr>
+      <tr>
+        <td>عرض النتيجة</td>
+        <td>نص فقط — لا يوجد مشغل فيديو</td>
+        <td>—</td>
+        <td><strong>مشغل فيديو مدمج</strong> بترجمات WebVTT متزامنة</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ======================= 3. المكتبات المختارة (نتائج البحث) ======================= -->
+  <div class="card">
+    <h2><span class="num">٣</span> المكتبات المختارة — بنية «قوية المعلومات»</h2>
+
+    <h3>🎙️ أ — التفريغ الصوتي الأسرع (STT)</h3>
+    <table>
+      <tr><th>المكتبة</th><th>الإصدار</th><th>لماذا؟</th><th>السرعة على CPU</th></tr>
+      <tr>
+        <td><strong>sherpa-onnx</strong> (k2-fsa)<br><span class="ver">مُوصى به</span></td>
+        <td>1.13.4</td>
+        <td>مكتبة «كالدى الجيل الجديد» من الفريق الذي صنع نماذج Whisper المدربة. حزم Node جاهزة لـ Windows x64 (تُنزّل تلقائيًا)، تدعم النماذج المتنقلة (streaming) والدفعات، وتبقى محلية 100% بدون إنترنت.</td>
+        <td>أسرع من الوقت الفعلي ×1.5-4 مع whisper-tiny/base</td>
+      </tr>
+      <tr>
+        <td><strong>whisper-node / nodejs-whisper</strong><br><span class="ver">بديل</span></td>
+        <td>1.1.1 / 0.3.1</td>
+        <td>روابط Node لـ whisper.cpp (محرك C++ فائق السرعة متعدد الخيوط). قد يحتاج بناء/تنزيل ثنائيات على Windows.</td>
+        <td>سريع جدًا لكن إعداده أصعب</td>
+      </tr>
+      <tr>
+        <td><strong>ترقية onnxruntime-node</strong><br><span class="ver">بديل آمن</span></td>
+        <td>1.14 ← 1.27</td>
+        <td>إبقاء نفس الكود لكن بمحرك ORT أحدث (تحسينات أداء + خيوط متعددة). أقل مخاطرة، مكسب متوسط.</td>
+        <td>مكسب ~2-3x</td>
+      </tr>
+    </table>
+    <div class="note green">
+      ✅ <strong>الخطة:</strong> نجرب <strong>sherpa-onnx</strong> أولًا (الأسرع)، وإن تعذّر تثبيته على هذا الجهاز نرتفع
+      to onnxruntime-node 1.27 مع whisper-tiny. نُبقي الكود الحالي احتياطيًا.
+    </div>
+
+    <h3>🌍 ب — ترجمة «أي لغة» (قائمة ~130 لغة)</h3>
+    <table>
+      <tr><th>المحرك</th><th>اللغات</th><th>ملاحظات</th></tr>
+      <tr>
+        <td><strong>Google المجاني</strong> (الأساسي)</td>
+        <td>~130 لغة</td>
+        <td>سريع ومجاني، لكن بحصة يومية/IP (429 مؤقتًا). نضيف قائمة كاملة بأسماء كل اللغات بالعربية في زر الاختيار + بحث.</td>
+      </tr>
+      <tr>
+        <td><strong>Gemini API</strong> (احتياطي)</td>
+        <td>~100 لغة</td>
+        <td>موجود — يُستخدم عند فشل Google.</td>
+      </tr>
+      <tr>
+        <td><strong>NLLB-200 محلي</strong> (offline اختياري)</td>
+        <td>200 لغة</td>
+        <td>نموذج ميتا المحلي عبر transformers.js. يعمل بدون إنترنت لكنه بطيء على هذا المعالج (ثوانٍ لكل جملة) — نضيفه لاحقًا كخيار «وضع عدم الاتصال» وليس افتراضيًا.</td>
+      </tr>
+    </table>
+
+    <h3>🎬 ج — تشغيل الفيديو مع الترجمة المتزامنة</h3>
+    <table>
+      <tr><th>الخيار</th><th>التقنية</th><th>كيف يعمل</th></tr>
+      <tr>
+        <td><strong>الخيار (أ): فيديو مضمّن + ترجمة تحته</strong><br><span class="ver">مُوصى — سريع</span></td>
+        <td>YouTube IFrame Player API + مؤقّت JS</td>
+        <td>نشغّل الفيديو داخل الصفحة عبر مشغل يوتيوب الرسمي، ونعرض <strong>شريط الترجمة المترجمة</strong> أسفل الفيديو؛ نص يتحدث تلقائيًا مع <code>currentTime</code> (بدون تحميل الفيديو = فوري).</td>
+      </tr>
+      <tr>
+        <td><strong>الخيار (ب): فيديو محلي + ترجمة فوقه</strong><br><span class="ver">ترجمات حقيقية على الفيديو</span></td>
+        <td>yt-dlp تنزيل + <code>&lt;video&gt;</code> + <code>&lt;track&gt;</code> WebVTT</td>
+        <td>ننزّل الفيديو (خيار) ونشغّله بمشغل Plyr، والترجمة المترجمة <strong>تُرسم داخل الفيديو نفسه</strong> (ترجمة مصاحبة حقيقية مثل يوتيوب) لأن المتصفح يدعم مسارات WebVTT.</td>
+      </tr>
+      <tr>
+        <td><strong>الخيار (ج): دبلجة صوتية</strong></td>
+        <td>TTS فوق الفيديو</td>
+        <td>نستبدل الصوت بالقراءة العربية (gTTS) — أثقل وأبطأ؛ مرحلة لاحقة اختيارية.</td>
+      </tr>
+    </table>
+
+    <h3>💾 د — السرعة العامة</h3>
+    <table>
+      <tr><th>الأداة</th><th>الغرض</th></tr>
+      <tr><td><strong>كاش ترجمة دائم</strong> (ملف JSON في <code>cache/</code>)</td><td>نفس النص/الرابط يُرجع فورًا بدون طلب شبكة — حل لمشكلة الحصص اليومية + سرعة الإعادة</td></tr>
+      <tr><td><strong>تحويل m4a → f32 مباشر</strong></td><td>حذف ملف wav الوسيط (350MB!) — توفير وقت وقرص</td></tr>
+      <tr><td><strong>تحديد أفضل صيغة يوتيوب</strong></td><td>تنزيل الصوت بأقل جودة ممكنة للمحتوى الصوتي (m4a ~64kbps)</td></tr>
+      <tr><td><strong>ترجمة موازية خفيفة</strong> (دفعات متوازية)</td><td>تسريع النصوص الطويلة (مع احترام حدود Google)</td></tr>
+    </table>
+  </div>
+
+  <!-- ======================= 4. شكل الواجهة الجديدة ======================= -->
+  <div class="card">
+    <h2><span class="num">٤</span> الواجهة الجديدة (بعد التطوير)</h2>
+    <ol>
+      <li><strong>شريط الإدخال:</strong> حقل الرابط + <strong>زر اختيار اللغة</strong> كبير واضح (قائمة منسدلة بـ 130 لغة + بحث سريع + «اكتشاف تلقائي» للغة المصدر).</li>
+      <li><strong>زر الترجمة:</strong> «ترجم الآن» — يبدأ الجلب والترجمة.</li>
+      <li><strong>منطقة النتيجة للفيديو:</strong>
+        <ul>
+          <li>🎬 <strong>مشغل الفيديو</strong> في الأعلى (مضمّن يوتيوب — يعمل فورًا).</li>
+          <li>💬 <strong>شريط الترجمة المترجمة</strong> أسفله مباشرة — جملة تلو الأخرى متزامنة مع اللحظة.</li>
+          <li>📜 قائمة بكل الجمل (للتمرير/النسخ) + زر «تحميل SRT».</li>
+          <li>🔊 زر «استمع بالعربية» (موجود).</li>
+          <li>↩️ زر «العب فيديو محليًا بترجمات مدمجة» (خيار ب — تنزيل وتشغيل بترجمات WebVTT على الفيديو).</li>
+        </ul>
+      </li>
+      <li><strong>منطقة النتيجة للمقالات:</strong> نفس العرض الحالي + زر القراءة الصوتية.</li>
+    </ol>
+    <div class="vs">
+      <div>
+        <h4>🎬 خيار (أ) — مضمّن يوتيوب</h4>
+        <ul>
+          <li class="pro">+ فوري بدون تنزيل</li>
+          <li class="pro">+ ترجمة متزامنة أسفل الفيديو</li>
+          <li class="con">− الترجمة ليست «داخل» الفيديو</li>
+        </ul>
+      </div>
+      <div>
+        <h4>📺 خيار (ب) — فيديو محلي</h4>
+        <ul>
+          <li class="pro">+ الترجمة تُرسم داخل الفيديو (مثل يوتيوب)</li>
+          <li class="pro">+ تحكم كامل (إيقاف، سرعة، متابعة)</li>
+          <li class="con">− يحتاج تنزيلًا (يستغرق وقتًا)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="decision">
+      <h4>❓ قرارك المطلوب (1): أي شكل تشغيل تريد أولًا؟</h4>
+      <label><input type="radio" name="player" checked> (أ) فيديو يوتيوب مضمّن + الترجمة تظهر أسفله متزامنة — <strong>الافتراضي</strong></label>
+      <label><input type="radio" name="player"> (ب) تنزيل الفيديو وتشغيله بترجمات مرسومة فوقه (WebVTT) — أنظف لكن أبطأ</label>
+      <label><input type="radio" name="player"> (أ + ب) كلاهما — أ تلقائيًا، وب زر إضافي</label>
+    </div>
+    <div class="decision">
+      <h4>❓ قرارك المطلوب (2): مستوى «أي لغة»؟</h4>
+      <label><input type="radio" name="langs" checked> قائمة كاملة ~130 لغة في زر الاختيار (Google مجاني + Gemini) — <strong>الافتراضي</strong></label>
+      <label><input type="radio" name="langs"> 130 لغة + خيار «وضع عدم الاتصال» عبر NLLB-200 المحلي (بطيء على هذا الجهاز)</label>
+    </div>
+    <div class="decision">
+      <h4>❓ قرارك المطلوب (3): هل نحفظ الترجمات السابقة؟</h4>
+      <label><input type="radio" name="cache" checked> نعم — كاش ملفي بسيط: إعادة نفس الرابط فورية + حل لمشكلة حصص Google اليومية — <strong>الافتراضي</strong></label>
+      <label><input type="radio" name="cache"> لا — بلا حفظ (كل مرة ترجمة جديدة)</label>
+    </div>
+  </div>
+
+  <!-- ======================= 5. مراحل التنفيذ ======================= -->
+  <div class="card">
+    <h2><span class="num">٥</span> مراحل التنفيذ (أمواج متوازية)</h2>
+    <ul class="timeline">
+      <li>
+        <span class="phase">الموجة 1 — الأساس الخلفي للسرعة</span> <span class="est">(ساعتان)</span>
+        <ul>
+          <li>تبديل مسار التفريغ إلى <strong>sherpa-onnx</strong> (أو ترقية onnxruntime) مع إبقاء whisper-tiny احتياطيًا.</li>
+          <li>تحويل <strong>m4a → f32 مباشر</strong> بدون ملف wav وسيط.</li>
+          <li>إضافة <strong>كاش الترجمة الدائم</strong> (cache/translation-cache.json) على مستوى الجملة.</li>
+        </ul>
+      </li>
+      <li>
+        <span class="phase">الموجة 2 — كل اللغات</span> <span class="est">(ساعتان)</span>
+        <ul>
+          <li>قائمة <strong>130 لغة</strong> بأسمائها العربية + رموزها في زر الاختيار، مع حقل بحث.</li>
+          <li>عرض «اللغة المصدر المكتشفة» + مزامنة الرمز بين الواجهة والخادم.</li>
+          <li>ترجمة موازية خفيفة (2-3 دفعات) للنصوص الطويلة مع الحفاظ على الترتيب.</li>
+        </ul>
+      </li>
+      <li>
+        <span class="phase">الموجة 3 — مشغل الفيديو المترجم</span> <span class="est">(3 ساعات)</span>
+        <ul>
+          <li>دمج <strong>YouTube IFrame Player API</strong> + شريط ترجمة متزامن أسفل الفيديو.</li>
+          <li>تحويل الشرائح إلى <strong>WebVTT</strong> (خادم) وتشغيلها عبر <code>&lt;video&gt;+&lt;track&gt;</code> في مشغل Plyr (خيار ب).</li>
+          <li>أزرار: استمع بالعربية، تحميل SRT، تشغيل محلي.</li>
+        </ul>
+      </li>
+      <li>
+        <span class="phase">الموجة 4 — الصقل والاختبار</span> <span class="est">(ساعتان)</span>
+        <ul>
+          <li>قياس السرعة قبل/بعد، اختبار كل الأنواع (فيديو بترجمات/بدون، مقال، نص حر).</li>
+          <li>رسائل أخطاء عربية للحالات الجديدة، استجابة الجوال.</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ======================= 6. المخاطر ======================= -->
+  <div class="card">
+    <h2><span class="num">٦</span> المخاطر المتوقعة والتخفيف</h2>
+    <table>
+      <tr><th>الخطر</th><th>التخفيف</th></tr>
+      <tr><td>sherpa-onnx لا يُثبَّت على هذا الجهاز</td><td>احتياطي: ترقية onnxruntime-node إلى 1.27 + whisper-tiny (مكسب ~2-3x)</td></tr>
+      <tr><td>حصة Google اليومية (429) تمنع الاختبار</td><td>الكاش يقلل الطلبات؛ Gemini احتياطي؛ الانتظار لتجديد الحصة</td></tr>
+      <tr><td>الفيديو الطويل + التفريغ البطيء</td><td>الحد الأقصى الاختياري للمدة، أو تحسين رسالة «يستغرق دقائق»</td></tr>
+      <tr><td>مقاطع يوتيوب ترفض التنزيل (JS challenge)</td><td>الخيار (أ) المضمّن يعمل دائمًا حتى لو فشل التنزيل</td></tr>
+      <tr><td>NLLB-200 بطيء جدًا على CPU</td><td>يبقى اختياريًا «وضع عدم الاتصال» فقط — لا يؤثر على الافتراضي</td></tr>
+    </table>
+  </div>
+
+  <!-- ======================= 7. ماذا يعني للمستخدم ======================= -->
+  <div class="card">
+    <h2><span class="num">٧</span> النتيجة النهائية المتوقعة</h2>
+    <div class="note green">
+      ✅ الصق رابط فيديو إنجليزي → اختر «العربية» → <strong>الفيديو يشتغل فورًا</strong> والترجمة العربية
+      تظهر متزامنة أسفله، وتستمع إليها بصوت عربي، أو تحمّل الفيديو بترجمات مرسومة فوقه — كل ذلك
+      بسرعات أفضل بعد الموجة الأولى، وبدون حاجة لأي مفتاح API للتفريغ الصوتي.
+    </div>
+  </div>
+
+  <footer>خطة تطوير AraLink — المرحلة الثانية · تُبنى في <code>specs/speed-video-langs/</code> بعد تأكيد القرارات</footer>
+</div>
+
+</body>
+</html>
