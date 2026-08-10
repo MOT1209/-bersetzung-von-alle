@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+
+# Translation cache
+cache/
+
+# STT models (downloaded automatically — never commit)
+models/
+
+# Uploads (local storage)
+public/uploads/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# Vendored starter-kit clones (their own git repos)
+agentic-coding-starter-kit/
+skills/
+
+# Local backup archives
+*.zip

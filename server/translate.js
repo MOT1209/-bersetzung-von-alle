@@ -1,0 +1,171 @@
+// server/translate.js — محرك الترجمة: كشف اللغة + ترجمة + تقسيم + احتياطي Gemini
+const config = require('./config');
+const { get: cacheGet, set: cacheSet } = require('./cache');
+
+const GOOGLE_URL = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=:tl&dt=t';
+const MAX_CHUNK = 4500;
+const MAX_RETRIES = 3;
+
+// ===== الأدوات المساعدة =====
+
+function isUntranslatable(line) {
+  const t = line.trim();
+  if (!t) return true;
+  // رابط فقط
+  if (/^https?:\/\/\S+$/i.test(t)) return true;
+  // ختم زمني فقط
+  if (/^\d{1,2}:\d{2}(:\d{2})?([,.]\d+)?\s*$/.test(t)) return true;
+  // وسم موسيقى / تصفيق
+  if (/^\[(music|applause|laughter|music playing|♪|♫)\]/i.test(t)) return true;
+  // كود أو مسار تقني
+  if (/^[<\w\/.\\-]+$/i.test(t) && t.length < 60 && !/[أ-يa-zA-Z]{4,}/.test(t)) return false;
+  return false;
+}
+
+// ===== كشف اللغة =====
+async function detectLanguage(text) {
+  if (!text || !text.trim()) return 'en';
+  try {
+    const body = new URLSearchParams({ q: text.slice(0, 500) });
+    const res = await fetch(GOOGLE_URL.replace(':tl', 'en'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data && data[2] ? data[2] : 'en';
+  } catch (e) {
+    return 'en'; // الافتراضي عند الفشل
+  }
+}
+
+// ===== الترجمة عبر Google المجانية =====
+async function translateViaGoogle(text, targetLang, sourceLang) {
+  const sl = sourceLang || 'auto';
+  const url = GOOGLE_URL.replace(':tl', targetLang);
+  const body = new URLSearchParams({ q: text, sl, tl: targetLang, dt: 't' });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
+  const data = await res.json();
+  const translated = data[0].map((seg) => seg[0]).join('');
+  return translated;
+}
+
+// ===== الترجمة عبر Gemini (احتياطي) =====
+async function translateViaGemini(text, targetLang) {
+  if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY غير مضبوط');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL}:generateContent`;
+  const res = await fetch(url + `?key=${encodeURIComponent(config.GEMINI_API_KEY)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: `Translate the following text to ${targetLang}. Return only the translation, no explanations:\n\n${text}` }] }],
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
+  const data = await res.json();
+  const out = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!out) throw new Error('Gemini: استجابة فارغة');
+  return out.trim();
+}
+
+// ===== الترجمة مع محاولات وتقسيم =====
+async function translateText(text, targetLang, sourceLang) {
+  return (await translateTextWithMeta(text, targetLang, sourceLang)).translated;
+}
+
+// مثل translateText لكن مع إحصائيات الكاش — تُرجع { translated, chunksFromCache, chunksTotal }
+async function translateTextWithMeta(text, targetLang, sourceLang) {
+  if (!text || !text.trim()) return { translated: '', chunksFromCache: 0, chunksTotal: 0 };
+
+  const chunks = chunkText(text);
+  const results = [];
+  let fromCacheCount = 0;
+
+  for (const chunk of chunks) {
+    // كاش: نفس النص+اللغتين يُرجع فورًا بدون استهلاك حصة
+    const cached = cacheGet(chunk, sourceLang, targetLang);
+    if (cached !== null) {
+      console.log('[cache] hit:', chunk.slice(0, 60));
+      results.push(cached);
+      fromCacheCount++;
+      continue;
+    }
+
+    let out = null;
+    for (let attempt = 0; attempt < MAX_RETRIES && !out; attempt++) {
+      try {
+        out = await translateViaGoogle(chunk, targetLang, sourceLang);
+      } catch (e) {
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        }
+      }
+    }
+    if (!out) {
+      try {
+        out = await translateViaGemini(chunk, targetLang);
+      } catch (e) {
+        // كل الخدمات فشلت: خطأ واضح بدل إرجاع النص الأصلي بصمت (واجهة مضللة)
+        const err = new Error('translate-failed');
+        err.code = 'translate-failed';
+        err.cause = e;
+        throw err;
+      }
+    }
+    // الحفظ في الكاش بعد نجاح فقط — الأخطاء (429 مثلًا) لا تُخزَّن أبدًا
+    cacheSet(chunk, sourceLang, targetLang, out);
+    results.push(out);
+  }
+  return { translated: results.join('\n\n'), chunksFromCache: fromCacheCount, chunksTotal: chunks.length };
+}
+
+// ===== تقسيم النص إلى أجزاء =====
+function chunkText(text, maxChars = MAX_CHUNK) {
+  const clean = text.replace(/\r\n/g, '\n');
+  const paragraphs = clean.split(/\n{2,}/);
+  const chunks = [];
+  let current = '';
+
+  const pushChunk = (t) => {
+    if (!t.trim()) return;
+    chunks.push(t.trim());
+  };
+
+  for (const para of paragraphs) {
+    if ((current + '\n\n' + para).length <= maxChars) {
+      current = current ? current + '\n\n' + para : para;
+    } else {
+      // تقسيم الفقرة الطويلة جدًا على حدود الجمل
+      if (current) pushChunk(current);
+      current = '';
+      if (para.length > maxChars) {
+        const sentences = para.split(/(?<=[.!?؟])\s+/);
+        let part = '';
+        for (const s of sentences) {
+          if ((part + ' ' + s).length > maxChars && part) {
+            pushChunk(part);
+            part = s;
+          } else {
+            part = part ? part + ' ' + s : s;
+          }
+        }
+        if (part) pushChunk(part);
+      } else {
+        current = para;
+      }
+    }
+  }
+  if (current) pushChunk(current);
+  return chunks.length ? chunks : [text];
+}
+
+module.exports = { translateText, translateTextWithMeta, detectLanguage, chunkText, isUntranslatable };

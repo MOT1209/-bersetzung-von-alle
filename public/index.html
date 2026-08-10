@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="أرا لينك — الصق أي رابط (فيديو يوتيوب، مقال، موقع) واحصل عليه مترجمًا إلى أي لغة">
+  <title>أرا لينك | مترجم الروابط</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <h1 class="app-title">أرا لينك</h1>
+    <p class="app-tagline">الصق أي رابط واحصل عليه مترجمًا</p>
+  </header>
+
+  <main class="container">
+
+    <!-- مبدّل الوضع: رابط / نص سريع -->
+    <div class="mode-toggle" role="tablist" aria-label="اختر وضع الترجمة">
+      <button type="button" class="mode-btn active" data-mode="url" role="tab" aria-selected="true">ترجمة رابط</button>
+      <button type="button" class="mode-btn" data-mode="text" role="tab" aria-selected="false">ترجمة نص سريع</button>
+    </div>
+
+    <!-- بطاقة الإدخال -->
+    <section class="card hero-card" aria-label="إدخال المحتوى المراد ترجمته">
+
+      <div id="url-mode" class="field">
+        <label class="field-label" for="url-input">رابط الصفحة أو الفيديو</label>
+        <input type="url" id="url-input" class="input input-url" dir="ltr" placeholder="الصق رابط الصفحة أو الفيديو هنا" autocomplete="off" spellcheck="false">
+      </div>
+
+      <div id="text-mode" class="field" hidden>
+        <label class="field-label" for="text-input">النص المراد ترجمته</label>
+        <textarea id="text-input" class="input textarea" rows="5" placeholder="اكتب أو الصق النص هنا…"></textarea>
+      </div>
+
+      <div class="lang-row">
+        <label class="field-label" for="target-lang">ترجم إلى</label>
+        <input type="search" id="lang-search" class="input lang-search" placeholder="🔍 ابحث عن لغة…" aria-label="ابحث عن لغة" autocomplete="off">
+        <select id="target-lang" class="input select" aria-label="اللغة الهدف">
+          <option value="ar" selected>العربية</option>
+          <option value="en">الإنجليزية</option>
+          <option value="fr">الفرنسية</option>
+          <option value="es">الإسبانية</option>
+          <option value="de">الألمانية</option>
+          <option value="ru">الروسية</option>
+          <option value="tr">التركية</option>
+          <option value="fa">الفارسية</option>
+          <option value="ur">الأردية</option>
+          <option value="hi">الهندية</option>
+          <option value="ja">اليابانية</option>
+          <option value="ko">الكورية</option>
+        </select>
+        <button type="button" id="translate-btn" class="btn-primary">ترجم الآن</button>
+      </div>
+
+    </section>
+
+    <!-- شريط التقدم -->
+    <section id="progress" class="progress" aria-live="polite" hidden>
+      <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p id="progress-label" class="progress-label">جاري جلب المحتوى…</p>
+    </section>
+
+    <!-- منطقة النتيجة -->
+    <section id="result" class="result reveal" aria-label="نتيجة الترجمة" hidden>
+      <div id="result-embed" class="result-embed" hidden>
+        <div id="video-wrap" class="video-wrap">
+          <div id="player-embed"></div>
+          <div id="cap-bar" class="cap-bar" hidden></div>
+          <video id="local-player" class="local-player" controls preload="metadata" hidden></video>
+        </div>
+      </div>
+
+      <div class="result-header">
+        <div class="tabs" role="tablist" aria-label="عرض النتيجة">
+          <button type="button" class="tab active" data-tab="translated" role="tab" aria-selected="true">الترجمة</button>
+          <button type="button" class="tab" data-tab="original" role="tab" aria-selected="false">النص الأصلي</button>
+        </div>
+        <button type="button" id="listen-btn" class="btn-listen" hidden>🔊 استمع بالعربية</button>
+        <button type="button" id="local-btn" class="btn-srt" hidden>▶ تشغيل بترجمات مدمجة</button>
+        <button type="button" id="srt-btn" class="btn-srt" hidden>تحميل SRT</button>
+      </div>
+
+      <p id="meta-title" class="meta-title"></p>
+      <span id="cache-badge" class="cache-badge" hidden>⚡ من الذاكرة المؤقتة</span>
+      <p id="meta-line" class="meta-line"></p>
+      <p id="source-notice" class="source-notice" hidden></p>
+      <div id="result-body" class="result-body"></div>
+    </section>
+
+    <!-- رسالة الخطأ -->
+    <section id="error" class="error-card" role="alert" hidden>
+      <p id="error-message" class="error-message"></p>
+      <button type="button" id="retry-btn" class="btn-secondary">إعادة المحاولة</button>
+    </section>
+
+    <!-- مشغل الصوت (القراءة الصوتية) -->
+    <audio id="tts-player" hidden></audio>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>أرا لينك — ترجمة ذكية لأي محتوى على الويب</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
