@@ -1,6 +1,7 @@
 // server/translate.js — محرك الترجمة: كشف اللغة + ترجمة + تقسيم + احتياطي Gemini
 const config = require('./config');
 const { get: cacheGet, set: cacheSet } = require('./cache');
+const { logError } = require('./logger'); // سجل أخطاء المحركات (cache/errors.log)
 
 const GOOGLE_URL = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=:tl&dt=t';
 const MAX_CHUNK = 4500;
@@ -202,6 +203,8 @@ async function translateTextWithMeta(text, targetLang, sourceLang) {
       } catch (e) {
         lastErr = e;
         engineFailed(engine.name);
+        // سجّل الفشل (غير متزامن — لا يؤخر الاستجابة)
+        logError('engine:' + engine.name, e.message || e);
         // فاصل قصير بين المحركات لتجنّب حجب سريع
         await new Promise((r) => setTimeout(r, 300));
       }

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "أرا لينك — مترجم الروابط",
+  "version": "1.0.0",
+  "description": "ترجم الصفحة الحالية أو أي رابط فورًا عبر أرا لينك: افتح الإضافة واضغط زرًا واحدًا.",
+  "default_locale": null,
+  "permissions": ["activeTab", "tabs"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "أرا لينك — ترجم هذا الرابط",
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "48": "icons/icon48.svg",
+      "128": "icons/icon128.svg"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

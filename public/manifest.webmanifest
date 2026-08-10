@@ -1,0 +1,27 @@
+{
+  "name": "أرا لينك — مترجم الروابط",
+  "short_name": "أرا لينك",
+  "description": "الصق أي رابط (فيديو يوتيوب، مقال، موقع) واحصل عليه مترجمًا إلى أي لغة",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "ar",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "categories": ["productivity", "utilities", "education"],
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon.svg", "sizes": "128x128", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "ترجمة نص",
+      "short_name": "نص",
+      "description": "افتح أرا لينك لترجمة نص مباشر",
+      "url": "/?mode=text",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

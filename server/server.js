@@ -15,9 +15,19 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
+// ===== مفتاح API اختياري للطلاب (ARALINK_API_KEY في .env) =====
+// إن ضُبط: الطلبات التي تحمل المفتاح الصحيح تحصل على حد أعلى (×3)
+// إن لم يُضبط: الخدمة مفتوحة بحد عام واحد (الوضع الحالي — مناسب للمضيافات المجانية)
+const ARALINK_API_KEY = process.env.ARALINK_API_KEY || '';
+function isApiKeyValid(req) {
+  if (!ARALINK_API_KEY) return false;
+  const k = req.headers['x-api-key'] || req.query.api_key;
+  return typeof k === 'string' && k === ARALINK_API_KEY;
+}
+
 // ===== حد الطلبات البسيط (في الذاكرة — بدون مكتبات خارجية) =====
 // يمنع استنزاف حصص الترجمة المجانية عبر إساءة استخدام واجهة API
-function createRateLimiter({ windowMs, max }) {
+function createRateLimiter({ windowMs, max, keyedMultiplier = 3 }) {
   const hits = new Map(); // ip → { count, resetAt }
   // تنظيف دوري للإدخالات المنتهية (unref حتى لا يمنع إغلاق العملية)
   setInterval(() => {
@@ -36,7 +46,8 @@ function createRateLimiter({ windowMs, max }) {
       hits.set(ip, h);
     }
     h.count++;
-    if (h.count > max) {
+    const limit = isApiKeyValid(req) ? max * keyedMultiplier : max;
+    if (h.count > limit) {
       res.setHeader('Retry-After', Math.ceil((h.resetAt - now) / 1000));
       return res.status(429).json({ error: 'rate-limited' });
     }
@@ -100,3 +111,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+module.exports.createRateLimiter = createRateLimiter; // للاختبار المباشر (وحدة بلا شبكة)

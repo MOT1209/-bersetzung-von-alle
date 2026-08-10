@@ -6,6 +6,7 @@ const urlInput = document.getElementById('url-input');
 const textInput = document.getElementById('text-input');
 const targetLang = document.getElementById('target-lang');
 const translateBtn = document.getElementById('translate-btn');
+const smartBtn = document.getElementById('smart-btn');
 const retryBtn = document.getElementById('retry-btn');
 const modeBtns = document.querySelectorAll('.mode-btn');
 const urlModeEl = document.getElementById('url-mode');
@@ -107,6 +108,8 @@ const ERROR_MESSAGES = {
   'pdf-unsupported': 'تعذر قراءة هذا الملف PDF',
   'blocked-url': 'هذا الرابط مرفوض لأسباب أمنية',
   'rate-limited': 'كثرة الطلبات — انتظر قليلاً ثم حاول مجددًا',
+  'input-too-large': 'المدخلات كبيرة جدًا — قسّم النص أو الرابط وعد المحاولة',
+  'smart-unavailable': 'الترجمة الذكية تحتاج مفتاح Gemini — أضِفه من الإعدادات أو استخدم الترجمة العادية',
   'server-error': 'حدث خطأ غير متوقع',
   'tts-failed': 'تعذر توليد الصوت — حاول مجددًا بعد قليل',
   'text-too-long': 'النص طويل جدًا للقراءة الصوتية',
@@ -1263,6 +1266,52 @@ function handleResultDblClick(e) {
 translateBtn.addEventListener('click', runTranslate);
 retryBtn.addEventListener('click', runTranslate);
 
+// الترجمة الذكية (Gemini: تلخيص/إعادة صياغة) — لنص سريع
+async function runSmartTranslate() {
+  const text = textInput.value.trim();
+  if (!text) {
+    showToast('اكتب أو الصق النص أولاً');
+    textInput.focus();
+    return;
+  }
+  if (state.running) return;
+  state.running = true;
+  smartBtn.disabled = true;
+  try {
+    hideError();
+    result.hidden = true;
+    showLoading('🧠 جاري الترجمة الذكية (قد تستغرق دقيقة)…');
+    const { status, data } = await postJson('/api/translate-smart', { text, targetLang: targetLang.value });
+    hideLoading();
+    if (status === 503 && data && data.error === 'smart-unavailable') {
+      state.running = false;
+      smartBtn.disabled = false;
+      showError('smart-unavailable', 503);
+      return;
+    }
+    if (!data || data.error) {
+      state.running = false;
+      smartBtn.disabled = false;
+      showError((data && data.error) || 'server-error', status);
+      return;
+    }
+    state.current = { type: 'text', sourceLang: data.sourceLang || 'auto', translated: data.translated, original: text, meta: { title: 'ترجمة ذكية' } };
+    state.activeTab = 'translated';
+    result.hidden = false;
+    cacheBadge.hidden = true;
+    sourceNotice.hidden = true;
+    renderTab('translated');
+    smartBtn.disabled = false;
+    state.running = false;
+  } catch (e) {
+    hideLoading();
+    state.running = false;
+    smartBtn.disabled = false;
+    showError('server-error', 500);
+  }
+}
+smartBtn.addEventListener('click', runSmartTranslate);
+
 // زر المقارنة جنبًا إلى جنب
 compareBtn.addEventListener('click', () => {
   state.compare = !state.compare;
@@ -1400,6 +1449,7 @@ modeBtns.forEach((btn) => {
     });
     urlModeEl.hidden = state.mode !== 'url';
     textModeEl.hidden = state.mode !== 'text';
+    smartBtn.hidden = state.mode !== 'text'; // الترجمة الذكية لنص سريع فقط
     // إخفاء النتائج والأخطاء عند تغيير الوضع
     result.hidden = true;
     hideError();
@@ -1466,3 +1516,33 @@ loadLanguages();
 // عرض سجل الترجمات + معالجة رابط المشاركة (#share=…) عند فتح الصفحة
 renderHistory();
 handleShareHash();
+
+// ===== فتح عبر رابط خارجي: ?url=… (إضافة المتصفح) أو ?mode=text (اختصار PWA) =====
+(function bootstrapFromQuery() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get('mode') === 'text') {
+      // بدّل إلى وضع النص
+      const btn = document.querySelector('.mode-btn[data-mode="text"]');
+      if (btn) btn.click();
+    }
+    const targetUrl = params.get('url');
+    if (targetUrl && /^https?:\/\//i.test(targetUrl)) {
+      urlInput.value = targetUrl;
+      // انتظر اكتمال قائمة اللغات إن لم تكن جاهزة بعد (يُختار الهدف الصحيح)
+      const start = () => runTranslate();
+      if (targetLang.options.length <= 1) {
+        loadLanguages().then(start).catch(start);
+      } else {
+        start();
+      }
+    }
+  } catch (e) { /* تجاهل */ }
+})();
+
+// ===== تسجيل Service Worker (PWA — تثبيت + استخدام أوفلاين) =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* أوفلاين/خاص — لا يكسر شيئًا */ });
+  });
+}

@@ -4,6 +4,8 @@ const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript, buildSrt } = require('./youtube');
 const { translateText, translateTextWithMeta, detectLanguage, applyGlossary } = require('./translate');
 const { transcribeVideoAudio } = require('./audio');
+const { trackUsage, getUsage } = require('./usage'); // عدّاد استخدام بسيط
+const { logInfo } = require('./logger');
 
 const router = express.Router();
 
@@ -20,6 +22,9 @@ const ERROR_STATUS = {
   'rate-limited': 429,
   'translate-failed': 502,
   'server-error': 500,
+  'invalid-text': 400,
+  'smart-unavailable': 503,
+  'input-too-large': 413,
 };
 
 // ===== استجابة خطأ موحدة =====
@@ -39,6 +44,10 @@ router.post('/translate', async (req, res) => {
     return res.status(400).json({ error: 'invalid-url' });
   }
   const cleanUrl = url.trim();
+  // حد طول الرابط — يمنع مدخلات ضخمة عبر URL
+  if (cleanUrl.length > 2000) {
+    return res.status(413).json({ error: 'input-too-large' });
+  }
   // مسرد اختياري: مصفوفة {from,to} — تُطبَّق بعد الترجمة على النص النهائي فقط
   const g = Array.isArray(glossary) ? glossary : [];
 
@@ -63,14 +72,61 @@ router.post('/translate-text', async (req, res) => {
   if (!text || !String(text).trim()) {
     return res.status(400).json({ error: 'invalid-text' });
   }
+  // حد حجم النص (حوالي 200 ألف حرف) — يمنع استهلاك الذاكرة/تعليق الخادم
+  if (String(text).length > 200000) {
+    return res.status(413).json({ error: 'input-too-large' });
+  }
   try {
     const sourceLang = await detectLanguage(text);
     const raw = await translateText(String(text), targetLang, sourceLang);
     const translated = applyGlossary(raw, Array.isArray(glossary) ? glossary : []);
+    trackUsage({ type: 'text', sourceLang, targetLang }); // لا يُنتظر — احتياطي
     res.json({ type: 'text', sourceLang, translated, original: String(text) });
   } catch (e) {
     console.error('[translate-text] error:', e.message);
     return sendError(res, e);
+  }
+});
+
+// ===== POST /api/translate-smart — ترجمة ذكية (Gemini: تلخيص/إعادة صياغة) =====
+// body: { text, targetLang? } — يستخدم Gemini إن توفر مفتاح، وإلا ترجمة عادية مع تنبيه
+router.post('/translate-smart', async (req, res) => {
+  const { text, targetLang = 'ar' } = req.body || {};
+  if (!text || !String(text).trim()) {
+    return res.status(400).json({ error: 'invalid-text' });
+  }
+  try {
+    const config = require('./config');
+    if (!config.GEMINI_API_KEY) {
+      return res.status(503).json({ error: 'smart-unavailable' });
+    }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL}:generateContent`;
+    const prompt = `أعد صياغة النص التالي إلى ${targetLang === 'ar' ? 'العربية' : targetLang} بأسلوب طبيعي موجز يحافظ على المعنى. لا تشرح، أعد النص المترجم فقط:\n\n${String(text).slice(0, 8000)}`;
+    const geminiRes = await fetch(url + `?key=${encodeURIComponent(config.GEMINI_API_KEY)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!geminiRes.ok) throw new Error('Gemini HTTP ' + geminiRes.status);
+    const data = await geminiRes.json();
+    const out = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!out) throw new Error('Gemini empty');
+    logInfo('translate-smart', 'نجحت الترجمة الذكية');
+    trackUsage({ type: 'smart', sourceLang: 'auto', targetLang });
+    res.json({ type: 'smart', translated: out.trim(), sourceLang: 'auto' });
+  } catch (e) {
+    console.error('[translate-smart] error:', e.message);
+    return sendError(res, e);
+  }
+});
+
+// ===== GET /api/stats — عدّاد الاستخدام =====
+router.get('/stats', async (req, res) => {
+  try {
+    res.json(await getUsage());
+  } catch (e) {
+    res.status(500).json({ error: 'server-error' });
   }
 });
 
@@ -188,6 +244,7 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary) {
       captions: translatedAll,
       meta: { title: 'فيديو يوتيوب', source: metaSource, cached: totalChunks > 0 && cachedChunks === totalChunks },
     });
+    trackUsage({ type: 'youtube', sourceLang, targetLang }); // لا يُنتظر
   } catch (e) {
     return sendError(res, e);
   }
@@ -228,6 +285,7 @@ async function handleArticle(res, url, targetLang, glossary) {
     originalBlocks: blocks,
     meta: { title: title || 'مقال', cached: totalChunks > 0 && cachedChunks === totalChunks },
   });
+  trackUsage({ type: 'article', sourceLang, targetLang }); // لا يُنتظر
 }
 
 module.exports = router;

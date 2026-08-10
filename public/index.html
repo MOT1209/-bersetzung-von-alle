@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="أرا لينك — الصق أي رابط (فيديو يوتيوب، مقال، موقع) واحصل عليه مترجمًا إلى أي لغة">
+  <meta name="theme-color" content="#0f1117">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="أرا لينك">
   <title>أرا لينك | مترجم الروابط</title>
   <!-- تطبيق السمة قبل رسم الصفحة (يمنع وميض الألوان): الافتراضي dark، وإن لم يُحفظ تفضيل نعتمد على إعدادات النظام -->
   <script>
@@ -70,6 +76,7 @@
           <option value="ko">الكورية</option>
         </select>
         <button type="button" id="translate-btn" class="btn-primary">ترجم الآن</button>
+        <button type="button" id="smart-btn" class="btn-action" hidden title="ترجمة ذكية بالذكاء الاصطناعي — تلخيص/إعادة صياغة طبيعية">🧠 ترجمة بذكاء</button>
       </div>
 
       <details class="batch-details" id="batch-details">

@@ -1,0 +1,30 @@
+# AraLink — تشغيل محلي عبر Docker (نفس البيئة الإنتاجية بالضبط)
+# الاستخدام:  docker compose up --build   ثم افتح http://localhost:3999
+services:
+  aralink:
+    build: .
+    image: aralink:latest
+    container_name: aralink
+    ports:
+      - "3999:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      # انسخ مفاتيحك من .env (لا تُلتقط تلقائيًا لأسباب أمان)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MYMEMORY_EMAIL=${MYMEMORY_EMAIL:-}
+      - LIBRE_URL=${LIBRE_URL:-https://libretranslate.com}
+      - ARALINK_API_KEY=${ARALINK_API_KEY:-}
+    # مجلد الكاش والنماذج — خارج نظام الملفات الحاوي (يبقى عند إعادة البناء)
+    volumes:
+      - aralink-data:/app/cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 60s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  aralink-data:

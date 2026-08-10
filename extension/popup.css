@@ -1,0 +1,54 @@
+/* popup.css — إضافة أرا لينك (نمط داكن مطابق للواجهة) */
+:root {
+  --bg: #0f1117;
+  --card: #171a23;
+  --border: #262b3a;
+  --text: #e8eaf2;
+  --dim: #9aa1b5;
+  --primary: #818cf8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  width: 300px;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 14px;
+  font-size: 13px;
+}
+.head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.logo { font-size: 20px; }
+h1 { font-size: 16px; }
+.hint { color: var(--dim); margin-bottom: 12px; }
+.btn {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.btn:hover { border-color: var(--primary); }
+.btn.primary { background: var(--primary); color: #0f1117; font-weight: 700; border-color: transparent; }
+.row { display: flex; gap: 6px; }
+.row .btn { width: auto; margin-bottom: 8px; padding: 9px 12px; flex-shrink: 0; }
+input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 12px;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+input:focus { outline: none; border-color: var(--primary); }
+.open { display: block; text-align: center; color: var(--primary); text-decoration: none; margin: 4px 0 10px; }
+.status { color: var(--dim); font-size: 12px; min-height: 16px; }
+.foot { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 6px; }
+.foot label { display: block; color: var(--dim); font-size: 11px; margin-bottom: 4px; }
+.foot input { margin-bottom: 0; font-size: 11px; }

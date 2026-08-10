@@ -1074,3 +1074,17 @@ body {
   .embed-layout { grid-template-columns: 1fr; }
   .cap-panel { max-height: 240px; }
 }
+
+/* ===== تحسينات شاشة 375px (أصغر جوال شائع) ===== */
+@media (max-width: 375px) {
+  .hero-card { padding: 16px 14px; border-radius: 14px; }
+  .mode-btn { padding: 8px 10px; font-size: .78rem; }
+  .btn-primary, .btn-action { width: 100%; margin-top: 6px; }
+  .actions-row { flex-wrap: wrap; }
+  .result-tabs { gap: 4px; }
+  .tab { padding: 8px 10px; font-size: .78rem; }
+  .result-body { font-size: .95rem; }
+  .cap-bar { font-size: .82rem; padding: 8px 10px; }
+  .glossary-form, .batch-body { grid-template-columns: 1fr; }
+  .input-url, .input, .textarea { font-size: 15px; } /* يمنع تكبير iOS تلقائيًا */
+}
