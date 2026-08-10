@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="أرا لينك — الصق أي رابط (فيديو يوتيوب، مقال، موقع) واحصل عليه مترجمًا إلى أي لغة">
   <title>أرا لينك | مترجم الروابط</title>
+  <!-- تطبيق السمة قبل رسم الصفحة (يمنع وميض الألوان): الافتراضي dark، وإن لم يُحفظ تفضيل نعتمد على إعدادات النظام -->
+  <script>
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem('aralink-theme'); } catch (e) { /* تجاهل */ }
+      var theme = (saved === 'light' || saved === 'dark') ? saved
+        : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -13,6 +23,10 @@
 <body>
 
   <header class="site-header">
+    <div class="header-actions">
+      <button type="button" id="settings-btn" class="header-btn" aria-label="الإعدادات" title="الإعدادات">⚙️ الإعدادات</button>
+      <button type="button" id="theme-toggle" class="header-btn theme-toggle" aria-label="التبديل إلى الوضع الفاتح" title="تبديل الوضع الفاتح/الداكن">🌙</button>
+    </div>
     <h1 class="app-title">أرا لينك</h1>
     <p class="app-tagline">الصق أي رابط واحصل عليه مترجمًا</p>
   </header>
@@ -131,6 +145,37 @@
 
   <!-- إشعار منبثق (تم النسخ…) -->
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <!-- نافذة الإعدادات: مفاتيح API تُطبَّق فورًا دون إعادة تشغيل -->
+  <div id="settings-modal" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-header">
+        <h2 id="settings-title" class="modal-title">⚙️ الإعدادات</h2>
+        <button type="button" id="settings-close-btn" class="modal-close" aria-label="إغلاق">×</button>
+      </div>
+      <p class="modal-note">تُطبَّق الإعدادات فورًا دون إعادة تشغيل الخادم. مفتاح Gemini اختياري — بدونه تعمل الترجمة مجانًا عبر خدمات بديلة.</p>
+      <form id="settings-form" novalidate>
+        <div class="field">
+          <label class="field-label" for="settings-gemini-key">مفتاح Gemini API</label>
+          <input type="password" id="settings-gemini-key" class="input" dir="ltr" placeholder="أدخل مفتاح Gemini API" autocomplete="off" spellcheck="false">
+          <small class="field-hint">إذا كان مضبوطًا يظهر «مضبوط ✓» — تركه فارغًا يعني الإبقاء على المفتاح الحالي</small>
+        </div>
+        <div class="field">
+          <label class="field-label" for="settings-mymemory-email">بريد MyMemory (اختياري)</label>
+          <input type="email" id="settings-mymemory-email" class="input" dir="ltr" placeholder="you@example.com" autocomplete="off" spellcheck="false">
+          <small class="field-hint">يُستخدم ضمن الحد المجاني لخدمة MyMemory</small>
+        </div>
+        <div class="field">
+          <label class="field-label" for="settings-libre-url">عنوان خادم LibreTranslate (اختياري)</label>
+          <input type="url" id="settings-libre-url" class="input" dir="ltr" placeholder="https://libretranslate.com" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="settings-cancel-btn" class="btn-secondary">إلغاء</button>
+          <button type="submit" id="settings-save-btn" class="btn-primary">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

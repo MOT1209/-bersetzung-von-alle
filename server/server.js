@@ -6,6 +6,7 @@ const config = require('./config');
 const translateRouter = require('./routes-translate');
 const ttsRouter = require('./routes-tts');
 const videoRouter = require('./routes-video');
+const settingsRouter = require('./routes-settings'); // إعدادات المفاتيح (.env) — بدون حد طلبات
 const { getAllLanguages } = require('./languages');
 
 const app = express();
@@ -59,6 +60,9 @@ app.get('/api/health', (req, res) => {
 app.get('/api/languages', (req, res) => {
   res.json({ languages: getAllLanguages() });
 });
+
+// ===== إعدادات المفاتيح (قراءة/حفظ .env — لا تُحصى ضمن حد الطلبات) =====
+app.use('/api/settings', settingsRouter);
 
 // ===== مسارات الترجمة (مع حد طلبات) =====
 app.use('/api/translate', translateLimiter);

@@ -38,6 +38,15 @@ const historyEl = document.getElementById('history');
 const historyListEl = document.getElementById('history-list');
 const clearHistoryBtn = document.getElementById('clear-history-btn');
 const toast = document.getElementById('toast');
+const themeToggle = document.getElementById('theme-toggle');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const settingsForm = document.getElementById('settings-form');
+const settingsGeminiKey = document.getElementById('settings-gemini-key');
+const settingsMyMemoryEmail = document.getElementById('settings-mymemory-email');
+const settingsLibreUrl = document.getElementById('settings-libre-url');
+const settingsCancelBtn = document.getElementById('settings-cancel-btn');
+const settingsCloseBtn = document.getElementById('settings-close-btn');
 
 /* ---------- الحالة (آلة الحالات: idle → fetching → translating → done | error) ---------- */
 const state = {
@@ -390,6 +399,101 @@ function showError(code, status) {
 
 function hideError() {
   errorEl.hidden = true;
+}
+
+/* ---------- الوضع الفاتح/الداكن (data-theme على <html> + localStorage) ---------- */
+const THEME_KEY = 'aralink-theme';
+
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+function applyTheme(theme, persist = true) {
+  document.documentElement.setAttribute('data-theme', theme);
+  if (persist) safeSet(THEME_KEY, theme);
+  // مزامنة أيقونة الزر مع السمة الحالية
+  if (themeToggle) {
+    const isLight = theme === 'light';
+    themeToggle.textContent = isLight ? '☀️' : '🌙';
+    themeToggle.setAttribute('aria-label', isLight ? 'التبديل إلى الوضع الداكن' : 'التبديل إلى الوضع الفاتح');
+    themeToggle.title = isLight ? 'التبديل إلى الوضع الداكن' : 'التبديل إلى الوضع الفاتح';
+  }
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme() === 'light' ? 'dark' : 'light');
+}
+
+/* ---------- نافذة الإعدادات (GET/POST /api/settings) ---------- */
+let settingsLoaded = false; // هل نجح جلب الإعدادات الحالية؟ (يقرر ما إذا كان إرسال حقل فارغ يعني مسحه)
+
+async function openSettings() {
+  // إعادة تعيين الحقول عند كل فتح
+  settingsGeminiKey.value = '';
+  settingsMyMemoryEmail.value = '';
+  settingsLibreUrl.value = '';
+  settingsGeminiKey.placeholder = 'أدخل مفتاح Gemini API';
+  settingsLoaded = false;
+
+  settingsModal.hidden = false;
+  try {
+    const res = await fetch('/api/settings', { signal: AbortSignal.timeout(10000) });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data) {
+      settingsLoaded = true;
+      settingsGeminiKey.placeholder = data.hasGeminiKey ? 'مضبوط ✓' : 'أدخل مفتاح Gemini API';
+      settingsMyMemoryEmail.value = data.myMemoryEmail || '';
+      settingsLibreUrl.value = data.libreUrl || '';
+    }
+  } catch (e) {
+    /* الخادم غير متاح (أو الإعدادات غير مفعّلة) — تبقى الحقول فارغة، الحفظ سيُحاول مجددًا */
+  }
+  settingsGeminiKey.focus();
+}
+
+function closeSettings() {
+  settingsModal.hidden = true;
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const payload = {};
+  if (settingsGeminiKey.value.trim()) payload.geminiKey = settingsGeminiKey.value.trim();
+
+  // الحقول غير الأساسية: تُرسل فقط لو كتب المستخدم قيمة، أو لو حمّلنا الإعدادات الحالية (حتى يمكن مسحها)
+  if (settingsLoaded) {
+    payload.myMemoryEmail = settingsMyMemoryEmail.value.trim();
+    payload.libreUrl = settingsLibreUrl.value.trim();
+  } else {
+    if (settingsMyMemoryEmail.value.trim()) payload.myMemoryEmail = settingsMyMemoryEmail.value.trim();
+    if (settingsLibreUrl.value.trim()) payload.libreUrl = settingsLibreUrl.value.trim();
+  }
+
+  const saveBtn = document.getElementById('settings-save-btn');
+  saveBtn.disabled = true;
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (res.ok) {
+      closeSettings();
+      showToast('تم حفظ الإعدادات ✓');
+    } else {
+      let msg = 'تعذر حفظ الإعدادات — حاول مجددًا';
+      try {
+        const err = await res.json();
+        if (err && err.error === 'invalid-settings') msg = 'بيانات غير صالحة — راجع الحقول';
+      } catch (e2) { /* تجاهل */ }
+      showToast(msg);
+    }
+  } catch (e) {
+    showToast('تعذر حفظ الإعدادات — تحقق من اتصال الخادم');
+  } finally {
+    saveBtn.disabled = false;
+  }
 }
 
 /* ---------- إنشاء وإرسال الطلبات ---------- */
@@ -922,6 +1026,23 @@ shareCloseBtn.addEventListener('click', () => { shareView.hidden = true; });
 clearHistoryBtn.addEventListener('click', clearHistory);
 langSearch.addEventListener('input', filterLanguages);
 targetLang.addEventListener('change', () => safeSet('aralink-lang', targetLang.value));
+
+// الوضع الفاتح/الداكن
+applyTheme(currentTheme(), false); // مزامنة أيقونة الزر مع السمة المطبقة مسبقًا في <head>
+themeToggle.addEventListener('click', toggleTheme);
+
+// نافذة الإعدادات
+settingsBtn.addEventListener('click', openSettings);
+settingsCancelBtn.addEventListener('click', closeSettings);
+settingsCloseBtn.addEventListener('click', closeSettings);
+settingsForm.addEventListener('submit', saveSettings);
+// إغلاق بالنقر على الخلفية أو بزر Escape
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) closeSettings();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !settingsModal.hidden) closeSettings();
+});
 
 // تحميل قائمة اللغات الكاملة عند فتح الصفحة
 loadLanguages();

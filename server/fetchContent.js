@@ -1,6 +1,7 @@
 // server/fetchContent.js — جلب المقالات والمواقع واستخراج النص الأساسي
 const cheerio = require('cheerio');
 const { validatePublicUrl } = require('./ssrf'); // حماية SSRF قبل أي جلب
+const { extractPdfText, extractPdfTitle } = require('./pdf'); // مستخرج نصوص PDF (بدون مكتبات)
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -39,18 +40,26 @@ async function fetchArticleContent(url) {
   }
 
   const contentType = res.headers.get('content-type') || '';
-  if (contentType.includes('pdf')) {
-    // محاولة استخراج نص بسيطة من PDF نصي
+  // الكشف عن ملف PDF: امتداد .pdf في الرابط أو نوع المحتوى application/pdf
+  const isPdfUrl = /\.pdf($|\?)/i.test(url);
+  if (isPdfUrl || contentType.includes('pdf')) {
     try {
       const buf = Buffer.from(await res.arrayBuffer());
-      const txt = buf.toString('utf8');
-      const clean = txt.replace(/[^\x20-\x7E\u0600-\u06FF\u0621-\u064A\n\r\t]/g, ' ');
-      if (clean.length > 200) {
-        return { title: 'PDF Document', blocks: [{ type: 'text', content: clean.slice(0, 50000) }] };
+      const text = extractPdfText(buf); // يعيد '' إن كان النص قصيرًا جدًا أو غير قابل للقراءة
+      if (!text) {
+        const err = new Error('pdf-unsupported');
+        err.code = 'pdf-unsupported';
+        throw err;
       }
-      const err = new Error('pdf-unsupported');
-      err.code = 'pdf-unsupported';
-      throw err;
+      const title = extractPdfTitle(buf) || 'PDF';
+      // تقسيم النص إلى فقرات (كتل) بنفس صيغة المقالات حتى تمر عبر خط الترجمة نفسه
+      const blocks = text
+        .split(/\n{2,}/)
+        .map((p) => p.replace(/\s+/g, ' ').trim())
+        .filter((p) => p.length >= 3)
+        .map((p) => ({ type: 'text', content: p.slice(0, 20000) }));
+      if (!blocks.length) blocks.push({ type: 'text', content: text.slice(0, 20000) });
+      return { title, text, blocks, source: 'pdf' };
     } catch (e) {
       if (e.code === 'pdf-unsupported') throw e;
       const err = new Error('pdf-unsupported');
