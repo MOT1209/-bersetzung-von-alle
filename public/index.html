@@ -199,6 +199,11 @@
       <p class="modal-note">تُطبَّق الإعدادات فورًا دون إعادة تشغيل الخادم. مفتاح Gemini اختياري — بدونه تعمل الترجمة مجانًا عبر خدمات بديلة.</p>
       <form id="settings-form" novalidate>
         <div class="field">
+          <label class="field-label" for="settings-api-key">مفتاح إدارة الإعدادات (ADMIN_TOKEN)</label>
+          <input type="password" id="settings-api-key" class="input" dir="ltr" placeholder="اتركه فارغًا إن لم يُضبط المفتاح في الخادم" autocomplete="off" spellcheck="false">
+          <small class="field-hint">يُرسل مع طلب الحفظ كـ <code>x-admin-token</code> فقط عند تفعيله في الخادم (ADMIN_TOKEN). يُحفظ محليًا في متصفحك.</small>
+        </div>
+        <div class="field">
           <label class="field-label" for="settings-gemini-key">مفتاح Gemini API</label>
           <input type="password" id="settings-gemini-key" class="input" dir="ltr" placeholder="أدخل مفتاح Gemini API" autocomplete="off" spellcheck="false">
           <small class="field-hint">إذا كان مضبوطًا يظهر «مضبوط ✓» — تركه فارغًا يعني الإبقاء على المفتاح الحالي</small>

@@ -393,9 +393,21 @@ async function translateList(uniqueTexts, targetLang, translateFn) {
       // مطابقة 1:1 — Google يحافظ على عدد الأسطر عادة
       batch.forEach((t, i) => map.set(t, lines[i]));
     } else {
-      // اختلف عدد الأسطر — اربط كل النصوص بالنص المترجم الكامل (لا نرمي المحتوى)
-      const full = translatedText.trim();
-      batch.forEach((t) => map.set(t, full));
+      // اختلف عدد الأسطر — نُعيد المحاولة لكل عنصر منفرداً لتجنّب ربط عدة عناصر بنفس النص
+      // (السلوك السابق كان يفسد كل خلية من الثانية فما فوق بنص الدفعة الكاملة)
+      for (const item of batch) {
+        try {
+          const single = await translateFn(item, targetLang, 'auto');
+          const singleText =
+            single && typeof single === 'object' && 'translated' in single
+              ? String(single.translated || '')
+              : String(single || '');
+          // لا نُسجّل ترجمة فارغة — نترك العنصر بدون قيمة في الخريطة ليُحفظ كما هو
+          if (singleText.trim()) map.set(item, singleText);
+        } catch (e) {
+          // فشل منفرد — نُبقي العنصر بدون ترجمة (translateStructured سيُبقي النص الأصلي)
+        }
+      }
     }
     // تأخير بين الدفعات (حماية حصص Google المجانية)
     if (b < batches.length - 1) await new Promise((r) => setTimeout(r, 250));

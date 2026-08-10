@@ -1,7 +1,7 @@
 /* sw.js — Service Worker لأرا لينك (PWA)
-   استراتيجية: كاش-أول للملفات الثابتة (تفتح الواجهة أوفلاين)، شبكة-أول للباقي
-   السجل والمسرد مخزنان في localStorage — يعملان أوفلاين تلقائيًا */
-const CACHE = 'aralink-v1';
+   استراتيجية: شبكة-أوّل مع تحديث خلفي (stale-while-revalidate) للملفات الثابتة
+   لضمان ظهور النسخ المحدّثة بعد النشر. الكاش يبقى كاحتياطي أوفلاين فقط. */
+const CACHE = 'aralink-v2';
 const PRECACHE = [
   '/',
   '/index.html',
@@ -29,6 +29,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   // لا نتطفل على الواجهات/النطاقات الأخرى أبدًا
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+
   // الطلبات الديناميكية (API) → شبكة أولاً مع كاش احتياطي بسيط
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(
@@ -42,12 +43,20 @@ self.addEventListener('fetch', (e) => {
     );
     return;
   }
-  // الملفات الثابتة → كاش أولاً ثم شبكة (أوفلاين للواجهة)
+
+  // الملفات الثابتة → stale-while-revalidate:
+  // قدّم نسخة الكاش فوراً (سرعة + أوفلاين)، ثم احصل على النسخة الحديثة من الشبكة
+  // وخدّث الكاش للزيارات التالية. يضمن ظهور التحديثات دون إعادة تحميل قسري.
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy));
-      return res;
-    }))
+    caches.match(e.request).then((cached) => {
+      const networkFetch = fetch(e.request).then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+        }
+        return res;
+      }).catch(() => cached);
+      return cached || networkFetch;
+    })
   );
 });

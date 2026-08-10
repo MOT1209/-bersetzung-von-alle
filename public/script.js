@@ -55,6 +55,8 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const settingsForm = document.getElementById('settings-form');
 const settingsGeminiKey = document.getElementById('settings-gemini-key');
+const settingsApiKey = document.getElementById('settings-api-key');
+const ADMIN_TOKEN_STORAGE = 'aralinkAdminToken';
 const settingsMyMemoryEmail = document.getElementById('settings-mymemory-email');
 const settingsLibreUrl = document.getElementById('settings-libre-url');
 const settingsDeeplKey = document.getElementById('settings-deepl-key');
@@ -572,6 +574,7 @@ async function loadProviders() {
 async function openSettings() {
   // إعادة تعيين الحقول عند كل فتح
   settingsGeminiKey.value = '';
+  settingsApiKey.value = safeGet(ADMIN_TOKEN_STORAGE) || '';
   settingsMyMemoryEmail.value = '';
   settingsLibreUrl.value = '';
   settingsDeeplKey.value = '';
@@ -647,10 +650,18 @@ async function saveSettings(e) {
 
   const saveBtn = document.getElementById('settings-save-btn');
   saveBtn.disabled = true;
+
+  // مفتاح إدارة الإعدادات (ADMIN_TOKEN) — يُحفظ محليًا ويُرسل كـ x-admin-token
+  const adminToken = settingsApiKey.value.trim();
+  if (adminToken) safeSet(ADMIN_TOKEN_STORAGE, adminToken);
+  else safeRemove(ADMIN_TOKEN_STORAGE);
+  const headers = { 'Content-Type': 'application/json' };
+  if (adminToken) headers['x-admin-token'] = adminToken;
+
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15000)
     });
@@ -661,7 +672,13 @@ async function saveSettings(e) {
       let msg = 'تعذر حفظ الإعدادات — حاول مجددًا';
       try {
         const err = await res.json();
-        if (err && err.error === 'invalid-settings') msg = 'بيانات غير صالحة — راجع الحقول';
+        if (err && err.error === 'settings-disabled') {
+          msg = 'إدارة الإعدادات معطّلة على الخادم — اضبط ADMIN_TOKEN في البيئة لتفعيلها';
+        } else if (err && err.error === 'unauthorized') {
+          msg = 'مفتاح الإدارة غير صحيح — أدخل ADMIN_TOKEN الصحيح';
+        } else if (err && err.error === 'invalid-settings') {
+          msg = 'بيانات غير صالحة — راجع الحقول';
+        }
       } catch (e2) { /* تجاهل */ }
       showToast(msg);
     }
@@ -1125,10 +1142,12 @@ function buildWebVtt(captions) {
 }
 
 function vttClock(sec) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  const ms = Math.round((sec % 1) * 1000);
+  let value = Math.max(0, sec || 0);
+  let ms = Math.round((value - Math.floor(value)) * 1000);
+  if (ms === 1000) { value += 1; ms = 0; }
+  const h = Math.floor(value / 3600);
+  const m = Math.floor((value % 3600) / 60);
+  const s = Math.floor(value % 60);
   const p = (n) => String(n).padStart(2, '0');
   return p(h) + ':' + p(m) + ':' + p(s) + '.' + String(ms).padStart(3, '0');
 }
@@ -1552,16 +1571,6 @@ function highlightCaptionPanel(idx) {
 }
 
 /* ---------- التشغيل بترجمات مدمجة (خيار ب: فيديو محلي + WebVTT) ---------- */
-function buildWebVtt(captions) {
-  const lines = ['WEBVTT', ''];
-  (captions || []).forEach((c, i) => {
-    const start = formatSrtTime(c.start || 0);
-    const end = formatSrtTime((c.start || 0) + (c.duration || 2));
-    lines.push(String(i + 1), start + ' --> ' + end, (c.translated || c.original || ''), '');
-  });
-  return lines.join('\n');
-}
-
 async function playLocalVideo() {
   const data = state.current;
   if (!data || data.type !== 'youtube' || localBtn.disabled) return;
@@ -1741,14 +1750,23 @@ let wordAudioUrl = null;
 async function pronounceWord(word) {
   if (!word) return;
   try {
-    const { status, data } = await postJson('/api/tts', { text: word });
-    if (status !== 200 || !data || !data.audioUrl) {
+    // /api/tts يُعيد blob صوتي (وليس JSON) — نطلب الصوت مباشرة مثل listenToResult
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: word, lang: targetLang.value }),
+      signal: AbortSignal.timeout(60000)
+    });
+    if (!res.ok) {
+      showToast('تعذر نطق الكلمة');
+      return;
+    }
+    const blob = await res.blob();
+    if (!blob || !blob.size) {
       showToast('تعذر نطق الكلمة');
       return;
     }
     if (wordAudioUrl) URL.revokeObjectURL(wordAudioUrl);
-    const res = await fetch(data.audioUrl);
-    const blob = await res.blob();
     wordAudioUrl = URL.createObjectURL(blob);
     ttsPlayer.src = wordAudioUrl;
     ttsPlayer.play().catch(() => { /* المتصفح قد يمنع — تجاهل */ });
@@ -1790,9 +1808,9 @@ async function runSmartTranslate() {
   try {
     hideError();
     result.hidden = true;
-    showLoading('🧠 جاري الترجمة الذكية (قد تستغرق دقيقة)…');
+    showProgress('🧠 جاري الترجمة الذكية (قد تستغرق دقيقة)…');
     const { status, data } = await postJson('/api/translate-smart', { text, targetLang: targetLang.value });
-    hideLoading();
+    hideProgress();
     if (status === 503 && data && data.error === 'smart-unavailable') {
       state.running = false;
       smartBtn.disabled = false;
@@ -1814,7 +1832,7 @@ async function runSmartTranslate() {
     smartBtn.disabled = false;
     state.running = false;
   } catch (e) {
-    hideLoading();
+    hideProgress();
     state.running = false;
     smartBtn.disabled = false;
     showError('server-error', 500);

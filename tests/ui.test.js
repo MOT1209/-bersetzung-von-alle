@@ -20,6 +20,7 @@ test('الواجهة تحتوي كل عناصر الميزات الجديدة', 
     'rule-domain', 'rule-selector', 'rule-add-btn', 'rule-list', // قواعد استخراج
     'cap-panel', 'cap-panel-list', // لوحة يوتيوب
     'smart-btn', // ترجمة ذكية
+    'settings-api-key', // مفتاح إدارة الإعدادات (ADMIN_TOKEN)
   ];
   for (const id of ids) {
     assert.ok(html.includes(`id="${id}"`), `عنصر مفقود: #${id}`);
