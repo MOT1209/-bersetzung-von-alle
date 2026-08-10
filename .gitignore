@@ -23,7 +23,7 @@ Thumbs.db
 
 # Vendored starter-kit clones (their own git repos)
 agentic-coding-starter-kit/
-skills/
+/skills/
 
 # Local backup archives
 *.zip
