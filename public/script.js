@@ -42,6 +42,7 @@ const errorEl = document.getElementById('error');
 const errorMessage = document.getElementById('error-message');
 const copyBtn = document.getElementById('copy-btn');
 const shareBtn = document.getElementById('share-btn');
+const tashkeelBtn = document.getElementById('tashkeel-btn');
 const shareView = document.getElementById('share-view');
 const shareBody = document.getElementById('share-body');
 const shareCloseBtn = document.getElementById('share-close-btn');
@@ -131,7 +132,10 @@ const ERROR_MESSAGES = {
   'video-download-failed': 'تعذر تنزيل الفيديو — جرّب العرض المضمّن بدلاً منه',
   'invalid-format': 'صيغة الملف غير مدعومة',
   'invalid-file': 'تعذر قراءة الملف — قد يكون تالفًا أو كبيرًا جدًا',
-  'invalid-export': 'تعذر تصدير النتيجة بهذه الصيغة'
+  'invalid-export': 'تعذر تصدير النتيجة بهذه الصيغة',
+  'video-too-long': 'الفيديو أطول من الحد المسموح — هذا الحد لحماية سرعة المعالجة على هذا الجهاز',
+  'ocr-not-ready': 'محرك OCR غير جاهز بعد — أعد المحاولة خلال دقيقة',
+  'ocr-empty': 'لم يُستخرج نص من الصورة — جرّب صورة أوضح أو أكبر'
 };
 
 /* ---------- خريطة الخطأ ---------- */
@@ -160,8 +164,15 @@ const TYPE_NAMES = { text: 'نص', youtube: 'يوتيوب', article: 'مقال' 
 const FILE_FORMAT_NAMES = {
   txt: 'نص TXT', md: 'ماركداون MD', docx: 'مستند Word DOCX', xlsx: 'جدول Excel XLSX',
   csv: 'CSV', srt: 'ترجمات SRT', vtt: 'ترجمات VTT', json: 'JSON', xml: 'XML',
-  epub: 'كتاب EPUB', pptx: 'عرض PowerPoint PPTX'
+  epub: 'كتاب EPUB', pptx: 'عرض PowerPoint PPTX',
+  mp4: 'فيديو MP4', webm: 'فيديو WebM', mov: 'فيديو MOV', mkv: 'فيديو MKV',
+  avi: 'فيديو AVI', m4v: 'فيديو M4V', '3gp': 'فيديو 3GP',
+  mp3: 'صوت MP3', wav: 'صوت WAV', m4a: 'صوت M4A', ogg: 'صوت OGG',
+  png: 'صورة PNG', jpg: 'صورة JPG', jpeg: 'صورة JPEG', webp: 'صورة WebP', bmp: 'صورة BMP'
 };
+// صيغ الفيديو/الصوت (تُرسل إلى /api/video-local) وصيغ الصور (تُرسل إلى /api/ocr)
+const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v', '3gp', 'mp3', 'wav', 'm4a', 'ogg'];
+const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
 const EXPORT_FORMATS = [
   { fmt: 'txt', label: 'TXT' },
   { fmt: 'md', label: 'MD' },
@@ -726,13 +737,19 @@ async function runTranslate() {
       showToast('اختر ملفاً أولاً');
       return;
     }
-    payload = {
-      format: state.file.ext,
-      content: state.file.base64,
-      targetLang: target,
-      provider
-    };
-    endpoint = '/api/translate-file';
+    const ext = state.file.ext;
+    if (IMAGE_EXTS.includes(ext)) {
+      // صورة → استخراج نص عبر OCR ثم ترجمة
+      payload = { content: state.file.base64, ext };
+      endpoint = '/api/ocr';
+    } else if (VIDEO_EXTS.includes(ext)) {
+      // فيديو/صوت محلي → تفريغ صوتي محلي + ترجمة
+      payload = { format: ext, content: state.file.base64, targetLang: target, provider };
+      endpoint = '/api/video-local';
+    } else {
+      payload = { format: ext, content: state.file.base64, targetLang: target, provider };
+      endpoint = '/api/translate-file';
+    }
   }
 
   // تشغيل آلة الحالات
@@ -742,9 +759,11 @@ async function runTranslate() {
   if (state.mode === 'text') {
     showProgress('جاري الترجمة…');
   } else if (state.mode === 'file') {
-    showProgress('جاري فتح الملف…');
+    const isVideo = state.file && VIDEO_EXTS.includes(state.file.ext);
+    const isImage = state.file && IMAGE_EXTS.includes(state.file.ext);
+    showProgress(isVideo ? 'جاري تفريغ الصوت محلياً (قد يستغرق ~5.5× مدة الفيديو)…' : (isImage ? 'جاري استخراج النص من الصورة…' : 'جاري فتح الملف…'));
     setTimeout(() => {
-      if (state.running) showProgress('جاري الترجمة…');
+      if (state.running) showProgress(isVideo ? 'جاري الترجمة…' : 'جاري الترجمة…');
     }, 2500);
   } else {
     showProgress('جاري جلب المحتوى…');
@@ -772,11 +791,18 @@ async function runTranslate() {
     state.activeTab = 'translated';
 
     if (state.mode === 'file') {
-      if (!data || !data.translated) {
+      if (data && data.type === 'local-video') {
+        // فيديو محلي مترجم: مشغل + ترجمات متزامنة
+        renderLocalVideo(data);
+      } else if (data && data.text && !data.translated) {
+        // نتيجة OCR: انقل النص المستخرج إلى وضع النص للترجمة
+        handleOcrResult(data);
+      } else if (!data || !data.translated) {
         showError('server-error', 500);
         return;
+      } else {
+        renderFileResult(data);
       }
-      renderFileResult(data);
     } else {
       if (!data || !data.type) {
         showError('server-error', 500);
@@ -825,6 +851,10 @@ function renderResult(data) {
   // النسخ والمشاركة متاحان لجميع أنواع النتائج
   copyBtn.hidden = false;
   shareBtn.hidden = false;
+
+  // زر التشكيل: يظهر فقط إذا كان النص المترجم عربيًا
+  const translatedText = (state.current && state.current.translated) || '';
+  tashkeelBtn.hidden = !/[\u0600-\u06FF]/.test(translatedText);
 
   // زر المقارنة جنبًا إلى جنب للمقالات فقط
   compareBtn.hidden = data.type !== 'article';
@@ -1023,6 +1053,8 @@ function renderFileResult(data) {
   compareBtn.classList.remove('active');
   copyBtn.hidden = false;
   shareBtn.hidden = false;
+  // وضع الملف: التشكيل يظهر إن كانت الترجمة عربية
+  tashkeelBtn.hidden = !/[\u0600-\u06FF]/.test(String(data.translated || ''));
 
   // التبويبات: الترجمة نشطة
   tabs.forEach((t) => {
@@ -1063,6 +1095,174 @@ function renderFileResult(data) {
   result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+/* ---------- نتيجة OCR: نقل النص المستخرج إلى وضع النص للترجمة ---------- */
+function handleOcrResult(data) {
+  const text = String(data.text || '').trim();
+  if (!text) {
+    showError('ocr-empty', 422);
+    return;
+  }
+  // بدّل إلى وضع النص واملأ الحقل بالنص المستخرج
+  const btn = document.querySelector('.mode-btn[data-mode="text"]');
+  if (btn) btn.click();
+  textInput.value = text;
+  state.file = null;
+  showToast('تم استخراج النص من الصورة — اضغط «ترجمة» الآن');
+}
+
+/* ---------- فيديو محلي مترجم: مشغل + ترجمات WebVTT متزامنة + لوحة المقاطع ---------- */
+function buildWebVtt(captions) {
+  // captions: [{ start, duration, translated }] → نص WebVTT كامل
+  let out = 'WEBVTT\n\n';
+  (captions || []).forEach((c, i) => {
+    const s = c.start || 0;
+    const e = s + (c.duration || 2000);
+    out += (i + 1) + '\n';
+    out += vttClock(s) + ' --> ' + vttClock(e) + '\n';
+    out += (c.translated || c.original || '') + '\n\n';
+  });
+  return out;
+}
+
+function vttClock(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  const ms = Math.round((sec % 1) * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return p(h) + ':' + p(m) + ':' + p(s) + '.' + String(ms).padStart(3, '0');
+}
+
+function renderLocalVideo(data) {
+  // الفيديو المحلي لا يملك «نصًا أصليًا» منفصلًا — نخفي تبويبه
+  const origTab = document.querySelector('.tab[data-tab="original"]');
+  if (origTab) origTab.hidden = true;
+
+  const fname = (state.file && state.file.name) ? state.file.name : '';
+  metaTitle.textContent = fname ? ('🎬 ' + fname) : 'الفيديو المترجم';
+  cacheBadge.hidden = !(data.meta && data.meta.cached === true);
+  let line = 'تمت ترجمة الفيديو من ' + langName(data.sourceLang) + ' إلى ' + langName(targetLang.value);
+  if (data.captions) line += ' · ' + data.captions.length + ' مقطع';
+  metaLine.textContent = line;
+  sourceNotice.hidden = true;
+
+  // أزرار: نسخ/مشاركة/تصدير فقط (لا استماع ولا مقارنة للفيديو المترجم)
+  srtBtn.hidden = true;
+  localBtn.hidden = true;
+  listenBtn.hidden = true;
+  compareBtn.hidden = true;
+  state.compare = false;
+  compareBtn.classList.remove('active');
+  copyBtn.hidden = false;
+  shareBtn.hidden = false;
+  tashkeelBtn.hidden = true;
+
+  tabs.forEach((t) => {
+    const active = t.dataset.tab === 'translated';
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', String(active));
+  });
+  state.activeTab = 'translated';
+
+  // المشغل: الفيديو من كائن المتصفح + مسار ترجمات WebVTT (بلا إعادة بث من الخادم)
+  resultEmbed.hidden = false;
+  resultEmbed.innerHTML = '';
+  const video = document.createElement('video');
+  video.controls = true;
+  video.preload = 'metadata';
+  video.style.width = '100%';
+  video.style.maxHeight = '360px';
+  video.style.borderRadius = '12px';
+  video.style.background = '#000';
+  if (state.file && state.file.file) {
+    video.src = URL.createObjectURL(state.file.file);
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = 'العربية';
+    track.srclang = 'ar';
+    track.default = true;
+    track.src = URL.createObjectURL(new Blob([buildWebVtt(data.captions || [])], { type: 'text/vtt' }));
+    video.appendChild(track);
+  }
+  resultEmbed.appendChild(video);
+
+  // لوحة المقاطع المترجمة (نمط لوحة يوتيوب)
+  capPanel.hidden = false;
+  capPanelList.innerHTML = '';
+  for (const c of data.captions || []) {
+    const row = document.createElement('div');
+    row.className = 'cap';
+    const time = document.createElement('span');
+    time.className = 'cap-time';
+    time.textContent = '[' + formatTime(c.start || 0) + ']';
+    const text = document.createElement('span');
+    text.className = 'cap-text';
+    text.textContent = c.translated || c.original || '';
+    row.appendChild(time);
+    row.appendChild(text);
+    capPanelList.appendChild(row);
+  }
+
+  // تبويب الترجمة: النص الكامل المترجم
+  resultBody.innerHTML = '';
+  renderParagraphs((data.captions || []).map((c) => c.translated || c.original || '').join('\n'));
+
+  // أزرار التصدير: SRT/VTT من المقاطع + النص الكامل للبقية
+  state.resultForExport = {
+    format: 'vtt',
+    segments: (data.captions || []).map((c) => ({
+      start: c.start || 0,
+      end: (c.start || 0) + (c.duration || 2000),
+      text: c.translated || c.original || '',
+    })),
+    translated: (data.captions || []).map((c) => c.translated || c.original || '').join('\n'),
+  };
+  renderExportRow(state.resultForExport);
+
+  result.hidden = false;
+  result.classList.remove('reveal');
+  void result.offsetWidth;
+  result.classList.add('reveal');
+  result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ---------- زر التشكيل: إضافة حركات للنص العربي المترجم ---------- */
+function setupTashkeelButton() {
+  tashkeelBtn.addEventListener('click', async () => {
+    if (state.running) return;
+    const text = (state.current && (state.current.translated || '')) || '';
+    if (!text || !/[\u0600-\u06FF]/.test(text)) {
+      showToast('النص لا يحتوي على حروف عربية');
+      return;
+    }
+    state.running = true;
+    tashkeelBtn.disabled = true;
+    try {
+      showProgress('جاري التشكيل (إضافة الحركات)…');
+      const { status, data } = await postJson('/api/tashkeel', { text });
+      hideProgress();
+      if (data && data.error) {
+        showError(data.error, status);
+        return;
+      }
+      if (data && data.diacritized) {
+        if (state.current) state.current.translated = data.diacritized;
+        state.activeTab = 'translated';
+        resultBody.innerHTML = '';
+        renderParagraphs(data.diacritized);
+        showToast(data.engine === 'gemini' ? 'تم التشكيل (Gemini) ✓' : 'تم التشكيل (قواعدي — سكون/شدة) ✓');
+      }
+    } catch (e) {
+      hideProgress();
+      showError('server-error', 500);
+    } finally {
+      state.running = false;
+      tashkeelBtn.disabled = false;
+    }
+  });
+}
+
+/* ---------- صف أزرار التصدير (حسب نوع النتيجة) ---------- */
 function renderExportRow(data) {
   const buttons = document.getElementById('export-buttons');
   buttons.innerHTML = '';
@@ -1828,6 +2028,7 @@ loadLanguages();
 
 // تهيئة وضع الملف (سحب/إفلات + اختيار ملف)
 setupFileMode();
+setupTashkeelButton();
 
 // عرض سجل الترجمات + معالجة رابط المشاركة (#share=…) عند فتح الصفحة
 renderHistory();

@@ -196,25 +196,25 @@ function normalizeChunks(segments, fullText) {
   return chunks;
 }
 
-// ===== تنزيل صوت الفيديو + تحويله + تفريغه =====
-// الإرجاع: { chunks: [{ start, duration, text }] } (التوقيع لا يتغير أبدًا)
-async function transcribeVideoAudio(videoId) {
+// ===== تفريغ ملف وسائط محلي (فيديو/صوت مرتفع) =====
+// يحوّل الملف إلى PCM خام (16 كيلوهرتز، قناة واحدة، float32) ثم يفرّغه عبر المحرك النشط
+// (sherpa-onnx الافتراضي مع احتياطي تلقائي إلى transformers عند فشل sherpa وقت التشغيل)
+// الإرجاع: { chunks: [{ start, duration, text }] } — نفس شكل مخرجات transcribeVideoAudio
+async function transcribeMediaFile(mediaPath, label) {
   await fs.mkdir(TMP_DIR, { recursive: true });
-  const m4aPath = path.join(TMP_DIR, `audio-${videoId}.m4a`); // تحميل m4a فقط (لا wav)
-  const pcmPath = path.join(TMP_DIR, `audio-${videoId}.f32`);
+  // اسم ملف PCM مؤقت فريد (يُنظَّف في finally داخل هذه الدالة — لا يُلمس من الخارج)
+  const tag = String(label || path.basename(mediaPath || 'media')).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const pcmPath = path.join(TMP_DIR, `pcm-${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}.f32`);
 
   try {
-    // 1) تنزيل الصوت كـ m4a مباشرة عبر yt-dlp.exe (الثنائي المباشر — موثوق)
-    await downloadAudio('https://www.youtube.com/watch?v=' + videoId, m4aPath);
+    // 1) تحويل الملف → PCM خام مباشرة: 16 كيلوهرتز، قناة واحدة، float32 (بدون wav وسيط)
+    await execFileAsync('ffmpeg', ['-y', '-i', mediaPath, '-ar', '16000', '-ac', '1', '-f', 'f32le', pcmPath]);
 
-    // 2) تحويل m4a → PCM خام مباشرة: 16 كيلوهرتز، قناة واحدة، float32 (بدون wav وسيط)
-    await execFileAsync('ffmpeg', ['-y', '-i', m4aPath, '-ar', '16000', '-ac', '1', '-f', 'f32le', pcmPath]);
-
-    // 3) قراءة العينات مباشرة في Float32Array (لا يوجد AudioContext في Node)
+    // 2) قراءة العينات مباشرة في Float32Array (لا يوجد AudioContext في Node)
     const buf = await fs.readFile(pcmPath);
     const audio = new Float32Array(buf.buffer, buf.byteOffset, buf.length / 4);
 
-    // 4) التفريغ عبر المحرك النشط (sherpa أسرع بكثير؛ transformers احتياطي)
+    // 3) التفريغ عبر المحرك النشط (sherpa أسرع بكثير؛ transformers احتياطي)
     const engine = activeEngine();
     console.log('[audio] STT engine: ' + engine + (engine === 'sherpa' ? ' (sherpa-onnx)' : ' (transformers fallback)'));
     let res;
@@ -225,7 +225,7 @@ async function transcribeVideoAudio(videoId) {
       res = await stt(audio, { task: 'transcribe', return_timestamps: true });
     }
 
-    // 5) توحيد المقاطع إلى شكل chunks موحد
+    // 4) توحيد المقاطع إلى شكل chunks موحد
     const segments = segmentsFromResult(res, engine);
     const chunks = normalizeChunks(segments, res.text || '');
 
@@ -267,9 +267,34 @@ async function transcribeVideoAudio(videoId) {
     err.code = 'fetch-failed';
     throw err;
   } finally {
-    // 6) تنظيف الملفات المؤقتة دائمًا (لا wav بعد الآن — m4a + f32 فقط)
-    await removeFiles(m4aPath, pcmPath);
+    // 5) تنظيف ملف PCM المؤقت دائمًا
+    await removeFiles(pcmPath);
   }
 }
 
-module.exports = { transcribeVideoAudio };
+// ===== تنزيل صوت الفيديو + تفريغه (يوتيوب) =====
+// الإرجاع: { chunks: [{ start, duration, text }] } (التوقيع لا يتغير أبدًا)
+async function transcribeVideoAudio(videoId) {
+  await fs.mkdir(TMP_DIR, { recursive: true });
+  const m4aPath = path.join(TMP_DIR, `audio-${videoId}.m4a`); // تحميل m4a فقط (لا wav)
+
+  try {
+    // 1) تنزيل الصوت كـ m4a مباشرة عبر yt-dlp.exe (الثنائي المباشر — موثوق)
+    await downloadAudio('https://www.youtube.com/watch?v=' + videoId, m4aPath);
+
+    // 2) إعادة استخدام خط الأنابيب المشترك (ffmpeg → PCM → STT → chunks)
+    return await transcribeMediaFile(m4aPath, 'yt-' + videoId);
+  } catch (e) {
+    console.error('[audio] transcription failed:', e && e.message);
+    // نحافظ على رمز الخطأ المعروف ونحوّل الباقي إلى fetch-failed
+    if (e && e.code) throw e;
+    const err = new Error('audio transcription failed' + (e && e.message ? ': ' + e.message : ''));
+    err.code = 'fetch-failed';
+    throw err;
+  } finally {
+    // 3) تنظيف ملف الصوت المؤقت دائمًا (لا wav بعد الآن — m4a فقط)
+    await removeFiles(m4aPath);
+  }
+}
+
+module.exports = { transcribeVideoAudio, transcribeMediaFile };

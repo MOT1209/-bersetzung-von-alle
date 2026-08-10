@@ -90,6 +90,14 @@ app.use('/api', ttsRouter);
 app.use('/api/video', heavyLimiter);
 app.use('/api', videoRouter);
 
+// ===== الموجة 2: تشكيل عربي + فيديو محلي + OCR (كلها تحت heavyLimiter — مكلفة) =====
+app.use('/api/tashkeel', heavyLimiter);
+app.use('/api', require('./routes-tashkeel'));
+app.use('/api/video-local', heavyLimiter);
+app.use('/api', require('./routes-local-video'));
+app.use('/api/ocr', heavyLimiter);
+app.use('/api', require('./routes-ocr'));
+
 // ===== معالجة الأخطاء العامة =====
 app.use((err, req, res, next) => {
   console.error('[server] unhandled:', err);

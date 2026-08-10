@@ -181,6 +181,56 @@ function distributeByRatio(translated, lines) {
 
 // ===== معالجة يوتيوب =====
 // opts اختياري: { provider?, providers? } — يُمرَّر إلى سلسلة المزوّدين
+// ===== ترجمة أسطر زمنية (مقاطع يوتيوب/فيديو محلي) =====
+// lines: [{ start, duration, original }] → { sourceLang, captions: [{start,duration,original,translated}], cached }
+// منطق مشترك: دفعات ≤4000 حرف + كشف لغة من الدفعة الأولى + محاذاة 1:1 عبر distributeByRatio
+async function translateLines(lines, targetLang, opts, glossary) {
+  // تجميع الأسطر في دفعات ≤ 4000 حرف مع الحفاظ على المطابقة 1:1
+  const batches = [];
+  let cur = [];
+  let curLen = 0;
+  for (const line of lines) {
+    const len = String(line.original || '').length + 1;
+    if (curLen + len > 4000 && cur.length) {
+      batches.push(cur);
+      cur = [line];
+      curLen = len;
+    } else {
+      cur.push(line);
+      curLen += len;
+    }
+  }
+  if (cur.length) batches.push(cur);
+
+  // كشف لغة المصدر من أول دفعة فقط (تكراره لكل دفعة يهدر طلبات الشبكة)
+  let sourceLang = 'en';
+  if (batches[0]) {
+    const sample = batches[0].map((l) => l.original).join(' ').slice(0, 500);
+    const detected = await detectLanguage(sample);
+    if (detected) sourceLang = detected;
+  }
+
+  const translatedAll = [];
+  let totalChunks = 0;
+  let cachedChunks = 0;
+  for (const batch of batches) {
+    // ضم الأسطر بـ \n\n حتى يُعامل كل سطر كقطعة مستقلة في chunkText
+    // (يضمن محاذاة الترجمة 1:1 مع الأسطر بدل فقدان المطابقة)
+    const joined = batch.map((l) => l.original).join('\n\n');
+    const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(joined, targetLang, sourceLang, opts);
+    totalChunks += chunksTotal;
+    cachedChunks += chunksFromCache;
+    const parts = distributeByRatio(translated, batch);
+    // توزيع: مطابقة 1:1 إن أمكن، وإلا توزيع نسبي على كل الأسطر
+    batch.forEach((line, i) => {
+      line.translated = parts[i] !== undefined ? parts[i] : line.original;
+      line.translated = applyGlossary(line.translated, glossary || []);
+    });
+    translatedAll.push(...batch);
+  }
+  return { sourceLang, captions: translatedAll, cached: totalChunks > 0 && cachedChunks === totalChunks };
+}
+
 async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts) {
   try {
     // محاولة جلب الترجمات النصية أولًا
@@ -204,60 +254,16 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts
       }
     }
 
-    // تجميع الأسطر في دفعات للترجمة (offset بالمللي ثانية → نحوله لثوانٍ)
+    // الأسطر الزمنية (offset بالمللي ثانية → ثوانٍ) ثم الترجمة عبر المسار المشترك
     const lines = transcript.map((l) => ({ start: (l.offset || 0) / 1000, duration: (l.duration || 2000) / 1000, original: l.text }));
-
-    // دمج الأسطر القصيرة في دفعات ≤ 4000 حرف مع الحفاظ على المطابقة 1:1
-    const batches = [];
-    let cur = [];
-    let curLen = 0;
-    for (const line of lines) {
-      const len = line.original.length + 1;
-      if (curLen + len > 4000 && cur.length) {
-        batches.push(cur);
-        cur = [line];
-        curLen = len;
-      } else {
-        cur.push(line);
-        curLen += len;
-      }
-    }
-    if (cur.length) batches.push(cur);
-
-    // ترجمة كل دفعة ثم توزيع النص المترجم على الأسطر بنسبة الطول
-    // كشف لغة المصدر من أول دفعة فقط (تكراره لكل دفعة يهدر طلبات الشبكة)
-    let sourceLang = 'en';
-    if (batches[0]) {
-      const sample = batches[0].map((l) => l.original).join(' ').slice(0, 500);
-      const detected = await detectLanguage(sample);
-      if (detected) sourceLang = detected;
-    }
-
-    const translatedAll = [];
-    let totalChunks = 0;
-    let cachedChunks = 0;
-    for (const batch of batches) {
-      // ضم الأسطر بـ \n\n حتى يُعامل كل سطر كقطعة مستقلة في chunkText
-      // (يضمن محاذاة الترجمة 1:1 مع الأسطر بدل فقدان المطابقة)
-      const joined = batch.map((l) => l.original).join('\n\n');
-      const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(joined, targetLang, sourceLang, opts);
-      totalChunks += chunksTotal;
-      cachedChunks += chunksFromCache;
-      const parts = distributeByRatio(translated, batch);
-      // توزيع: مطابقة 1:1 إن أمكن، وإلا توزيع نسبي على كل الأسطر
-      batch.forEach((line, i) => {
-        line.translated = parts[i] !== undefined ? parts[i] : line.original;
-        line.translated = applyGlossary(line.translated, glossary || []);
-      });
-      translatedAll.push(...batch);
-    }
+    const { sourceLang, captions, cached } = await translateLines(lines, targetLang, opts, glossary);
 
     res.json({
       type: 'youtube',
       videoId,
       sourceLang,
-      captions: translatedAll,
-      meta: { title: 'فيديو يوتيوب', source: metaSource, cached: totalChunks > 0 && cachedChunks === totalChunks },
+      captions,
+      meta: { title: 'فيديو يوتيوب', source: metaSource, cached },
     });
     trackUsage({ type: 'youtube', sourceLang, targetLang }); // لا يُنتظر
   } catch (e) {
@@ -306,3 +312,4 @@ async function handleArticle(res, url, targetLang, glossary, opts) {
 
 module.exports = router;
 module.exports.distributeByRatio = distributeByRatio;
+module.exports.translateLines = translateLines; // فيديو محلي — تُستدعى وقت التنفيذ
