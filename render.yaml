@@ -1,0 +1,16 @@
+# Render.com blueprints — نشر AraLink بسحب واحد
+services:
+  - type: web
+    name: aralink
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false            # يُضاف يدويًا من لوحة Render (اختياري)
+      - key: MYMEMORY_EMAIL
+        sync: false
+      - key: LIBRE_URL
+        value: https://libretranslate.com
+      - key: RATE_LIMIT_MAX
+        value: "20"

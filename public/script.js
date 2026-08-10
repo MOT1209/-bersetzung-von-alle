@@ -47,13 +47,24 @@ const settingsMyMemoryEmail = document.getElementById('settings-mymemory-email')
 const settingsLibreUrl = document.getElementById('settings-libre-url');
 const settingsCancelBtn = document.getElementById('settings-cancel-btn');
 const settingsCloseBtn = document.getElementById('settings-close-btn');
+const glossaryListEl = document.getElementById('glossary-list');
+const glossaryFrom = document.getElementById('glossary-from');
+const glossaryTo = document.getElementById('glossary-to');
+const glossaryAddBtn = document.getElementById('glossary-add-btn');
+const compareBtn = document.getElementById('compare-btn');
+const batchInput = document.getElementById('batch-input');
+const batchBtn = document.getElementById('batch-btn');
+const batchStatus = document.getElementById('batch-status');
+const batchResults = document.getElementById('batch-results');
 
 /* ---------- الحالة (آلة الحالات: idle → fetching → translating → done | error) ---------- */
 const state = {
   mode: 'url',            // 'url' | 'text'
   running: false,         // حارس ضد الضغط المزدوج
   current: null,          // آخر نتيجة معروضة
-  activeTab: 'translated' // 'translated' | 'original'
+  activeTab: 'translated',// 'translated' | 'original'
+  compare: false,         // وضع المقارنة جنبًا إلى جنب
+  batchRunning: false     // حارس ترجمة الدفعات
 };
 
 /* ---------- أسماء اللغات (الرمز → الاسم العربي) ---------- */
@@ -114,6 +125,7 @@ function langName(code) {
 
 /* ---------- سجل الترجمات (localStorage — متسامح مع غياب التخزين) ---------- */
 const HISTORY_KEY = 'aralink-history';
+const GLOSSARY_KEY = 'aralink-glossary';
 const HISTORY_MAX = 20;
 const TYPE_NAMES = { text: 'نص', youtube: 'يوتيوب', article: 'مقال' };
 
@@ -220,6 +232,57 @@ function clearHistory() {
   safeRemove(HISTORY_KEY);
   renderHistory();
   showToast('تم مسح السجل');
+}
+
+/* ---------- مسرد المصطلحات (localStorage — يُرسل مع كل ترجمة) ---------- */
+function loadGlossary() {
+  try {
+    const raw = safeGet(GLOSSARY_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((g) => g && typeof g.from === 'string' && typeof g.to === 'string') : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveGlossary(list) {
+  safeSet(GLOSSARY_KEY, JSON.stringify(list.slice(0, 100)));
+}
+
+function getGlossary() {
+  return loadGlossary();
+}
+
+function renderGlossaryList() {
+  const list = loadGlossary();
+  glossaryListEl.innerHTML = '';
+  if (!list.length) {
+    glossaryListEl.innerHTML = '<p class="field-hint">لا توجد مصطلحات بعد — أضف زوجًا مثل cloud → سحابة</p>';
+    return;
+  }
+  list.forEach((g, i) => {
+    const row = document.createElement('div');
+    row.className = 'glossary-item';
+    row.innerHTML = '<span dir="ltr" class="glossary-from">' + escapeHtml(g.from) + '</span><span class="glossary-arrow">←</span><span class="glossary-to">' + escapeHtml(g.to) + '</span>';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'glossary-del';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'حذف ' + g.from);
+    del.addEventListener('click', () => {
+      const next = loadGlossary();
+      next.splice(i, 1);
+      saveGlossary(next);
+      renderGlossaryList();
+      showToast('حُذفت من المسرد');
+    });
+    row.appendChild(del);
+    glossaryListEl.appendChild(row);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 function reopenHistory(rec) {
@@ -436,6 +499,7 @@ async function openSettings() {
   settingsLoaded = false;
 
   settingsModal.hidden = false;
+  renderGlossaryList();
   try {
     const res = await fetch('/api/settings', { signal: AbortSignal.timeout(10000) });
     const data = await res.json().catch(() => null);
@@ -531,6 +595,7 @@ async function runTranslate() {
 
   const target = targetLang.value;
   let payload;
+  const glossary = getGlossary();
 
   if (state.mode === 'url') {
     const url = urlInput.value.trim();
@@ -538,14 +603,14 @@ async function runTranslate() {
       showError('invalid-url', 400);
       return;
     }
-    payload = { url, targetLang: target };
+    payload = { url, targetLang: target, glossary };
   } else {
     const text = textInput.value.trim();
     if (!text) {
       showError('invalid-text', 400);
       return;
     }
-    payload = { text, targetLang: target };
+    payload = { text, targetLang: target, glossary };
   }
 
   // تشغيل آلة الحالات
@@ -624,6 +689,11 @@ function renderResult(data) {
   copyBtn.hidden = false;
   shareBtn.hidden = false;
 
+  // زر المقارنة جنبًا إلى جنب للمقالات فقط
+  compareBtn.hidden = data.type !== 'article';
+  state.compare = false;
+  compareBtn.classList.remove('active');
+
   // إشعار مصدر الترجمة: فيديو بدون ترجمات نصية (تفريغ صوتي تلقائي)
   if (data.type === 'youtube' && data.meta && data.meta.source === 'audio') {
     sourceNotice.textContent = 'تم التفريغ من الصوت تلقائيًا — لا توجد ترجمات نصية';
@@ -652,6 +722,12 @@ function renderTab(tab) {
   state.activeTab = tab;
   const data = state.current;
   if (!data) return;
+
+  // وضع المقارنة جنبًا إلى جنب (مقالات فقط) يتجاوز التبويب
+  if (state.compare && data.type === 'article') {
+    renderCompareView(data);
+    return;
+  }
 
   resultBody.innerHTML = '';
   if (data.type === 'youtube') {
@@ -962,9 +1038,208 @@ async function playLocalVideo() {
   }
 }
 
+/* ---------- عرض المقارنة جنبًا إلى جنب (مقالات فقط) ---------- */
+function renderCompareView(data) {
+  resultBody.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'compare-wrap';
+
+  const colA = document.createElement('div');
+  colA.className = 'compare-col';
+  const colB = document.createElement('div');
+  colB.className = 'compare-col';
+
+  const hA = document.createElement('h3');
+  hA.className = 'compare-head';
+  hA.textContent = 'النص الأصلي';
+  const hB = document.createElement('h3');
+  hB.className = 'compare-head';
+  hB.textContent = 'الترجمة';
+  colA.appendChild(hA);
+  colB.appendChild(hB);
+
+  const originals = data.originalBlocks || [];
+  const translated = data.translatedBlocks || [];
+  const max = Math.max(originals.length, translated.length);
+  for (let i = 0; i < max; i++) {
+    const ob = originals[i];
+    const tb = translated[i];
+    if (ob) {
+      const el = document.createElement('p');
+      el.className = 'blk' + (ob.type === 'heading' ? ' blk-heading' : '');
+      el.textContent = ob.content;
+      colA.appendChild(el);
+    }
+    if (tb) {
+      const el = document.createElement('p');
+      el.className = 'blk' + (tb.type === 'heading' ? ' blk-heading' : '');
+      el.textContent = tb.content;
+      colB.appendChild(el);
+    }
+  }
+  wrap.appendChild(colA);
+  wrap.appendChild(colB);
+  resultBody.appendChild(wrap);
+}
+
+/* ---------- ترجمة دفعات (روابط متعددة) ---------- */
+async function runBatch() {
+  if (state.batchRunning) return;
+  const lines = batchInput.value.split(/\n+/).map((s) => s.trim()).filter((s) => /^https?:\/\//i.test(s));
+  if (!lines.length) {
+    showToast('أدخل رابطًا واحدًا صالحًا على الأقل');
+    return;
+  }
+  state.batchRunning = true;
+  batchBtn.disabled = true;
+  batchResults.innerHTML = '';
+  const target = targetLang.value;
+  const glossary = getGlossary();
+
+  for (let i = 0; i < lines.length; i++) {
+    batchStatus.textContent = 'جاري الترجمة (' + (i + 1) + '/' + lines.length + '): ' + lines[i];
+    const card = document.createElement('div');
+    card.className = 'batch-item';
+    const linkEl = document.createElement('div');
+    linkEl.className = 'batch-link';
+    linkEl.dir = 'ltr';
+    linkEl.textContent = lines[i];
+    card.appendChild(linkEl);
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'batch-body';
+    bodyEl.textContent = 'قيد الترجمة…';
+    card.appendChild(bodyEl);
+    batchResults.appendChild(card);
+    batchResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    try {
+      const { status, data } = await postJson('/api/translate', { url: lines[i], targetLang: target, glossary });
+      if (data && data.error) {
+        bodyEl.textContent = '❌ ' + mapError(data.error, status);
+        bodyEl.classList.add('batch-err');
+      } else if (data && data.type === 'youtube') {
+        const caps = data.captions || [];
+        bodyEl.textContent = '✅ ' + caps.length + ' سطرًا مترجمًا';
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'btn-secondary';
+        open.textContent = 'فتح النتيجة';
+        open.addEventListener('click', () => {
+          state.current = data;
+          state.activeTab = 'translated';
+          teardownPlayers();
+          saveToHistory(data, target);
+          renderResult(data);
+        });
+        bodyEl.appendChild(open);
+      } else if (data && data.translatedBlocks) {
+        bodyEl.textContent = '✅ ' + data.translatedBlocks.length + ' كتلة مترجمة';
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'btn-secondary';
+        open.textContent = 'فتح النتيجة';
+        open.addEventListener('click', () => {
+          state.current = data;
+          state.activeTab = 'translated';
+          teardownPlayers();
+          saveToHistory(data, target);
+          renderResult(data);
+        });
+        bodyEl.appendChild(open);
+      } else {
+        bodyEl.textContent = '❌ استجابة غير متوقعة';
+        bodyEl.classList.add('batch-err');
+      }
+    } catch (e) {
+      bodyEl.textContent = '❌ ' + mapError('server-error', 500);
+      bodyEl.classList.add('batch-err');
+    }
+    // فاصل قصير بين الروابط لتفادي حجب الحصص
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
+  batchStatus.textContent = 'اكتملت ترجمة ' + lines.length + ' رابطًا ✓';
+  state.batchRunning = false;
+  batchBtn.disabled = false;
+}
+
+/* ---------- نطق الكلمة عند النقر المزدوج ---------- */
+let wordAudioUrl = null;
+async function pronounceWord(word) {
+  if (!word) return;
+  try {
+    const { status, data } = await postJson('/api/tts', { text: word });
+    if (status !== 200 || !data || !data.audioUrl) {
+      showToast('تعذر نطق الكلمة');
+      return;
+    }
+    if (wordAudioUrl) URL.revokeObjectURL(wordAudioUrl);
+    const res = await fetch(data.audioUrl);
+    const blob = await res.blob();
+    wordAudioUrl = URL.createObjectURL(blob);
+    ttsPlayer.src = wordAudioUrl;
+    ttsPlayer.play().catch(() => { /* المتصفح قد يمنع — تجاهل */ });
+  } catch (e) {
+    showToast('تعذر نطق الكلمة');
+  }
+}
+
+function handleResultDblClick(e) {
+  if (!state.current || state.activeTab !== 'translated') return;
+  const sel = window.getSelection && window.getSelection().toString();
+  if (sel && sel.trim().length <= 180) {
+    pronounceWord(sel.trim());
+    return;
+  }
+  // نقر مزدوج على كلمة واحدة
+  if (e.target && e.target.closest && e.target.closest('.result-body, .blk, .compare-col')) {
+    const text = e.target.textContent || '';
+    const word = (text.split(/[\s\n،.،!؟]+/).filter(Boolean).pop() || '').replace(/[^\p{L}\p{N}'_-]/gu, '');
+    if (word && word.length <= 180) pronounceWord(word);
+  }
+}
+
 /* ---------- التفاعلات ---------- */
 translateBtn.addEventListener('click', runTranslate);
 retryBtn.addEventListener('click', runTranslate);
+
+// زر المقارنة جنبًا إلى جنب
+compareBtn.addEventListener('click', () => {
+  state.compare = !state.compare;
+  compareBtn.classList.toggle('active', state.compare);
+  if (state.compare) {
+    tabs.forEach((t) => t.classList.remove('active'));
+  } else {
+    renderTab('translated');
+  }
+  renderTab(state.compare ? state.compare : state.activeTab);
+});
+
+// ترجمة الدفعات
+batchBtn.addEventListener('click', runBatch);
+
+// نطق الكلمة عند النقر المزدوج
+resultBody.addEventListener('dblclick', handleResultDblClick);
+
+// المسرد: إضافة زوج جديد
+function addGlossaryPair() {
+  const from = glossaryFrom.value.trim();
+  const to = glossaryTo.value.trim();
+  if (!from || !to) {
+    showToast('أدخل الكلمتين معًا');
+    return;
+  }
+  const list = loadGlossary();
+  list.push({ from, to });
+  saveGlossary(list);
+  glossaryFrom.value = '';
+  glossaryTo.value = '';
+  renderGlossaryList();
+  showToast('أُضيف إلى المسرد ✓');
+}
+glossaryAddBtn.addEventListener('click', addGlossaryPair);
+glossaryFrom.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); glossaryTo.focus(); } });
+glossaryTo.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addGlossaryPair(); } });
 
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') runTranslate();
@@ -994,6 +1269,7 @@ modeBtns.forEach((btn) => {
     localBtn.hidden = true;
     copyBtn.hidden = true;
     shareBtn.hidden = true;
+    compareBtn.hidden = true;
     shareView.hidden = true;
     sourceNotice.hidden = true;
     cacheBadge.hidden = true;

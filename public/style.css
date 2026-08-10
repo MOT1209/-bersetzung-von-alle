@@ -887,3 +887,128 @@ body {
   .history-preview { flex-basis: 100%; }
   .history-meta { text-align: start; }
 }
+
+/* ===== الميزات الجديدة: دفعات + مقارنة + مسرد + نطق ===== */
+.batch-details {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(127, 127, 127, .05);
+  padding: 4px 14px 14px;
+}
+.batch-summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-weight: 600;
+  color: var(--primary);
+  list-style: none;
+}
+.batch-summary::-webkit-details-marker { display: none; }
+.batch-summary::before { content: '▼ '; font-size: .8em; }
+.batch-details[open] .batch-summary::before { content: '▲ '; }
+.batch-status { color: var(--text-dim); font-size: .85rem; }
+.batch-results { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.batch-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--card-bg);
+}
+.batch-link {
+  font-size: .78rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: left;
+  margin-bottom: 6px;
+}
+.batch-body {
+  font-size: .9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.batch-body .btn-secondary { font-size: .8rem; padding: 5px 12px; }
+.batch-err { color: var(--danger, #ef4444); }
+
+.compare-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.compare-col {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(127, 127, 127, .04);
+  min-width: 0;
+}
+.compare-head {
+  margin: 0 0 10px;
+  font-size: .95rem;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+.btn-action.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(99, 102, 241, .12);
+}
+
+.modal-sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 18px 0 12px;
+}
+.modal-subtitle {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: var(--text);
+}
+.glossary-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  margin: 10px 0;
+}
+.glossary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.glossary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: .88rem;
+  background: rgba(127, 127, 127, .05);
+}
+.glossary-from { direction: ltr; font-weight: 600; color: var(--primary); }
+.glossary-arrow { color: var(--text-dim); }
+.glossary-to { flex: 1; }
+.glossary-del {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: .85rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.glossary-del:hover { color: var(--danger, #ef4444); background: rgba(239, 68, 68, .12); }
+
+/* نطق الكلمة عند النقر المزدوج */
+.result-body .blk, .compare-col .blk {
+  user-select: text;
+  -webkit-user-select: text;
+}

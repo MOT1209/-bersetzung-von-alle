@@ -2,7 +2,7 @@
 const express = require('express');
 const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript, buildSrt } = require('./youtube');
-const { translateText, translateTextWithMeta, detectLanguage } = require('./translate');
+const { translateText, translateTextWithMeta, detectLanguage, applyGlossary } = require('./translate');
 const { transcribeVideoAudio } = require('./audio');
 
 const router = express.Router();
@@ -31,37 +31,42 @@ function sendError(res, e) {
 }
 
 // ===== POST /api/translate — ترجمة رابط =====
+// body: { url, targetLang, videoLang?, glossary?: [{from,to}] }
 router.post('/translate', async (req, res) => {
-  const { url, targetLang = 'ar', videoLang } = req.body || {};
+  const { url, targetLang = 'ar', videoLang, glossary } = req.body || {};
 
   if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) {
     return res.status(400).json({ error: 'invalid-url' });
   }
   const cleanUrl = url.trim();
+  // مسرد اختياري: مصفوفة {from,to} — تُطبَّق بعد الترجمة على النص النهائي فقط
+  const g = Array.isArray(glossary) ? glossary : [];
 
   try {
     // 1) يوتيوب؟
     const videoId = extractVideoId(cleanUrl);
     if (videoId) {
-      return await handleYouTube(res, videoId, targetLang, videoLang);
+      return await handleYouTube(res, videoId, targetLang, videoLang, g);
     }
 
     // 2) مقال / موقع
-    return await handleArticle(res, cleanUrl, targetLang);
+    return await handleArticle(res, cleanUrl, targetLang, g);
   } catch (e) {
     return sendError(res, e);
   }
 });
 
 // ===== POST /api/translate-text — ترجمة نص مباشر =====
+// body: { text, targetLang?, glossary?: [{from,to}] }
 router.post('/translate-text', async (req, res) => {
-  const { text, targetLang = 'ar' } = req.body || {};
+  const { text, targetLang = 'ar', glossary } = req.body || {};
   if (!text || !String(text).trim()) {
     return res.status(400).json({ error: 'invalid-text' });
   }
   try {
     const sourceLang = await detectLanguage(text);
-    const translated = await translateText(String(text), targetLang, sourceLang);
+    const raw = await translateText(String(text), targetLang, sourceLang);
+    const translated = applyGlossary(raw, Array.isArray(glossary) ? glossary : []);
     res.json({ type: 'text', sourceLang, translated, original: String(text) });
   } catch (e) {
     console.error('[translate-text] error:', e.message);
@@ -105,7 +110,7 @@ function distributeByRatio(translated, lines) {
 }
 
 // ===== معالجة يوتيوب =====
-async function handleYouTube(res, videoId, targetLang, videoLang) {
+async function handleYouTube(res, videoId, targetLang, videoLang, glossary) {
   try {
     // محاولة جلب الترجمات النصية أولًا
     let metaSource = 'captions';
@@ -171,6 +176,7 @@ async function handleYouTube(res, videoId, targetLang, videoLang) {
       // توزيع: مطابقة 1:1 إن أمكن، وإلا توزيع نسبي على كل الأسطر
       batch.forEach((line, i) => {
         line.translated = parts[i] !== undefined ? parts[i] : line.original;
+        line.translated = applyGlossary(line.translated, glossary || []);
       });
       translatedAll.push(...batch);
     }
@@ -188,7 +194,7 @@ async function handleYouTube(res, videoId, targetLang, videoLang) {
 }
 
 // ===== معالجة مقال =====
-async function handleArticle(res, url, targetLang) {
+async function handleArticle(res, url, targetLang, glossary) {
   const { title, blocks } = await fetchArticleContent(url);
 
   // كشف لغة المصدر من أول 5 كتل
@@ -211,7 +217,7 @@ async function handleArticle(res, url, targetLang) {
       })
     );
     slice.forEach((b, j) => {
-      translatedBlocks.push({ type: b.type, content: results[j] });
+      translatedBlocks.push({ type: b.type, content: applyGlossary(results[j], glossary || []) });
     });
   }
 

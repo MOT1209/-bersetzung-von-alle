@@ -266,4 +266,34 @@ function chunkText(text, maxChars = MAX_CHUNK) {
   return chunks.length ? chunks : [text];
 }
 
-module.exports = { translateText, translateTextWithMeta, detectLanguage, chunkText, isUntranslatable };
+// ===== مسرد المصطلحات: استبدال بعد الترجمة (per-user — لا يُخزَّن في الكاش) =====
+// الاستبدال حساس لحالة الأحرف مع حدود كلمة، الأطول أولاً، دون المساس بالروابط
+function applyGlossary(text, glossary) {
+  if (!text || !Array.isArray(glossary) || !glossary.length) return text;
+  const pairs = glossary
+    .filter((g) => g && typeof g.from === 'string' && typeof g.to === 'string')
+    .map((g) => ({ from: g.from.trim(), to: g.to.trim() }))
+    .filter((g) => g.from.length >= 2 && g.from.length <= 100 && g.to.length <= 200)
+    // الأطول أولاً — يمنع الاستبدال الجزئي (dog قبل doghouse)
+    .sort((a, b) => b.from.length - a.from.length);
+  if (!pairs.length) return text;
+
+  // حماية الروابط: استبدل المواضع داخل الروابط بعلامات مميزة ثم أعدها لاحقاً
+  const links = [];
+  let out = text.replace(/https?:\/\/\S+/gi, (m) => {
+    links.push(m);
+    return `\u0000L${links.length - 1}\u0000`;
+  });
+
+  for (const { from, to } of pairs) {
+    // كلمات أبجدية رقمية فقط (مع عربية) — منع حقن regex برموز خاصة
+    if (!/^[\w\u0600-\u06FF' -]+$/u.test(from)) continue;
+    const re = new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'giu');
+    out = out.replace(re, to);
+  }
+
+  // إعادة الروابط
+  return out.replace(/\u0000L(\d+)\u0000/g, (m, i) => links[Number(i)] || m);
+}
+
+module.exports = { translateText, translateTextWithMeta, detectLanguage, chunkText, isUntranslatable, applyGlossary };

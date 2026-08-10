@@ -72,6 +72,19 @@
         <button type="button" id="translate-btn" class="btn-primary">ترجم الآن</button>
       </div>
 
+      <details class="batch-details" id="batch-details">
+        <summary class="batch-summary">📦 ترجمة دفعات (روابط متعددة)</summary>
+        <div class="field">
+          <label class="field-label" for="batch-input">روابط — سطر لكل رابط</label>
+          <textarea id="batch-input" class="input textarea" rows="3" dir="ltr" placeholder="https://…\nhttps://…\nhttps://…" spellcheck="false"></textarea>
+        </div>
+        <div class="lang-row">
+          <button type="button" id="batch-btn" class="btn-secondary">ترجمة الدفعة</button>
+          <span id="batch-status" class="batch-status" aria-live="polite"></span>
+        </div>
+        <div id="batch-results" class="batch-results"></div>
+      </details>
+
     </section>
 
     <!-- شريط التقدم -->
@@ -95,6 +108,7 @@
           <button type="button" class="tab active" data-tab="translated" role="tab" aria-selected="true">الترجمة</button>
           <button type="button" class="tab" data-tab="original" role="tab" aria-selected="false">النص الأصلي</button>
         </div>
+        <button type="button" id="compare-btn" class="btn-action" hidden>↔️ مقارنة</button>
         <button type="button" id="listen-btn" class="btn-listen" hidden>🔊 استمع بالعربية</button>
         <button type="button" id="local-btn" class="btn-srt" hidden>▶ تشغيل بترجمات مدمجة</button>
         <button type="button" id="srt-btn" class="btn-srt" hidden>تحميل SRT</button>
@@ -169,6 +183,15 @@
           <label class="field-label" for="settings-libre-url">عنوان خادم LibreTranslate (اختياري)</label>
           <input type="url" id="settings-libre-url" class="input" dir="ltr" placeholder="https://libretranslate.com" autocomplete="off" spellcheck="false">
         </div>
+        <hr class="modal-sep">
+        <h3 class="modal-subtitle">📖 مسرد المصطلحات</h3>
+        <p class="modal-note">كلمات تُستبدل دائمًا في النص المترجم — تُحفظ محليًا في متصفحك وتُرسل مع كل ترجمة.</p>
+        <div class="glossary-form">
+          <input type="text" id="glossary-from" class="input" dir="ltr" placeholder="من: cloud" autocomplete="off" spellcheck="false" aria-label="الكلمة الأصلية">
+          <input type="text" id="glossary-to" class="input" placeholder="إلى: سحابة" autocomplete="off" spellcheck="false" aria-label="الترجمة المفضلة">
+          <button type="button" id="glossary-add-btn" class="btn-secondary">إضافة</button>
+        </div>
+        <div id="glossary-list" class="glossary-list" aria-label="قائمة المسرد"></div>
         <div class="modal-actions">
           <button type="button" id="settings-cancel-btn" class="btn-secondary">إلغاء</button>
           <button type="submit" id="settings-save-btn" class="btn-primary">حفظ</button>

@@ -1,0 +1,11 @@
+node_modules
+.env
+cache
+models
+public/uploads
+agentic-coding-starter-kit
+skills
+.git
+*.zip
+*.log
+test-results
