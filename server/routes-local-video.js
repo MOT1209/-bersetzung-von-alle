@@ -69,11 +69,17 @@ router.post('/video-local', async (req, res) => {
     return res.status(400).json({ error: 'invalid-file' });
   }
 
-  // ملف مؤقت فريد (يُنظَّف في finally)
+  // ملف مؤقت فريد (يُنظَّف قبل إرسال أي رد — لا سباق)
   const tmpFile = path.join(
     os.tmpdir(),
     'aralink-local-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + format
   );
+
+  // يرسل الاستجابة بعد حذف الملف المؤقت أولًا — يضمن عدم بقاء ملفات بعد عودة fetch
+  const respond = async (status, body) => {
+    await fs.promises.unlink(tmpFile).catch(() => {});
+    return res.status(status).json(body);
+  };
 
   try {
     // 3) حفظ الفيديو مؤقتًا
@@ -87,14 +93,14 @@ router.post('/video-local', async (req, res) => {
       // ffprobe فشل (ملف تالف؟) — نكمل بدون حد مدة صارم؛ التفريغ سيفشل لاحقًا بخطأ واضح
     }
     if (durationSec > config.LOCAL_VIDEO_MAX_MIN * 60) {
-      return res.status(422).json({ error: 'video-too-long', maxMinutes: config.LOCAL_VIDEO_MAX_MIN });
+      return await respond(422, { error: 'video-too-long', maxMinutes: config.LOCAL_VIDEO_MAX_MIN });
     }
 
     // 5) تفريغ صوتي محلي (سيركا-onnx — وصول وقت التنفيذ ليمكن تزييفه في الاختبارات)
     const { transcribeMediaFile } = require('./audio');
     const { chunks } = await transcribeMediaFile(tmpFile, 'local-' + format);
     if (!Array.isArray(chunks) || !chunks.length) {
-      return res.status(422).json({ error: 'audio-empty' });
+      return await respond(422, { error: 'audio-empty' });
     }
 
     // 6) ترجمة المقاطع عبر المسار المشترك (محاذاة 1:1 + كاش — وصول وقت التنفيذ)
@@ -106,18 +112,17 @@ router.post('/video-local', async (req, res) => {
     }));
     const { sourceLang, captions, cached } = await translateLines(lines, targetLang, { provider, providers });
 
-    // 7) النجاح
-    res.json({
+    // 7) النجاح — حذف قبل الرد
+    return await respond(200, {
       type: 'local-video',
       sourceLang,
       captions,
       meta: { source: 'audio', durationSec: Math.round(durationSec), cached, maxMinutes: config.LOCAL_VIDEO_MAX_MIN },
     });
   } catch (e) {
+    // تنظيف قبل إرسال الخطأ أيضًا
+    await fs.promises.unlink(tmpFile).catch(() => {});
     return sendError(res, e);
-  } finally {
-    // تنظيف الملف المؤقت دائمًا
-    fs.unlink(tmpFile, () => {});
   }
 });
 
