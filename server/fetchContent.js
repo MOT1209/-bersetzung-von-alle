@@ -2,6 +2,7 @@
 const cheerio = require('cheerio');
 const { validatePublicUrl } = require('./ssrf'); // حماية SSRF قبل أي جلب
 const { extractPdfText, extractPdfTitle } = require('./pdf'); // مستخرج نصوص PDF (بدون مكتبات)
+const { getRuleForUrl } = require('./extractionRules'); // قواعد استخراج مخصصة للمواقع الصعبة
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -69,7 +70,61 @@ async function fetchArticleContent(url) {
   }
 
   const html = await res.text();
+
+  // قاعدة استخراج مخصصة لهذا النطاق؟ (مواقع لا تلتقطها الأداة العامة)
+  const rule = await getRuleForUrl(url);
+  if (rule) {
+    try {
+      return extractWithSelectors(html, rule);
+    } catch (e) {
+      if (e.code === 'content-empty') {
+        // القاعدة لم تطابق شيئًا — نعود للاستخراج العام بدل الفشل
+        return extractMainText(html);
+      }
+      throw e;
+    }
+  }
+
   return extractMainText(html);
+}
+
+// ===== استخراج النص عبر محددات CSS مخصصة (قواعد المستخدم للمواقع الصعبة) =====
+function extractWithSelectors(html, rule) {
+  const $ = cheerio.load(html);
+  const title = $(rule.titleSelector || 'h1').first().text().replace(/\s+/g, ' ').trim() || '';
+
+  // أزل العناصر المزعجة قبل الجمع
+  $('script, style, nav, footer, header, aside, iframe, form, button, svg, noscript').remove();
+
+  const blocks = [];
+  const selectors = Array.isArray(rule.contentSelectors) ? rule.contentSelectors : ['article'];
+  for (const sel of selectors) {
+    $(sel).each((_, el) => {
+      // استخرج العناوين داخل الحاوية ثم الفقرات
+      $(el).find('h1, h2, h3').each((_, h) => {
+        const t = $(h).text().replace(/\s+/g, ' ').trim();
+        if (t.length >= 2) blocks.push({ type: 'heading', content: t });
+      });
+      $(el).find('p, blockquote, li').each((_, p) => {
+        const t = $(p).text().replace(/\s+/g, ' ').trim();
+        if (t.length >= 3) blocks.push({ type: 'text', content: t });
+      });
+      // نص مباشر داخل الحاوية (عناوين/فقرات بمستوى واحد بدون وسائط)
+      const direct = $(el)
+        .contents()
+        .filter(function () { return this.type === 'text'; })
+        .text().replace(/\s+/g, ' ').trim();
+      if (direct.length >= 3) blocks.push({ type: 'text', content: direct });
+    });
+  }
+
+  if (!blocks.length) {
+    const err = new Error('content-empty');
+    err.code = 'content-empty';
+    throw err;
+  }
+
+  return { title, blocks };
 }
 
 // ===== استخراج النص الأساسي من HTML =====
@@ -122,4 +177,4 @@ function extractMainText(html) {
   return { title, blocks };
 }
 
-module.exports = { fetchArticleContent, extractMainText };
+module.exports = { fetchArticleContent, extractMainText, extractWithSelectors };

@@ -96,10 +96,16 @@
     <!-- منطقة النتيجة -->
     <section id="result" class="result reveal" aria-label="نتيجة الترجمة" hidden>
       <div id="result-embed" class="result-embed" hidden>
-        <div id="video-wrap" class="video-wrap">
-          <div id="player-embed"></div>
-          <div id="cap-bar" class="cap-bar" hidden></div>
-          <video id="local-player" class="local-player" controls preload="metadata" hidden></video>
+        <div id="embed-layout" class="embed-layout">
+          <div id="video-wrap" class="video-wrap">
+            <div id="player-embed"></div>
+            <div id="cap-bar" class="cap-bar" hidden></div>
+            <video id="local-player" class="local-player" controls preload="metadata" hidden></video>
+          </div>
+          <div id="cap-panel" class="cap-panel" aria-label="الترجمات المتزامنة" hidden>
+            <div class="cap-panel-head">🎬 الترجمة المتزامنة</div>
+            <div id="cap-panel-list" class="cap-panel-list"></div>
+          </div>
         </div>
       </div>
 
@@ -192,6 +198,15 @@
           <button type="button" id="glossary-add-btn" class="btn-secondary">إضافة</button>
         </div>
         <div id="glossary-list" class="glossary-list" aria-label="قائمة المسرد"></div>
+        <hr class="modal-sep">
+        <h3 class="modal-subtitle">🔍 قواعد الاستخراج (المواقع الصعبة)</h3>
+        <p class="modal-note">للمواقع التي لا تُستخرج تلقائيًا (مثل جوجل نيوز): حدد نطاقًا ومحدد CSS للمحتوى.</p>
+        <div class="glossary-form">
+          <input type="text" id="rule-domain" class="input" dir="ltr" placeholder="النطاق: news.google.com" autocomplete="off" spellcheck="false" aria-label="نطاق الموقع">
+          <input type="text" id="rule-selector" class="input" dir="ltr" placeholder="المحدد: article, .news-item" autocomplete="off" spellcheck="false" aria-label="محدد CSS للمحتوى">
+          <button type="button" id="rule-add-btn" class="btn-secondary">إضافة</button>
+        </div>
+        <div id="rule-list" class="glossary-list" aria-label="قائمة القواعد"></div>
         <div class="modal-actions">
           <button type="button" id="settings-cancel-btn" class="btn-secondary">إلغاء</button>
           <button type="submit" id="settings-save-btn" class="btn-primary">حفظ</button>

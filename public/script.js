@@ -26,6 +26,8 @@ const langSearch = document.getElementById('lang-search');
 const localBtn = document.getElementById('local-btn');
 const cacheBadge = document.getElementById('cache-badge');
 const capBar = document.getElementById('cap-bar');
+const capPanel = document.getElementById('cap-panel');
+const capPanelList = document.getElementById('cap-panel-list');
 const localPlayer = document.getElementById('local-player');
 const errorEl = document.getElementById('error');
 const errorMessage = document.getElementById('error-message');
@@ -51,6 +53,10 @@ const glossaryListEl = document.getElementById('glossary-list');
 const glossaryFrom = document.getElementById('glossary-from');
 const glossaryTo = document.getElementById('glossary-to');
 const glossaryAddBtn = document.getElementById('glossary-add-btn');
+const ruleDomain = document.getElementById('rule-domain');
+const ruleSelector = document.getElementById('rule-selector');
+const ruleAddBtn = document.getElementById('rule-add-btn');
+const ruleListEl = document.getElementById('rule-list');
 const compareBtn = document.getElementById('compare-btn');
 const batchInput = document.getElementById('batch-input');
 const batchBtn = document.getElementById('batch-btn');
@@ -500,6 +506,7 @@ async function openSettings() {
 
   settingsModal.hidden = false;
   renderGlossaryList();
+  loadRules().then(renderRules);
   try {
     const res = await fetch('/api/settings', { signal: AbortSignal.timeout(10000) });
     const data = await res.json().catch(() => null);
@@ -582,6 +589,9 @@ function teardownPlayers() {
   localPlayer.hidden = true;
   capBar.hidden = true;
   capBar.textContent = '';
+  capPanel.hidden = true;
+  capPanelList.innerHTML = '';
+  capPanelItems = [];
   cacheBadge.hidden = true;
   resultEmbed.hidden = true;
   resultEmbed.innerHTML = '';
@@ -672,10 +682,13 @@ function renderResult(data) {
   // مشغل يوتيوب + شريط الترجمة المتزامن
   if (data.type === 'youtube') {
     resultEmbed.hidden = false;
+    buildCaptionPanel();
     setupYtPlayer(data.videoId);
   } else {
     resultEmbed.hidden = true;
     resultEmbed.innerHTML = '';
+    capPanel.hidden = true;
+    capPanelList.innerHTML = '';
   }
 
   // أزرار SRT والتشغيل المدمج للفيديو فقط
@@ -963,20 +976,67 @@ function startCaptionSync() {
     let t = 0;
     try { t = ytPlayer.getCurrentTime() || 0; } catch (e) { return; }
     let shown = false;
-    for (const c of caps) {
+    for (let i = 0; i < caps.length; i++) {
+      const c = caps[i];
       if (t >= (c.start || 0) && t < (c.start || 0) + (c.duration || 2)) {
         const txt = c.translated || c.original || '';
         if (capBar.textContent !== txt) capBar.textContent = txt;
+        highlightCaptionPanel(i);
         shown = true;
         break;
       }
     }
-    if (!shown && capBar.textContent) capBar.textContent = '';
+    if (!shown) {
+      if (capBar.textContent) capBar.textContent = '';
+      highlightCaptionPanel(-1);
+    }
   }, 250);
 }
 
 function stopCaptionSync() {
   if (capSyncTimer) { clearInterval(capSyncTimer); capSyncTimer = null; }
+}
+
+/* ---------- لوحة الترجمة المتزامنة: قائمة كاملة مع تمييز السطر الحالي ---------- */
+let capPanelItems = [];
+function buildCaptionPanel() {
+  const data = state.current;
+  const caps = (data && data.captions) || [];
+  capPanelList.innerHTML = '';
+  capPanelItems = [];
+  if (!caps.length) { capPanel.hidden = true; return; }
+  caps.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'cap-item';
+    const t = document.createElement('span');
+    t.className = 'cap-time';
+    t.dir = 'ltr';
+    t.textContent = formatTime(c.start || 0);
+    const s = document.createElement('span');
+    s.className = 'cap-text';
+    s.textContent = c.translated || c.original || '';
+    row.appendChild(t);
+    row.appendChild(s);
+    capPanelList.appendChild(row);
+    capPanelItems.push(row);
+  });
+  capPanel.hidden = false;
+}
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function highlightCaptionPanel(idx) {
+  capPanelItems.forEach((el, i) => el.classList.toggle('active', i === idx));
+  if (idx >= 0 && capPanelItems[idx]) {
+    const el = capPanelItems[idx];
+    if (typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
 }
 
 /* ---------- التشغيل بترجمات مدمجة (خيار ب: فيديو محلي + WebVTT) ---------- */
@@ -1240,6 +1300,86 @@ function addGlossaryPair() {
 glossaryAddBtn.addEventListener('click', addGlossaryPair);
 glossaryFrom.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); glossaryTo.focus(); } });
 glossaryTo.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addGlossaryPair(); } });
+
+/* ---------- قواعد الاستخراج (المواقع الصعبة) ---------- */
+async function loadRules() {
+  try {
+    const res = await fetch('/api/settings/rules', { signal: AbortSignal.timeout(10000) });
+    const data = await res.json().catch(() => null);
+    return (data && Array.isArray(data.rules)) ? data.rules : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function renderRules(rules) {
+  ruleListEl.innerHTML = '';
+  if (!rules.length) {
+    ruleListEl.innerHTML = '<p class="field-hint">لا توجد قواعد بعد — أضف نطاقًا مثل news.google.com مع المحدد article</p>';
+    return;
+  }
+  rules.forEach((r) => {
+    const row = document.createElement('div');
+    row.className = 'glossary-item';
+    const dom = document.createElement('span');
+    dom.className = 'glossary-from';
+    dom.dir = 'ltr';
+    dom.textContent = r.domain;
+    const sel = document.createElement('span');
+    sel.className = 'glossary-to';
+    sel.dir = 'ltr';
+    sel.textContent = (r.contentSelectors || []).join(', ');
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'glossary-del';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'حذف قاعدة ' + r.domain);
+    del.addEventListener('click', async () => {
+      try {
+        await fetch('/api/settings/rules/' + encodeURIComponent(r.domain), { method: 'DELETE' });
+      } catch (e) { /* تجاهل */ }
+      const rules2 = await loadRules();
+      renderRules(rules2);
+      showToast('حُذفت القاعدة');
+    });
+    row.appendChild(dom);
+    row.appendChild(sel);
+    row.appendChild(del);
+    ruleListEl.appendChild(row);
+  });
+}
+
+async function addRule() {
+  const domain = ruleDomain.value.trim();
+  const selector = ruleSelector.value.trim();
+  if (!domain || !selector) {
+    showToast('أدخل النطاق والمحدد معًا');
+    return;
+  }
+  const contentSelectors = selector.split(',').map((s) => s.trim()).filter(Boolean);
+  try {
+    const res = await fetch('/api/settings/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain, titleSelector: 'h1', contentSelectors }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      showToast(data && data.error === 'invalid-rule' ? 'قاعدة غير صالحة — تحقق من النطاق والمحدد' : 'تعذر حفظ القاعدة');
+      return;
+    }
+    ruleDomain.value = '';
+    ruleSelector.value = '';
+    renderRules((data && data.rules) || await loadRules());
+    showToast('أُضيفت القاعدة ✓');
+  } catch (e) {
+    showToast('تعذر حفظ القاعدة');
+  }
+}
+ruleAddBtn.addEventListener('click', addRule);
+ruleDomain.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ruleSelector.focus(); } });
+ruleSelector.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addRule(); } });
 
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') runTranslate();
