@@ -61,6 +61,25 @@
 - **إصلاح جوهري**: تنزيل يوتيوب عبر `server/downloader.js` (yt-dlp.exe مباشرة بـ execFile) —
   الغلاف النصي السابق كان يكسر الصيغ ويعلّق.
 
+## 🗂️ المنصة: ملفات + مزوّدون — `specs/wave1-providers-files/`
+
+منفذة بالكامل ✅ — ترقية أرا لينك إلى منصة ترجمة حقيقية:
+
+- **6 مزوّدات موحّدة كلها مجانية**: Google / MyMemory / Libre / Gemini / DeepL (Free) /
+  OpenAI-compatible (Ollama وLM Studio محليان بلا مفتاح).
+- **`GET /api/providers`** يعيد كل المزوّدين وحالتهم؛ والطلب يقبل `provider` (فرض واحد) أو
+  `providers` (ترتيب مخصّص) مع بقاء الاحتياط التلقائي.
+- **مفاتيح اختيارية** عبر `.env`: `DEEPL_API_KEY`، `OPENAI_BASE_URL`
+  (مثال Ollama: `http://localhost:11434/v1`)، `OPENAI_MODEL`، `PROVIDER_ORDER`.
+- **ترجمة ملفات**: 11 صيغة إدخال (txt, md, docx, xlsx, csv, srt, vtt, json, xml, epub, pptx)
+  و8 صيغ إخراج (txt, md, docx, srt, vtt, json, csv, xml) — مع الحفاظ على البنية:
+  توقيتات SRT/VTT، مفاتيح JSON/XML، صفوف CSV/XLSX.
+- **نقطتان جديدتان**: `POST /api/translate-file` (ترجمة ملف base64) و`POST /api/export`
+  (تنزيل النتيجة بأي صيغة، مع أسماء ملفات عربية صحيحة).
+- **الواجهة**: وضع «📄 ترجمة ملف» (سحب/إفلات) + أزرار تصدير + قائمة «المحرك المفضّل»
+  في الإعدادات مع حقول DeepL وOpenAI.
+- **قيد v1 موثّق**: تصدير pptx/epub بـ txt/md/docx فقط (لا إعادة بناء الصيغة).
+
 ## 🚀 طريقة الاستخدام
 
 ### 1) مع أي وكيل برمجة (pi، Codex، Cursor، Claude Code)
@@ -97,6 +116,10 @@ npm run dev        # يبدأ الخادم على http://localhost:3000
 │   ├── fetchContent.js ← استخراج المقالات
 │   ├── youtube.js   ← ترجمات يوتيوب
 │   ├── translate.js ← محرك الترجمة
+│   ├── files.js     ← استيراد/تصدير الملفات (11 صيغة)
+│   ├── routes-file.js ← مسارات ترجمة الملفات والتصدير
+│   ├── usage.js     ← عدّاد الاستخدام
+│   ├── logger.js    ← سجلات موحدة
 │   └── config.js
 ├── .env             ← مفاتيح API (سرية)
 ├── specs/           ← المواصفات

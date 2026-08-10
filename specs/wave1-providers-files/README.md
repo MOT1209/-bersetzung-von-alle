@@ -56,4 +56,4 @@ graph TD
 - [x] [task-03-frontend-files-providers](./tasks/task-03-frontend-files-providers.md) — واجهة: وضع ملف + أزرار تصدير + اختيار المزوّد
 
 ### Wave 2
-- [ ] [task-04-integration-docs](./tasks/task-04-integration-docs.md) — npm test كامل + إصلاح + README/CHANGELOG + فحص يدوي
+- [x] [task-04-integration-docs](./tasks/task-04-integration-docs.md) — npm test كامل + إصلاح + README/CHANGELOG + فحص يدوي
