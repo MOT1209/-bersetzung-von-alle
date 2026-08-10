@@ -27,3 +27,6 @@ skills/
 
 # Local backup archives
 *.zip
+
+# OCR traineddata (تُحمَّل عبر npm run download:ocr — لا تُلتزم)
+server/ocr/traineddata/
