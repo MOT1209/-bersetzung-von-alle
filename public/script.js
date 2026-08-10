@@ -29,6 +29,15 @@ const capBar = document.getElementById('cap-bar');
 const localPlayer = document.getElementById('local-player');
 const errorEl = document.getElementById('error');
 const errorMessage = document.getElementById('error-message');
+const copyBtn = document.getElementById('copy-btn');
+const shareBtn = document.getElementById('share-btn');
+const shareView = document.getElementById('share-view');
+const shareBody = document.getElementById('share-body');
+const shareCloseBtn = document.getElementById('share-close-btn');
+const historyEl = document.getElementById('history');
+const historyListEl = document.getElementById('history-list');
+const clearHistoryBtn = document.getElementById('clear-history-btn');
+const toast = document.getElementById('toast');
 
 /* ---------- الحالة (آلة الحالات: idle → fetching → translating → done | error) ---------- */
 const state = {
@@ -94,6 +103,236 @@ function langName(code) {
   return LANG_NAMES[key] || 'اللغة الأصلية';
 }
 
+/* ---------- سجل الترجمات (localStorage — متسامح مع غياب التخزين) ---------- */
+const HISTORY_KEY = 'aralink-history';
+const HISTORY_MAX = 20;
+const TYPE_NAMES = { text: 'نص', youtube: 'يوتيوب', article: 'مقال' };
+
+function safeGet(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+
+function safeSet(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+}
+
+function safeRemove(key) {
+  try { localStorage.removeItem(key); } catch (e) { /* تجاهل */ }
+}
+
+function loadHistoryRaw() {
+  const raw = safeGet(HISTORY_KEY);
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function saveHistoryRaw(list) {
+  safeSet(HISTORY_KEY, JSON.stringify(list));
+}
+
+/* استخراج النص (مترجم/أصلي) حسب نوع النتيجة */
+function extractResultText(data, which) {
+  if (!data) return '';
+  if (data.type === 'youtube') {
+    return (data.captions || []).map((c) => c[which] || c.original || '').join('\n');
+  }
+  if (data.type === 'article') {
+    const blocks = which === 'translated' ? data.translatedBlocks : data.originalBlocks;
+    return (blocks || []).map((b) => (b && b.content) || '').join('\n');
+  }
+  return which === 'translated' ? (data.translated || '') : (data.original || '');
+}
+
+function saveToHistory(data, targetLangCode) {
+  if (!data || !data.type) return;
+  const rec = {
+    id: Date.now(),
+    type: data.type,
+    original: extractResultText(data, 'original'),
+    translated: extractResultText(data, 'translated'),
+    targetLang: targetLangCode,
+    date: new Date().toISOString(),
+    data: data // الحمولة الكاملة لإعادة فتح دقيقة للنتيجة
+  };
+  const list = loadHistoryRaw();
+  list.unshift(rec);
+  if (list.length > HISTORY_MAX) list.length = HISTORY_MAX;
+  saveHistoryRaw(list);
+  renderHistory();
+}
+
+function formatHistoryDate(iso) {
+  try {
+    return new Date(iso).toLocaleString('ar', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  } catch (e) { return ''; }
+}
+
+function renderHistory() {
+  const list = loadHistoryRaw();
+  historyEl.hidden = list.length === 0;
+  historyListEl.innerHTML = '';
+  list.forEach((rec, index) => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+
+    const badge = document.createElement('span');
+    badge.className = 'history-badge badge-' + (rec.type || 'text');
+    badge.textContent = TYPE_NAMES[rec.type] || 'نص';
+
+    const preview = document.createElement('span');
+    preview.className = 'history-preview';
+    const previewText = (rec.translated || rec.original || '').trim().replace(/\s+/g, ' ');
+    preview.textContent = previewText ? previewText.slice(0, 120) : '—';
+
+    const meta = document.createElement('span');
+    meta.className = 'history-meta';
+    meta.textContent = langName(rec.targetLang) + ' · ' + formatHistoryDate(rec.date);
+
+    const reopen = document.createElement('button');
+    reopen.type = 'button';
+    reopen.className = 'btn-reopen';
+    reopen.textContent = 'إعادة فتح';
+    reopen.addEventListener('click', () => reopenHistory(list[index]));
+
+    item.appendChild(badge);
+    item.appendChild(preview);
+    item.appendChild(meta);
+    item.appendChild(reopen);
+    historyListEl.appendChild(item);
+  });
+}
+
+function clearHistory() {
+  safeRemove(HISTORY_KEY);
+  renderHistory();
+  showToast('تم مسح السجل');
+}
+
+function reopenHistory(rec) {
+  if (!rec || !rec.data) return;
+  hideError();
+  shareView.hidden = true;
+  teardownPlayers();
+  // استعادة اللغة المستخدمة في تلك الترجمة لعرض ملخص دقيق
+  if (rec.targetLang) targetLang.value = rec.targetLang;
+  state.current = rec.data;
+  state.activeTab = 'translated';
+  renderResult(rec.data);
+}
+
+/* ---------- نسخ ومشاركة النتيجة ---------- */
+function encodeBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+function decodeBase64(b64) {
+  const bin = atob(b64);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function currentResultText() {
+  return extractResultText(state.current, state.activeTab);
+}
+
+function copyTextToClipboard(text) {
+  return new Promise((resolve) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => resolve(true), () => resolve(false));
+    } else {
+      resolve(false);
+    }
+  }).then((ok) => {
+    if (ok) return true;
+    // بديل: textarea خفي + execCommand('copy')
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-9999px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const copied = document.execCommand('copy');
+      ta.remove();
+      return copied;
+    } catch (e) {
+      return false;
+    }
+  });
+}
+
+async function copyResult() {
+  const text = currentResultText();
+  if (!text) return;
+  const ok = await copyTextToClipboard(text);
+  showToast(ok ? 'تم النسخ ✓' : 'تعذر النسخ — انسخ النص يدويًا');
+}
+
+async function shareResult() {
+  const data = state.current;
+  if (!data) return;
+  const text = extractResultText(data, 'translated');
+  if (!text) return;
+  const url = location.origin + location.pathname + '#share=' + encodeBase64(text);
+  const ok = await copyTextToClipboard(url);
+  showToast(ok ? 'تم نسخ رابط المشاركة ✓' : 'تعذر نسخ الرابط — انسخه يدويًا من شريط العنوان');
+}
+
+/* عرض النص المترجم المشارَك (يُستدعى عند فتح رابط #share=…) */
+function appendParagraphs(container, text) {
+  const parts = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) parts.push(text);
+  for (const part of parts) {
+    const el = document.createElement('p');
+    el.className = 'blk';
+    el.textContent = part;
+    container.appendChild(el);
+  }
+}
+
+function renderShareView(text) {
+  shareBody.innerHTML = '';
+  appendParagraphs(shareBody, text);
+  shareView.hidden = false;
+  shareView.classList.remove('reveal');
+  void shareView.offsetWidth;
+  shareView.classList.add('reveal');
+  shareView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function handleShareHash() {
+  const m = location.hash.match(/^#share=(.+)$/);
+  if (!m || !m[1]) return;
+  let text = '';
+  try { text = decodeBase64(m[1]); } catch (e) { return; }
+  if (!text.trim()) return;
+  renderShareView(text.trim());
+}
+
+/* ---------- إشعار منبثق ---------- */
+let toastTimer = null;
+function showToast(message, ms = 2000) {
+  toast.textContent = message;
+  toast.hidden = false;
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    toast.hidden = true;
+  }, ms);
+}
+
 /* ---------- تحميل قائمة اللغات (~130) من الخادم + بحث ---------- */
 async function loadLanguages() {
   try {
@@ -110,7 +349,7 @@ async function loadLanguages() {
         LANG_NAMES[String(l.code).toLowerCase().split('-')[0]] = l.nameAr;
       }
       // استعادة آخر اختيار للمستخدم
-      const saved = localStorage.getItem('aralink-lang');
+      const saved = safeGet('aralink-lang');
       if (saved && Array.from(targetLang.options).some((o) => o.value === saved)) targetLang.value = saved;
     }
   } catch (e) {
@@ -166,10 +405,25 @@ async function postJson(url, body) {
   return { status: res.status, data };
 }
 
+/* ---------- تنظيف المشغلات من عرض سابق ---------- */
+function teardownPlayers() {
+  stopCaptionSync();
+  if (ytPlayer && typeof ytPlayer.destroy === 'function') { try { ytPlayer.destroy(); } catch (e) { /* تجاهل */ } }
+  ytPlayer = null;
+  if (localPlayer.src) { localPlayer.pause(); localPlayer.removeAttribute('src'); localPlayer.load(); }
+  localPlayer.hidden = true;
+  capBar.hidden = true;
+  capBar.textContent = '';
+  cacheBadge.hidden = true;
+  resultEmbed.hidden = true;
+  resultEmbed.innerHTML = '';
+}
+
 /* ---------- سير العمل الرئيسي ---------- */
 async function runTranslate() {
   if (state.running) return; // حارس ضد الضغط المزدوج
   hideError();
+  shareView.hidden = true;
 
   const target = targetLang.value;
   let payload;
@@ -222,18 +476,12 @@ async function runTranslate() {
     }
 
     // تنظيف أي عرض سابق
-    stopCaptionSync();
-    if (ytPlayer && typeof ytPlayer.destroy === 'function') { try { ytPlayer.destroy(); } catch (e) { /* تجاهل */ } }
-    ytPlayer = null;
-    if (localPlayer.src) { localPlayer.pause(); localPlayer.removeAttribute('src'); localPlayer.load(); }
-    localPlayer.hidden = true;
-    capBar.hidden = true;
-    capBar.textContent = '';
-    cacheBadge.hidden = true;
-    resultEmbed.hidden = true;
-    resultEmbed.innerHTML = '';
+    teardownPlayers();
     state.current = data;
     state.activeTab = 'translated';
+
+    // حفظ الترجمة الناجحة في السجل (آخر 20)
+    saveToHistory(data, target);
 
     renderResult(data);
   } catch (e) {
@@ -267,6 +515,10 @@ function renderResult(data) {
 
   // زر الاستماع متاح لجميع أنواع النتائج
   listenBtn.hidden = false;
+
+  // النسخ والمشاركة متاحان لجميع أنواع النتائج
+  copyBtn.hidden = false;
+  shareBtn.hidden = false;
 
   // إشعار مصدر الترجمة: فيديو بدون ترجمات نصية (تفريغ صوتي تلقائي)
   if (data.type === 'youtube' && data.meta && data.meta.source === 'audio') {
@@ -362,14 +614,7 @@ function renderBlocks(blocks) {
 
 /* ---------- عرض نص عادي (فقرات) ---------- */
 function renderParagraphs(text) {
-  const parts = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
-  if (!parts.length) parts.push(text);
-  for (const part of parts) {
-    const el = document.createElement('p');
-    el.className = 'blk';
-    el.textContent = part;
-    resultBody.appendChild(el);
-  }
+  appendParagraphs(resultBody, text);
 }
 
 /* ---------- أدوات الوقت وSRT ---------- */
@@ -643,6 +888,9 @@ modeBtns.forEach((btn) => {
     srtBtn.hidden = true;
     listenBtn.hidden = true;
     localBtn.hidden = true;
+    copyBtn.hidden = true;
+    shareBtn.hidden = true;
+    shareView.hidden = true;
     sourceNotice.hidden = true;
     cacheBadge.hidden = true;
     stopCaptionSync();
@@ -668,8 +916,16 @@ tabs.forEach((tab) => {
 srtBtn.addEventListener('click', downloadSrt);
 listenBtn.addEventListener('click', listenToResult);
 localBtn.addEventListener('click', playLocalVideo);
+copyBtn.addEventListener('click', copyResult);
+shareBtn.addEventListener('click', shareResult);
+shareCloseBtn.addEventListener('click', () => { shareView.hidden = true; });
+clearHistoryBtn.addEventListener('click', clearHistory);
 langSearch.addEventListener('input', filterLanguages);
-targetLang.addEventListener('change', () => localStorage.setItem('aralink-lang', targetLang.value));
+targetLang.addEventListener('change', () => safeSet('aralink-lang', targetLang.value));
 
 // تحميل قائمة اللغات الكاملة عند فتح الصفحة
 loadLanguages();
+
+// عرض سجل الترجمات + معالجة رابط المشاركة (#share=…) عند فتح الصفحة
+renderHistory();
+handleShareHash();

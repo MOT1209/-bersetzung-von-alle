@@ -84,6 +84,8 @@
         <button type="button" id="listen-btn" class="btn-listen" hidden>🔊 استمع بالعربية</button>
         <button type="button" id="local-btn" class="btn-srt" hidden>▶ تشغيل بترجمات مدمجة</button>
         <button type="button" id="srt-btn" class="btn-srt" hidden>تحميل SRT</button>
+        <button type="button" id="copy-btn" class="btn-action" hidden>📋 نسخ</button>
+        <button type="button" id="share-btn" class="btn-action" hidden>🔗 مشاركة</button>
       </div>
 
       <p id="meta-title" class="meta-title"></p>
@@ -93,10 +95,29 @@
       <div id="result-body" class="result-body"></div>
     </section>
 
+    <!-- عرض المشاركة: نص مترجم وصل عبر رابط #share=... -->
+    <section id="share-view" class="share-view reveal" aria-label="نص مترجم مشارَك" hidden>
+      <div class="share-header">
+        <h2 class="share-title">📖 نص مترجم مشارَك</h2>
+        <button type="button" id="share-close-btn" class="btn-secondary">إغلاق</button>
+      </div>
+      <p class="share-note">هذا النص وصل إليك مترجمًا عبر رابط مشاركة — يُعرض مباشرة دون إعادة ترجمة.</p>
+      <div id="share-body" class="result-body"></div>
+    </section>
+
     <!-- رسالة الخطأ -->
     <section id="error" class="error-card" role="alert" hidden>
       <p id="error-message" class="error-message"></p>
       <button type="button" id="retry-btn" class="btn-secondary">إعادة المحاولة</button>
+    </section>
+
+    <!-- سجل الترجمات (localStorage — آخر 20 ترجمة ناجحة) -->
+    <section id="history" class="history" aria-label="سجل الترجمات" hidden>
+      <div class="history-header">
+        <h2 class="history-title">🗂️ سجل الترجمات</h2>
+        <button type="button" id="clear-history-btn" class="btn-secondary btn-danger-outline">مسح السجل</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
     </section>
 
     <!-- مشغل الصوت (القراءة الصوتية) -->
@@ -107,6 +128,9 @@
   <footer class="site-footer">
     <p>أرا لينك — ترجمة ذكية لأي محتوى على الويب</p>
   </footer>
+
+  <!-- إشعار منبثق (تم النسخ…) -->
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="script.js"></script>
 </body>

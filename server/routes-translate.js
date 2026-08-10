@@ -224,3 +224,4 @@ async function handleArticle(res, url, targetLang) {
 }
 
 module.exports = router;
+module.exports.distributeByRatio = distributeByRatio;
