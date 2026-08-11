@@ -9,7 +9,6 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
-const { pipeline, env } = require('@xenova/transformers');
 const { downloadAudio } = require('./downloader');
 const config = require('./config');
 
@@ -31,13 +30,28 @@ function activeEngine() {
   return config.STT_ENGINE === 'sherpa' && sherpa ? 'sherpa' : 'transformers';
 }
 
-// ===== مفرد: أنبوب Whisper (transformers) يُحمَّل مرة واحدة فقط =====
-if (env && env.backends && env.backends.onnx) {
-  env.backends.onnx.numThreads = 4; // onnxruntime-node الأحدث يستفيد من الخيوط المتعددة
+// ===== transformers: استيراد كسول (لا يُحمَّل عند إقلاع الخادم) =====
+// كان `require('@xenova/transformers')` عند القمة، فيعتمد إقلاع الخادم كله على
+// اعتمادية أصلية ثقيلة. ثبت هذا عمليًا داخل حاوية Docker: غياب onnxruntime-node
+// (اعتمادية اختيارية) منع الخادم من الإقلاع أصلًا بدل أن يعطّل التفريغ وحده.
+// النمط نفسه المستخدم مع sherpa-onnx أدناه: الفشل يعطّل الميزة لا التطبيق.
+let transformers = null;
+function loadTransformers() {
+  if (!transformers) {
+    transformers = require('@xenova/transformers');
+    const { env } = transformers;
+    if (env && env.backends && env.backends.onnx) {
+      env.backends.onnx.numThreads = 4; // onnxruntime-node الأحدث يستفيد من الخيوط المتعددة
+    }
+  }
+  return transformers;
 }
+
+// ===== مفرد: أنبوب Whisper (transformers) يُحمَّل مرة واحدة فقط =====
 let sttPromise = null;
 function getPipeline() {
   if (!sttPromise) {
+    const { pipeline, env } = loadTransformers();
     env.allowLocalModels = false; // نحمّل النموذج من Hugging Face وليس محليًا
     sttPromise = pipeline('automatic-speech-recognition', config.WHISPER_MODEL).catch((e) => {
       sttPromise = null; // نسمح بإعادة المحاولة في المرة القادمة
