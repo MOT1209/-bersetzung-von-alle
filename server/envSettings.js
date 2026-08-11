@@ -18,9 +18,9 @@ const SETTING_KEYS = [
   'LIBRE_URL',
   // ===== المزوّدات الاختيارية (مجانية) =====
   'DEEPL_API_KEY',
-  'OPENAI_API_KEY',
-  'OPENAI_BASE_URL',
-  'OPENAI_MODEL',
+  'ZEN_API_KEY',
+  'ZEN_BASE_URL',
+  'ZEN_MODEL',
   'PROVIDER_ORDER',
 ];
 
@@ -51,7 +51,7 @@ async function getSettings() {
   const { map } = await readEnvFile();
   const gemini = map.GEMINI_API_KEY || '';
   const deepl = map.DEEPL_API_KEY || '';
-  const openaiKey = map.OPENAI_API_KEY || '';
+  const zenKey = map.ZEN_API_KEY || '';
   return {
     geminiKey: gemini ? maskKey(gemini) : '',
     hasGeminiKey: Boolean(gemini),
@@ -62,10 +62,10 @@ async function getSettings() {
     // ===== المزوّدات الاختيارية (المفاتيح مقنّعة) =====
     deeplKey: deepl ? maskKey(deepl) : '',
     hasDeeplKey: Boolean(deepl),
-    openaiKey: openaiKey ? maskKey(openaiKey) : '',
-    hasOpenaiKey: Boolean(openaiKey),
-    openaiBaseUrl: map.OPENAI_BASE_URL || '',
-    openaiModel: map.OPENAI_MODEL || '',
+    zenKey: zenKey ? maskKey(zenKey) : '',
+    hasZenKey: Boolean(zenKey),
+    zenBaseUrl: map.ZEN_BASE_URL || '',
+    zenModel: map.ZEN_MODEL || '',
     providerOrder: map.PROVIDER_ORDER || '',
   };
 }
@@ -105,8 +105,8 @@ async function saveSettings(body) {
       err.code = 'invalid-settings';
       throw err;
     }
-    // تحقق من صيغة عنوان خادم OpenAI المتوافق (Ollama / LM Studio…)
-    if (key === 'OPENAI_BASE_URL' && !/^https?:\/\//i.test(value)) {
+    // تحقق من صيغة عنوان بوابة zen / أي خادم متوافق (Ollama / LM Studio…)
+    if (key === 'ZEN_BASE_URL' && !/^https?:\/\//i.test(value)) {
       const err = new Error('invalid-settings');
       err.code = 'invalid-settings';
       throw err;
@@ -136,9 +136,9 @@ async function saveSettings(body) {
     if (key === 'LIBRE_URL') config.LIBRE_URL = value;
     // ===== المزوّدات الاختيارية — تطبيق فوري على config =====
     if (key === 'DEEPL_API_KEY') config.DEEPL_API_KEY = value;
-    if (key === 'OPENAI_API_KEY') config.OPENAI_API_KEY = value;
-    if (key === 'OPENAI_BASE_URL') config.OPENAI_BASE_URL = value;
-    if (key === 'OPENAI_MODEL') config.OPENAI_MODEL = value;
+    if (key === 'ZEN_API_KEY') config.ZEN_API_KEY = value;
+    if (key === 'ZEN_BASE_URL') config.ZEN_BASE_URL = value;
+    if (key === 'ZEN_MODEL') config.ZEN_MODEL = value;
     if (key === 'PROVIDER_ORDER') config.PROVIDER_ORDER = value;
   }
 

@@ -60,9 +60,9 @@ const ADMIN_TOKEN_STORAGE = 'aralinkAdminToken';
 const settingsMyMemoryEmail = document.getElementById('settings-mymemory-email');
 const settingsLibreUrl = document.getElementById('settings-libre-url');
 const settingsDeeplKey = document.getElementById('settings-deepl-key');
-const settingsOpenaiKey = document.getElementById('settings-openai-key');
-const settingsOpenaiBaseUrl = document.getElementById('settings-openai-base-url');
-const settingsOpenaiModel = document.getElementById('settings-openai-model');
+const settingsZenKey = document.getElementById('settings-zen-key');
+const settingsZenBaseUrl = document.getElementById('settings-zen-base-url');
+const settingsZenModel = document.getElementById('settings-zen-model');
 const settingsProviderOrder = document.getElementById('settings-provider-order');
 const settingsCancelBtn = document.getElementById('settings-cancel-btn');
 const settingsCloseBtn = document.getElementById('settings-close-btn');
@@ -578,13 +578,13 @@ async function openSettings() {
   settingsMyMemoryEmail.value = '';
   settingsLibreUrl.value = '';
   settingsDeeplKey.value = '';
-  settingsOpenaiKey.value = '';
-  settingsOpenaiBaseUrl.value = '';
-  settingsOpenaiModel.value = '';
+  settingsZenKey.value = '';
+  settingsZenBaseUrl.value = '';
+  settingsZenModel.value = '';
   settingsProviderOrder.value = '';
   settingsGeminiKey.placeholder = 'أدخل مفتاح Gemini API';
   settingsDeeplKey.placeholder = 'أدخل مفتاح DeepL API';
-  settingsOpenaiKey.placeholder = 'أدخل مفتاح OpenAI API';
+  settingsZenKey.placeholder = 'أدخل مفتاح opencode zen';
   settingsLoaded = false;
 
   settingsModal.hidden = false;
@@ -600,9 +600,9 @@ async function openSettings() {
       settingsMyMemoryEmail.value = data.myMemoryEmail || '';
       settingsLibreUrl.value = data.libreUrl || '';
       settingsDeeplKey.placeholder = data.hasDeeplKey ? 'مضبوط ✓' : 'أدخل مفتاح DeepL API';
-      settingsOpenaiKey.placeholder = data.hasOpenaiKey ? 'مضبوط ✓' : 'أدخل مفتاح OpenAI API';
-      settingsOpenaiBaseUrl.value = data.openaiBaseUrl || '';
-      settingsOpenaiModel.value = data.openaiModel || '';
+      settingsZenKey.placeholder = data.hasZenKey ? 'مضبوط ✓' : 'أدخل مفتاح opencode zen';
+      settingsZenBaseUrl.value = data.zenBaseUrl || '';
+      settingsZenModel.value = data.zenModel || '';
       settingsProviderOrder.value = data.providerOrder || '';
     }
   } catch (e) {
@@ -635,16 +635,16 @@ async function saveSettings(e) {
   if (preferredProvider.value) safeSet('preferredProvider', preferredProvider.value);
   else safeRemove('preferredProvider');
 
-  // حقول المزوّدين الجديدة (DeepL / OpenAI / ترتيب الاحتياط) — بأسماء المفاتيح الكبيرة
+  // حقول المزوّدين الجديدة (DeepL / zen / ترتيب الاحتياط) — بأسماء المفاتيح الكبيرة
   if (settingsDeeplKey.value.trim()) payload.DEEPL_API_KEY = settingsDeeplKey.value.trim();
-  if (settingsOpenaiKey.value.trim()) payload.OPENAI_API_KEY = settingsOpenaiKey.value.trim();
+  if (settingsZenKey.value.trim()) payload.ZEN_API_KEY = settingsZenKey.value.trim();
   if (settingsLoaded) {
-    payload.OPENAI_BASE_URL = settingsOpenaiBaseUrl.value.trim();
-    payload.OPENAI_MODEL = settingsOpenaiModel.value.trim();
+    payload.ZEN_BASE_URL = settingsZenBaseUrl.value.trim();
+    payload.ZEN_MODEL = settingsZenModel.value.trim();
     payload.PROVIDER_ORDER = settingsProviderOrder.value.trim();
   } else {
-    if (settingsOpenaiBaseUrl.value.trim()) payload.OPENAI_BASE_URL = settingsOpenaiBaseUrl.value.trim();
-    if (settingsOpenaiModel.value.trim()) payload.OPENAI_MODEL = settingsOpenaiModel.value.trim();
+    if (settingsZenBaseUrl.value.trim()) payload.ZEN_BASE_URL = settingsZenBaseUrl.value.trim();
+    if (settingsZenModel.value.trim()) payload.ZEN_MODEL = settingsZenModel.value.trim();
     if (settingsProviderOrder.value.trim()) payload.PROVIDER_ORDER = settingsProviderOrder.value.trim();
   }
 

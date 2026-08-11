@@ -104,7 +104,7 @@ test('ARALINK_API_KEY لا يفتح /api/settings', async () => {
     const res = await fetch(`${baseUrl}/api/settings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 'student-quota-key' },
-      body: JSON.stringify({ OPENAI_BASE_URL: 'https://evil.example' }),
+      body: JSON.stringify({ ZEN_BASE_URL: 'https://evil.example' }),
     });
     assert.equal(res.status, 503, 'مفتاح الحصص يجب ألا يمنح صلاحية الكتابة في .env');
   } finally {

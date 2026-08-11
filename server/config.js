@@ -18,11 +18,12 @@ module.exports = {
   // DeepL المجاني — مفتاح اختياري من deeple.com/pro-api (مجاني)؛ الخادم الافتراضي api-free
   DEEPL_API_KEY: process.env.DEEPL_API_KEY || '',
   DEEPL_URL: process.env.DEEPL_URL || 'https://api-free.deepl.com',
-  // أي خادم متوافق مع OpenAI (Ollama محلي مجاني: http://localhost:11434/v1 —
-  // LM Studio: http://localhost:1234/v1 — أو OpenRouter/Groq بمفتاح مجاني)
-  OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || '', // مثال: http://localhost:11434/v1
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-  OPENAI_MODEL: process.env.OPENAI_MODEL || '',
+  // opencode zen — بوابة متوافقة مع OpenAI (/chat/completions بمصادقة Bearer).
+  // ZEN_BASE_URL قابل للتغيير فيغطي أيضًا أي خادم متوافق: Ollama المحلي
+  // (http://localhost:11434/v1) أو LM Studio (http://localhost:1234/v1).
+  ZEN_BASE_URL: process.env.ZEN_BASE_URL || 'https://opencode.ai/zen/v1',
+  ZEN_API_KEY: process.env.ZEN_API_KEY || '',
+  ZEN_MODEL: process.env.ZEN_MODEL || 'deepseek-v4-flash-free',
   // ترتيب المزوّدين المفضّل (فاصلة) — تُتخطى المزوّدات غير المتوفرة تلقائيًا
   PROVIDER_ORDER: process.env.PROVIDER_ORDER || '', // مثل: 'google,mymemory,libre,gemini'
   WHISPER_MODEL: process.env.WHISPER_MODEL || 'Xenova/whisper-tiny', // whisper-tiny: سريع؛ whisper-base أدق لكنه أبطأ بكثير

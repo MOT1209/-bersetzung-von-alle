@@ -287,33 +287,38 @@ registerProvider({
   },
 });
 
-// ===== المزوّد الجديد 2: متوافق OpenAI (محلي مجاني — Ollama / LM Studio) =====
-// يغطي أي خادم chat/completions: Ollama (http://localhost:11434/v1)،
-// LM Studio (http://localhost:1234/v1)، OpenRouter، Groq… مجاني أو بمفتاح مجاني.
+// ===== المزوّد الجديد 2: opencode zen (متوافق OpenAI) =====
+// بوابة opencode zen على https://opencode.ai/zen/v1 بمصادقة Bearer، وفيها نماذج
+// مجانية (deepseek-v4-flash-free وغيرها). ولأن البروتوكول متوافق مع OpenAI،
+// يكفي تغيير ZEN_BASE_URL لاستخدام أي خادم chat/completions آخر:
+// Ollama (http://localhost:11434/v1) أو LM Studio (http://localhost:1234/v1).
+//
+// شرط التوفر هو المفتاح لا الرابط: ZEN_BASE_URL له قيمة افتراضية دائمًا، فلو
+// اعتمدنا عليه لظهر المزوّد متاحًا وفشل كل طلب بـ401.
 registerProvider({
-  id: 'openai',
-  label: 'AI محلي/متوافق OpenAI',
-  requiresKey: false,
-  isAvailable: () => Boolean(config.OPENAI_BASE_URL),
+  id: 'zen',
+  label: 'opencode zen (متوافق OpenAI)',
+  requiresKey: true,
+  isAvailable: () => Boolean(config.ZEN_API_KEY && config.ZEN_BASE_URL),
   translate: async (text, targetLang, sourceLang) => {
-    const url = config.OPENAI_BASE_URL.replace(/\/+$/, '') + '/chat/completions';
+    const url = config.ZEN_BASE_URL.replace(/\/+$/, '') + '/chat/completions';
     const headers = { 'Content-Type': 'application/json' };
-    if (config.OPENAI_API_KEY) headers.Authorization = `Bearer ${config.OPENAI_API_KEY}`;
+    if (config.ZEN_API_KEY) headers.Authorization = `Bearer ${config.ZEN_API_KEY}`;
     const prompt = `Translate the following text to ${targetLang}. Return only the translation, no explanations:\n\n${text}`;
     const res = await fetch(url, {
       method: 'POST',
       headers,
       signal: AbortSignal.timeout(30000),
       body: JSON.stringify({
-        model: config.OPENAI_MODEL || 'gpt-3.5-turbo',
+        model: config.ZEN_MODEL || 'deepseek-v4-flash-free',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
       }),
     });
-    if (!res.ok) throw new Error(`OpenAI-compatible HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`zen HTTP ${res.status}`);
     const data = await res.json();
     const out = data?.choices?.[0]?.message?.content;
-    if (!out) throw new Error('OpenAI-compatible: استجابة فارغة');
+    if (!out) throw new Error('zen: استجابة فارغة');
     return out.trim();
   },
 });
