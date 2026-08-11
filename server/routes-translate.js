@@ -30,6 +30,7 @@ const ERROR_STATUS = {
   'alignment-failed': 502,
   'gemini-video-failed': 502,
   'gemini-model-unavailable': 502,
+  'gemini-rate-limited': 429,
   'gemini-video-disabled': 503,
   'video-too-long': 422,
   'download-failed': 502,

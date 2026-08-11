@@ -214,3 +214,42 @@ test('HTTP 404 ⇒ يُجرَّب GEMINI_MODEL الاحتياطي وينجح', a
   assert.match(urls[0], /model-does-not-exist/, 'المحاولة الأولى بنموذج الفيديو');
   assert.match(urls[1], /gemini-2\.0-flash/, 'المحاولة الثانية بالنموذج الاحتياطي');
 });
+
+// ===== 429: خطأ مؤقت لا عطل =====
+// الحصة تتجدد، فالإعادة الفورية تفشل حتمًا للسبب نفسه. الصواب انتظار المهلة
+// التي تقترحها Google في RetryInfo ثم إعادة المحاولة.
+
+test('parseRetryDelay: يستخرج المهلة من RetryInfo ويسقفها', () => {
+  const { parseRetryDelay } = geminiVideo;
+  assert.equal(parseRetryDelay('{"retryDelay":"7s"}'), 7000);
+  assert.equal(parseRetryDelay('{"retryDelay":"1.5s"}'), 1500);
+  assert.equal(parseRetryDelay('{"retryDelay":"600s"}'), 20000, 'يجب ألا نتجاوز السقف');
+  assert.equal(parseRetryDelay('لا مهلة هنا'), 0);
+  assert.equal(parseRetryDelay(null), 0);
+});
+
+test('429 ثم نجاح ⇒ ينتظر ويعيد المحاولة بدل الاستسلام', async () => {
+  let i = 0;
+  global.fetch = async () => {
+    if (i++ === 0) {
+      return { ok: false, status: 429, text: async () => '{"error":{"code":429},"retryDelay":"0.05s"}' };
+    }
+    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: GOOD }] } }] }) };
+  };
+  const r = await geminiVideo.translateYouTubeVideo(vid(), 'ar');
+  assert.equal(r.captions.length, 2, 'يجب أن ينجح بعد الانتظار');
+  assert.equal(i, 2, 'محاولتان: الأولى 429 والثانية ناجحة');
+});
+
+test('429 مستمر ⇒ gemini-rate-limited لا gemini-video-failed', async () => {
+  global.fetch = async () => ({
+    ok: false, status: 429, text: async () => '{"error":{"code":429},"retryDelay":"0.05s"}',
+  });
+  await assert.rejects(
+    () => geminiVideo.translateYouTubeVideo(vid(), 'ar'),
+    (e) => {
+      assert.equal(e.code, 'gemini-rate-limited', 'الرمز يجب أن يميّز الحصة عن العطل');
+      return true;
+    }
+  );
+});

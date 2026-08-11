@@ -16,6 +16,9 @@ const { get: cacheGet, set: cacheSet } = require('./cache');
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TIMEOUT_MS = 300000; // الفيديو أبطأ بكثير من النص
+// سقف انتظار الحصة: نحن داخل طلب HTTP، فلا يصح أن ننتظر دقيقة كاملة
+const MAX_RETRY_WAIT_MS = 20000;
+const RATE_LIMIT_ATTEMPTS = 2; // محاولتان إضافيتان بانتظار تصاعدي
 
 // مخطط مُقيَّد للمخرَج. التوثيق لا يؤكد دعمه على مسار الفيديو، لذا التحقق
 // الدفاعي أدناه إلزامي لا اعتماد عليه وحده.
@@ -32,6 +35,15 @@ const RESPONSE_SCHEMA = {
     required: ['start', 'end', 'translated'],
   },
 };
+
+/** مهلة الانتظار التي تقترحها Google في RetryInfo (مثل "27s") → مللي ثانية */
+function parseRetryDelay(body) {
+  const m = String(body || '').match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);
+  if (!m) return 0;
+  return Math.min(Math.round(Number(m[1]) * 1000), MAX_RETRY_WAIT_MS);
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function err(code, message) {
   const e = new Error(message || code);
@@ -162,6 +174,13 @@ async function callGemini(videoId, targetLang, maxSeconds, modelOverride) {
     if (res.status === 404 || /not found|not supported|unsupported model/i.test(snippet)) {
       throw err('gemini-model-unavailable', `النموذج ${model} غير متاح: HTTP ${res.status} ${snippet}`);
     }
+    // 429 خطأ مؤقت لا عطل: الحصة تتجدد. نميّزه ونحمل معه المهلة التي
+    // تقترحها Google (RetryInfo) حتى ننتظرها بدل إعادة فورية تفشل حتمًا.
+    if (res.status === 429) {
+      const e = err('gemini-rate-limited', 'تجاوز حصة Gemini المؤقتة: ' + snippet);
+      e.retryAfterMs = parseRetryDelay(body);
+      throw e;
+    }
     throw err('gemini-video-failed', `Gemini HTTP ${res.status} ${snippet}`);
   }
 
@@ -212,10 +231,28 @@ async function translateYouTubeVideo(videoId, targetLang) {
     // الفيديو الطويل لا تنفع معه إعادة المحاولة — نرفعه فورًا
     if (e && e.code === 'video-too-long') throw e;
 
-    // نموذج الفيديو غير متاح لهذا المفتاح ⇒ نجرّب GEMINI_MODEL العادي مرة
-    // واحدة. أسماء النماذج تتغيّر، ولا يصح أن يسقط المسار كله بسببها.
-    if (e && e.code === 'gemini-model-unavailable' && config.GEMINI_MODEL &&
+    // تجاوز الحصة: خطأ مؤقت. ننتظر المهلة التي تقترحها Google (أو انتظارًا
+    // تصاعديًا) ونعيد المحاولة. الإعادة الفورية هنا تفشل حتمًا للسبب نفسه.
+    if (e && e.code === 'gemini-rate-limited') {
+      let lastErr = e;
+      for (let attempt = 1; attempt <= RATE_LIMIT_ATTEMPTS; attempt++) {
+        const wait = Math.min(lastErr.retryAfterMs || attempt * 5000, MAX_RETRY_WAIT_MS);
+        console.error(`[geminiVideo] حصة مستنزفة — انتظار ${Math.round(wait / 1000)}ث (محاولة ${attempt})`);
+        await sleep(wait);
+        try {
+          captions = await callGemini(videoId, targetLang, maxSeconds);
+          lastErr = null;
+          break;
+        } catch (e2) {
+          lastErr = e2;
+          if (e2 && e2.code !== 'gemini-rate-limited') throw e2;
+        }
+      }
+      if (lastErr) throw lastErr; // ما زالت الحصة مستنزفة → رمز واضح للمستخدم
+    } else if (e && e.code === 'gemini-model-unavailable' && config.GEMINI_MODEL &&
         config.GEMINI_MODEL !== (config.GEMINI_VIDEO_MODEL || config.GEMINI_MODEL)) {
+      // نموذج الفيديو غير متاح لهذا المفتاح ⇒ نجرّب GEMINI_MODEL العادي مرة
+      // واحدة. أسماء النماذج تتغيّر، ولا يصح أن يسقط المسار كله بسببها.
       console.error('[geminiVideo] ' + e.message + ' — يُجرَّب ' + config.GEMINI_MODEL);
       captions = await callGemini(videoId, targetLang, maxSeconds, config.GEMINI_MODEL);
     } else {
@@ -230,6 +267,7 @@ async function translateYouTubeVideo(videoId, targetLang) {
 
 module.exports = {
   translateYouTubeVideo,
+  parseRetryDelay,
   isAvailable,
   // مُصدَّرة للاختبار المباشر
   parseTimestamp,
