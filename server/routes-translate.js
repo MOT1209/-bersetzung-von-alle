@@ -28,6 +28,8 @@ const ERROR_STATUS = {
   'smart-unavailable': 503,
   'input-too-large': 413,
   'alignment-failed': 502,
+  'gemini-video-failed': 502,
+  'video-too-long': 422,
   'download-failed': 502,
   'youtube-blocked': 422,
   'ytdlp-missing': 500,
@@ -257,7 +259,34 @@ async function translateLines(lines, targetLang, opts, glossary) {
 
 async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts) {
   try {
-    // محاولة جلب الترجمات النصية أولًا
+    // ===== المسار 1: Gemini تشاهد الفيديو وتترجمه =====
+    // أولًا دائمًا لأنه الوحيد الذي يعمل على الاستضافة السحابية: خوادم Google
+    // تجلب الفيديو، فلا يمسّه حجب يوتيوب لعناوين مراكز البيانات.
+    const geminiVideo = require('./geminiVideo');
+    if (geminiVideo.isAvailable()) {
+      try {
+        const r = await geminiVideo.translateYouTubeVideo(videoId, targetLang);
+        const captions = r.captions.map((c) => ({
+          ...c,
+          translated: applyGlossary(c.translated, glossary || []),
+        }));
+        res.json({
+          type: 'youtube',
+          videoId,
+          sourceLang: r.sourceLang,
+          captions,
+          meta: { title: 'فيديو يوتيوب', source: 'gemini', cached: r.cached },
+        });
+        trackUsage({ type: 'youtube', sourceLang: r.sourceLang, targetLang });
+        return;
+      } catch (e) {
+        // الفيديو الطويل خطأ مستخدم لا عطل مسار — لا فائدة من الاحتياطي
+        if (e && e.code === 'video-too-long') throw e;
+        console.error('[translate] gemini-video failed, falling back:', e && e.message);
+      }
+    }
+
+    // ===== المسار 2: ترجمات يوتيوب النصية =====
     let metaSource = 'captions';
     let transcript;
     try {

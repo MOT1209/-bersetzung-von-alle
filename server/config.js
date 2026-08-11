@@ -7,8 +7,16 @@ const MODEL_DIR = process.env.MODEL_DIR || path.join(__dirname, '..', 'models');
 
 module.exports = {
   PORT: process.env.PORT || 3000,
+  CORS_ORIGIN: process.env.CORS_ORIGIN || '', // empty = same-origin only; comma-separated allowlist
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+  // ===== مسار الفيديو: Gemini تجلب رابط يوتيوب بنفسها =====
+  // يتجاوز حجب يوتيوب لعناوين مراكز البيانات (السبب الوحيد لفشل الروابط على
+  // Render). نموذج منفصل لأن 2.0-flash أضعف في فهم الفيديو.
+  GEMINI_VIDEO: process.env.GEMINI_VIDEO !== 'false', // مفعّل ما لم يُعطَّل صراحةً
+  GEMINI_VIDEO_MODEL: process.env.GEMINI_VIDEO_MODEL || 'gemini-2.5-flash',
+  // حد المدة: ~300 رمز لكل ثانية فيديو، والحصة المجانية 8 ساعات يوميًا
+  MAX_VIDEO_MINUTES: Number(process.env.MAX_VIDEO_MINUTES) || 20,
 
   // محركات الترجمة الاحتياطية المجانية (تُستخدم عند حجب Google أو استنفاد حصته)
   LIBRE_URL: process.env.LIBRE_URL || 'https://libretranslate.com', // خادم LibreTranslate (اختياري)
@@ -26,7 +34,11 @@ module.exports = {
   ZEN_MODEL: process.env.ZEN_MODEL || 'deepseek-v4-flash-free',
   // ترتيب المزوّدين المفضّل (فاصلة) — تُتخطى المزوّدات غير المتوفرة تلقائيًا
   PROVIDER_ORDER: process.env.PROVIDER_ORDER || '', // مثل: 'google,mymemory,libre,gemini'
-  WHISPER_MODEL: process.env.WHISPER_MODEL || 'Xenova/whisper-tiny', // whisper-tiny: سريع؛ whisper-base أدق لكنه أبطأ بكثير
+  // نموذج التفريغ الصوتي. tiny سريع لكنه ضعيف جدًا على العربية والتركية.
+  // للغات الأربع المستهدفة (ar/de/tr/en) يُنصح بـ small على الأقل عند توفر
+  // الذاكرة: Xenova/whisper-tiny (39MB) < base (74MB) < small (244MB).
+  // الإنجليزية والألمانية مقبولتان على base؛ العربية والتركية تحتاج small+.
+  WHISPER_MODEL: process.env.WHISPER_MODEL || 'Xenova/whisper-tiny',
 
   // محرك التفريغ الصوتي: 'sherpa' (أسرع بكثير، sherpa-onnx) أو 'transformers' (الاحتياطي Xenova)
   // إن لم يكن sherpa-onnx مثبتًا أو فشل تحميل نموذجه يعود audio.js تلقائيًا إلى 'transformers'

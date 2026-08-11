@@ -844,7 +844,9 @@ function renderResult(data) {
   metaTitle.textContent = (data.meta && data.meta.title) ? data.meta.title : '';
   cacheBadge.hidden = !(data.meta && data.meta.cached === true);
   exportRow.hidden = true; // أزرار التصدير تظهر في وضع الملف فقط
-  metaLine.textContent = 'تمت الترجمة من ' + langName(data.sourceLang) + ' إلى ' + langName(targetLang.value);
+  const SOURCE_LABEL = { gemini: ' · فهم الفيديو بالذكاء الاصطناعي', captions: ' · من ترجمات الفيديو', audio: ' · تفريغ صوتي' };
+  const srcNote = (data.meta && SOURCE_LABEL[data.meta.source]) || '';
+  metaLine.textContent = 'تمت الترجمة من ' + langName(data.sourceLang) + ' إلى ' + langName(targetLang.value) + srcNote;
 
   // مشغل يوتيوب + شريط الترجمة المتزامن
   if (data.type === 'youtube') {
