@@ -69,6 +69,13 @@ app.use('/api', translateLimiter);
 app.use('/api/translate-file', heavyLimiter);
 app.use('/api/export', heavyLimiter);
 app.use('/api', require('./routes-file'));
+
+// الفيديو المحلي — قبل express.json العام أيضًا: جسمه base64 يصل 60mb، وحدّ الـ2mb
+// العام كان يرفضه قبل بلوغ المعالج، فيبقى MAX_BASE64=40MB كودًا ميتًا والميزة
+// مقيّدة عمليًا بـ2mb.
+app.use('/api/video-local', heavyLimiter);
+app.use('/api', require('./routes-local-video'));
+
 app.use(express.json({ limit: '2mb' }));
 
 // ===== الملفات الثابتة (الواجهة فقط — لا يُنشر جذر المشروع) =====
@@ -118,13 +125,20 @@ app.use('/api', videoRouter);
 // ===== الموجة 2: تشكيل عربي + فيديو محلي + OCR (كلها تحت heavyLimiter — مكلفة) =====
 app.use('/api/tashkeel', heavyLimiter);
 app.use('/api', require('./routes-tashkeel'));
-app.use('/api/video-local', heavyLimiter);
-app.use('/api', require('./routes-local-video'));
 app.use('/api/ocr', heavyLimiter);
 app.use('/api', require('./routes-ocr'));
 
 // ===== معالجة الأخطاء العامة =====
 app.use((err, req, res, next) => {
+  // أخطاء المحلل (body-parser) تحمل status/statusCode صحيحًا، وكان ابتلاعها في
+  // 500 يخفي السبب الحقيقي: تجاوز الحجم كان يظهر «خطأ خادم» بدل 413.
+  const status = err && (err.status || err.statusCode);
+  if (status === 413) {
+    return res.status(413).json({ error: 'input-too-large' });
+  }
+  if (err && err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'invalid-json' });
+  }
   console.error('[server] unhandled:', err);
   res.status(500).json({ error: 'server-error' });
 });

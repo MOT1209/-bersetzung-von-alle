@@ -9,8 +9,8 @@ const config = require('./config');
 
 const router = express.Router();
 
-// راوتر خاص بحد جسم أكبر (60mb — فيديو base64) — يُركَّب قبل express.json العام في server.js
-router.use(express.json({ limit: '60mb' }));
+// حد الجسم 60mb خاص بمسار الفيديو المحلي فقط (وسيط على المسار نفسه لا على الراوتر):
+// router.use كان يطبّق الحد على كل طلبات /api العابرة عبر هذا الراوتر.
 
 // ===== الصيغ المدعومة (فيديو + صوت) =====
 const SUPPORTED_EXT = ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v', '3gp', 'mp3', 'wav', 'm4a', 'ogg'];
@@ -56,7 +56,7 @@ const impl = { probeDuration };
 
 // ===== POST /api/video-local — فيديو محلي base64 → captions مترجمة =====
 // body: { content (base64), ext, targetLang?, provider?, providers? }
-router.post('/video-local', async (req, res) => {
+router.post('/video-local', express.json({ limit: '60mb' }), async (req, res) => {
   const { content, ext, targetLang = 'ar', provider, providers } = req.body || {};
   const format = String(ext || '').toLowerCase();
 
