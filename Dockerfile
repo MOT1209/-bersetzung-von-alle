@@ -14,11 +14,15 @@ WORKDIR /app
 
 # تثبيت الاعتماديات أولاً (استفادة من كاش الطبقات)
 COPY package*.json ./
-# --omit=optional يتخطّى youtube-dl-exec عمدًا: postinstall الخاص به ينزّل الثنائي
-# من GitHub API (60 طلبًا/ساعة لكل IP بلا مصادقة)، وعلى بنية Render بعناوين IP
-# مشتركة يفشل البناء بشكل متقطّع. الصورة تستخدم yt-dlp المثبَّت عبر pip3 أعلاه
-# عبر YTDLP_PATH، فلا حاجة إلى الثنائي المنزَّل.
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev --omit=optional; else npm install --omit=dev --omit=optional; fi
+# YOUTUBE_DL_SKIP_DOWNLOAD: postinstall الخاص بـ youtube-dl-exec ينزّل الثنائي من
+# GitHub API (60 طلبًا/ساعة لكل IP بلا مصادقة)، وعلى بنية Render بعناوين IP مشتركة
+# يفشل البناء بشكل متقطّع. الصورة تستخدم yt-dlp المثبَّت عبر pip3 أعلاه عبر
+# YTDLP_PATH، فلا حاجة إلى الثنائي المنزَّل.
+#
+# تنبيه: لا تستخدم --omit=optional هنا. جرّبتُه فأسقط onnxruntime-node (اعتمادية
+# اختيارية لـ @xenova/transformers) فتوقّف الخادم عن الإقلاع أصلًا داخل الحاوية.
+# العلم يسقط كل الاختياريات في الشجرة لا youtube-dl-exec وحده.
+RUN if [ -f package-lock.json ]; then YOUTUBE_DL_SKIP_DOWNLOAD=true npm ci --omit=dev; else YOUTUBE_DL_SKIP_DOWNLOAD=true npm install --omit=dev; fi
 
 # بقية الكود
 COPY . .
