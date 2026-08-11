@@ -28,11 +28,17 @@ const ERROR_STATUS = {
   'smart-unavailable': 503,
   'input-too-large': 413,
   'alignment-failed': 502,
+  'download-failed': 502,
+  'youtube-blocked': 422,
+  'ytdlp-missing': 500,
 };
 
 // ===== استجابة خطأ موحدة =====
 function sendError(res, e) {
-  const code = (e && e.code) || 'server-error';
+  // رمز الخطأ يجب أن يكون سلسلة معروفة. عمليات execFile الفاشلة تحمل code
+  // رقميًا (رمز الخروج)، فكان يتسرّب للواجهة كـ {"error":1} — بلا معنى.
+  const raw = e && e.code;
+  const code = typeof raw === 'string' && ERROR_STATUS[raw] ? raw : 'server-error';
   const status = ERROR_STATUS[code] || 500;
   console.error('[translate] error:', code, '→', e && e.message);
   return res.status(status).json({ error: code });

@@ -50,7 +50,19 @@ async function ytDownload(url, outPath, extraArgs = [], timeoutMs = 180000) {
       err.code = 'ytdlp-missing';
       throw err;
     }
-    throw e;
+    // أي فشل آخر: execFile يضع رمز الخروج الرقمي في e.code، وكان يتسرّب كما هو
+    // إلى الواجهة ({"error":1}). نحوّله إلى رمز نصّي مع سبب مقروء من stderr.
+    const stderr = String((e && e.stderr) || '');
+    const blocked =
+      /Sign in to confirm|not a bot|HTTP Error 429|blocked it in your country|unable to download webpage|Precondition check failed/i
+        .test(stderr);
+    const err = new Error(
+      (blocked
+        ? 'يوتيوب رفض الطلب من هذا الخادم (حجب عناوين مراكز البيانات). '
+        : 'فشل تنزيل الوسائط. ') + stderr.slice(0, 300)
+    );
+    err.code = blocked ? 'youtube-blocked' : 'download-failed';
+    throw err;
   }
 }
 

@@ -73,3 +73,18 @@ test('ثنائي مفقود → خطأ ytdlp-missing صريح لا ENOENT غام
     }
   );
 });
+
+// ===== تصنيف الأخطاء: لا رموز رقمية تتسرّب للواجهة =====
+// كان execFile الفاشل يضع رمز الخروج (1) في e.code فيصل للواجهة كـ {"error":1}.
+test('فشل غير ENOENT → رمز نصّي لا رقم', async () => {
+  // ننفّذ ثنائيًا موجودًا لكن بوسائط تُفشله (رمز خروج ≠ 0)
+  process.env.YTDLP_PATH = process.execPath; // node نفسه
+  await assert.rejects(
+    () => ytDownload('--وسيط-غير-صالح-تمامًا', '/tmp/x', [], 20000),
+    (e) => {
+      assert.equal(typeof e.code, 'string', `رمز رقمي تسرّب: ${e.code}`);
+      assert.ok(['download-failed', 'youtube-blocked'].includes(e.code), e.code);
+      return true;
+    }
+  );
+});

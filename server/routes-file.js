@@ -21,7 +21,10 @@ const ERROR_STATUS = {
 
 // ===== استجابة خطأ موحدة =====
 function sendError(res, e) {
-  const code = (e && e.code) || 'server-error';
+  // رمز الخطأ يجب أن يكون سلسلة معروفة. عمليات execFile الفاشلة تحمل code
+  // رقميًا (رمز الخروج)، فكان يتسرّب للواجهة كـ {"error":1} — بلا معنى.
+  const raw = e && e.code;
+  const code = typeof raw === 'string' && ERROR_STATUS[raw] ? raw : 'server-error';
   const status = ERROR_STATUS[code] || 500;
   console.error('[files] error:', code, '→', e && e.message);
   return res.status(status).json({ error: code });
