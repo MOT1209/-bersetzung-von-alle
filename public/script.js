@@ -1460,7 +1460,15 @@ function loadYouTubeApi() {
 
 // إعداد المشغل المضمّن (خيار أ) — إن فشل الـAPI: iframe عادي بلا شريط متزامن
 async function setupYtPlayer(videoId) {
-  const wrap = document.getElementById('player-embed');
+  // buildCaptionPanel يمسح resultEmbed.innerHTML وهو أب #player-embed، ويُنادى
+  // قبل هذه الدالة مباشرة — فتختفي الحاوية ويصبح getElementById = null.
+  // نعيد إنشاءها بدل الانهيار بـ "Cannot set properties of null".
+  let wrap = document.getElementById('player-embed');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'player-embed';
+    resultEmbed.appendChild(wrap);
+  }
   wrap.innerHTML = '';
   localPlayer.hidden = true;
   capBar.hidden = true;

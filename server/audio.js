@@ -99,7 +99,10 @@ async function ensureSherpaModel() {
 
 // خيارات transformers: نمرّر اللغة صراحةً متى عُرفت
 function sttOptions(lang) {
-  const o = { task: 'transcribe', return_timestamps: true };
+  // chunk_length_s ضروري: بدونه يحذّر transformers من الصوت الأطول من 30 ثانية
+  // ثم يُخرج قمامة (سلاسل شرطات وتكرارًا) بدل نص. stride للتداخل بين القطع
+  // حتى لا تُبتر الكلمات عند الحدود.
+  const o = { task: 'transcribe', return_timestamps: true, chunk_length_s: 30, stride_length_s: 5 };
   const l = normalizeLang(lang);
   if (l !== 'auto') o.language = l;
   return o;
@@ -177,7 +180,7 @@ function segmentsFromResult(res, engine) {
 }
 
 // تفريغ عبر sherpa-onnx: يعيد { text, segments:[{start,duration,text}] }
-async function transcribeWithSherpa(audio) {
+async function transcribeWithSherpa(audio, lang) {
   const recognizer = await getSherpaRecognizer(lang);
   const stream = recognizer.createStream();
   try {
@@ -253,7 +256,7 @@ async function transcribeMediaFile(mediaPath, label, lang) {
     console.log('[audio] STT engine: ' + engine + (engine === 'sherpa' ? ' (sherpa-onnx)' : ' (transformers fallback)'));
     let res;
     if (engine === 'sherpa') {
-      res = await transcribeWithSherpa(audio);
+      res = await transcribeWithSherpa(audio, lang);
     } else {
       const stt = await getPipeline();
       res = await stt(audio, sttOptions(lang));
