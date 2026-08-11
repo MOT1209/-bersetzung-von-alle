@@ -266,7 +266,7 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts
       if (e.code !== 'no-transcript') throw e;
       // لا توجد ترجمات نصية → تفريغ الصوت تلقائيًا عبر Whisper
       try {
-        const { chunks } = await transcribeVideoAudio(videoId);
+        const { chunks } = await transcribeVideoAudio(videoId, videoLang);
         transcript = chunks.map((c) => ({
           text: c.text,
           offset: Math.round(c.start * 1000),

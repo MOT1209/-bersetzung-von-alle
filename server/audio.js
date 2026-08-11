@@ -97,23 +97,42 @@ async function ensureSherpaModel() {
   }
 }
 
+// خيارات transformers: نمرّر اللغة صراحةً متى عُرفت
+function sttOptions(lang) {
+  const o = { task: 'transcribe', return_timestamps: true };
+  const l = normalizeLang(lang);
+  if (l !== 'auto') o.language = l;
+  return o;
+}
+
 // مفرد: مُعرِّف sherpa-onnx يُنشأ مرة واحدة ويعاد استخدامه
-let sherpaRecognizerPromise = null;
-function getSherpaRecognizer() {
+// اللغات المدعومة صراحةً — تمرير اللغة يرفع الدقة كثيرًا مقابل 'auto'،
+// خصوصًا العربية والتركية حيث يخطئ الكشف التلقائي كثيرًا.
+const SUPPORTED_STT_LANGS = ['ar', 'de', 'tr', 'en'];
+function normalizeLang(lang) {
+  const l = String(lang || '').toLowerCase().slice(0, 2);
+  return SUPPORTED_STT_LANGS.includes(l) ? l : 'auto';
+}
+
+// مُعرِّف لكل لغة: sherpa يثبّت اللغة وقت الإنشاء، فلا يكفي مُعرِّف واحد
+const sherpaRecognizers = new Map(); // lang → Promise<recognizer>
+function getSherpaRecognizer(lang) {
+  const language = normalizeLang(lang);
+  let sherpaRecognizerPromise = sherpaRecognizers.get(language) || null;
   if (!sherpaRecognizerPromise) {
     sherpaRecognizerPromise = ensureSherpaModel()
       .then(() => {
         const encoder = config.SHERPA_ENCODER || path.join(config.SHERPA_MODEL_DIR, SHERPA_FILES.encoder);
         const decoder = config.SHERPA_DECODER || path.join(config.SHERPA_MODEL_DIR, SHERPA_FILES.decoder);
         const tokens = config.SHERPA_TOKENS || path.join(config.SHERPA_MODEL_DIR, SHERPA_FILES.tokens);
-        console.log('[audio] sherpa-onnx whisper-tiny ready (' + sherpa.version + ')');
+        console.log('[audio] sherpa-onnx ready lang=' + language + ' (' + sherpa.version + ')');
         return sherpa.createOfflineRecognizer({
           featConfig: { sampleRate: 16000, featureDim: 80 },
           modelConfig: {
             whisper: {
               encoder,
               decoder,
-              language: 'auto',
+              language,
               task: 'transcribe',
               tailPaddings: -1,
               enableSegmentTimestamps: 1,
@@ -125,9 +144,10 @@ function getSherpaRecognizer() {
         });
       })
       .catch((e) => {
-        sherpaRecognizerPromise = null; // نسمح بإعادة المحاولة في المرة القادمة
+        sherpaRecognizers.delete(language); // نسمح بإعادة المحاولة في المرة القادمة
         throw e;
       });
+    sherpaRecognizers.set(language, sherpaRecognizerPromise);
   }
   return sherpaRecognizerPromise;
 }
@@ -158,7 +178,7 @@ function segmentsFromResult(res, engine) {
 
 // تفريغ عبر sherpa-onnx: يعيد { text, segments:[{start,duration,text}] }
 async function transcribeWithSherpa(audio) {
-  const recognizer = await getSherpaRecognizer();
+  const recognizer = await getSherpaRecognizer(lang);
   const stream = recognizer.createStream();
   try {
     stream.acceptWaveform(16000, audio); // Float32Array في المدى [-1,1]
@@ -214,7 +234,7 @@ function normalizeChunks(segments, fullText) {
 // يحوّل الملف إلى PCM خام (16 كيلوهرتز، قناة واحدة، float32) ثم يفرّغه عبر المحرك النشط
 // (sherpa-onnx الافتراضي مع احتياطي تلقائي إلى transformers عند فشل sherpa وقت التشغيل)
 // الإرجاع: { chunks: [{ start, duration, text }] } — نفس شكل مخرجات transcribeVideoAudio
-async function transcribeMediaFile(mediaPath, label) {
+async function transcribeMediaFile(mediaPath, label, lang) {
   await fs.mkdir(TMP_DIR, { recursive: true });
   // اسم ملف PCM مؤقت فريد (يُنظَّف في finally داخل هذه الدالة — لا يُلمس من الخارج)
   const tag = String(label || path.basename(mediaPath || 'media')).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -236,7 +256,7 @@ async function transcribeMediaFile(mediaPath, label) {
       res = await transcribeWithSherpa(audio);
     } else {
       const stt = await getPipeline();
-      res = await stt(audio, { task: 'transcribe', return_timestamps: true });
+      res = await stt(audio, sttOptions(lang));
     }
 
     // 4) توحيد المقاطع إلى شكل chunks موحد
@@ -260,7 +280,7 @@ async function transcribeMediaFile(mediaPath, label) {
         const stt = await getPipeline();
         const buf = await fs.readFile(pcmPath);
         const audio = new Float32Array(buf.buffer, buf.byteOffset, buf.length / 4);
-        const res = await stt(audio, { task: 'transcribe', return_timestamps: true });
+        const res = await stt(audio, sttOptions(lang));
         const segments = segmentsFromResult(res, 'transformers');
         const chunks = normalizeChunks(segments, res.text || '');
         if (!chunks.length) {
@@ -288,7 +308,7 @@ async function transcribeMediaFile(mediaPath, label) {
 
 // ===== تنزيل صوت الفيديو + تفريغه (يوتيوب) =====
 // الإرجاع: { chunks: [{ start, duration, text }] } (التوقيع لا يتغير أبدًا)
-async function transcribeVideoAudio(videoId) {
+async function transcribeVideoAudio(videoId, lang) {
   await fs.mkdir(TMP_DIR, { recursive: true });
   const m4aPath = path.join(TMP_DIR, `audio-${videoId}.m4a`); // تحميل m4a فقط (لا wav)
 
@@ -297,7 +317,7 @@ async function transcribeVideoAudio(videoId) {
     await downloadAudio('https://www.youtube.com/watch?v=' + videoId, m4aPath);
 
     // 2) إعادة استخدام خط الأنابيب المشترك (ffmpeg → PCM → STT → chunks)
-    return await transcribeMediaFile(m4aPath, 'yt-' + videoId);
+    return await transcribeMediaFile(m4aPath, 'yt-' + videoId, lang);
   } catch (e) {
     console.error('[audio] transcription failed:', e && e.message);
     // نحافظ على رمز الخطأ المعروف ونحوّل الباقي إلى fetch-failed
@@ -311,4 +331,4 @@ async function transcribeVideoAudio(videoId) {
   }
 }
 
-module.exports = { transcribeVideoAudio, transcribeMediaFile };
+module.exports = { transcribeVideoAudio, transcribeMediaFile, SUPPORTED_STT_LANGS, normalizeLang };
