@@ -30,3 +30,7 @@ agentic-coding-starter-kit/
 
 # OCR traineddata (تُحمَّل عبر npm run download:ocr — لا تُلتزم)
 server/ocr/traineddata/
+
+# عيّنات قياس التفريغ (صوت ومانيفست محلي)
+samples/stt/*
+!samples/stt/README.md
