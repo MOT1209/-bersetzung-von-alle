@@ -29,6 +29,8 @@ const ERROR_STATUS = {
   'input-too-large': 413,
   'alignment-failed': 502,
   'gemini-video-failed': 502,
+  'gemini-model-unavailable': 502,
+  'gemini-video-disabled': 503,
   'video-too-long': 422,
   'download-failed': 502,
   'youtube-blocked': 422,
@@ -258,6 +260,7 @@ async function translateLines(lines, targetLang, opts, glossary) {
 }
 
 async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts) {
+  let geminiError = null;
   try {
     // ===== المسار 1: Gemini تشاهد الفيديو وتترجمه =====
     // أولًا دائمًا لأنه الوحيد الذي يعمل على الاستضافة السحابية: خوادم Google
@@ -283,6 +286,7 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts
         // الفيديو الطويل خطأ مستخدم لا عطل مسار — لا فائدة من الاحتياطي
         if (e && e.code === 'video-too-long') throw e;
         console.error('[translate] gemini-video failed, falling back:', e && e.message);
+        geminiError = e; // نحتفظ به: لو فشلت الاحتياطيات أيضًا فهذا هو السبب الحقيقي
       }
     }
 
@@ -320,6 +324,11 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts
     });
     trackUsage({ type: 'youtube', sourceLang, targetLang }); // لا يُنتظر
   } catch (e) {
+    // فشل كل المسارات: سبب Gemini أنفع للمستخدم من youtube-blocked، لأن
+    // الحجب متوقّع على السحابة بينما فشل Gemini هو العطل القابل للإصلاح.
+    if (geminiError && (!e || e.code === 'youtube-blocked' || e.code === 'fetch-failed')) {
+      return sendError(res, geminiError);
+    }
     return sendError(res, e);
   }
 }

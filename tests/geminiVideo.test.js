@@ -195,3 +195,22 @@ test('GEMINI_VIDEO=false ⇒ المسار معطّل حتى مع وجود مفت
   config.GEMINI_VIDEO = false;
   assert.equal(geminiVideo.isAvailable(), false);
 });
+
+// ===== النموذج غير متاح: لا نضيّع محاولة على إعادة عمياء =====
+// أسماء نماذج Gemini تتغيّر؛ لو كان GEMINI_VIDEO_MODEL غير متاح لهذا المفتاح
+// يجب أن نجرّب GEMINI_MODEL العادي بدل إسقاط المسار كله.
+test('HTTP 404 ⇒ يُجرَّب GEMINI_MODEL الاحتياطي وينجح', async () => {
+  config.GEMINI_VIDEO_MODEL = 'model-does-not-exist';
+  config.GEMINI_MODEL = 'gemini-2.0-flash';
+  const urls = [];
+  let i = 0;
+  global.fetch = async (u) => {
+    urls.push(String(u));
+    if (i++ === 0) return { ok: false, status: 404, text: async () => 'model not found' };
+    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: GOOD }] } }] }) };
+  };
+  const r = await geminiVideo.translateYouTubeVideo(vid(), 'ar');
+  assert.equal(r.captions.length, 2);
+  assert.match(urls[0], /model-does-not-exist/, 'المحاولة الأولى بنموذج الفيديو');
+  assert.match(urls[1], /gemini-2\.0-flash/, 'المحاولة الثانية بالنموذج الاحتياطي');
+});

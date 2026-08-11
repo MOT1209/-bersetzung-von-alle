@@ -127,8 +127,8 @@ function buildPrompt(targetLang) {
   ].join('\n');
 }
 
-async function callGemini(videoId, targetLang, maxSeconds) {
-  const model = config.GEMINI_VIDEO_MODEL || config.GEMINI_MODEL;
+async function callGemini(videoId, targetLang, maxSeconds, modelOverride) {
+  const model = modelOverride || config.GEMINI_VIDEO_MODEL || config.GEMINI_MODEL;
   const url = `${API_BASE}/${model}:generateContent?key=${encodeURIComponent(config.GEMINI_API_KEY)}`;
 
   const videoPart = {
@@ -156,8 +156,13 @@ async function callGemini(videoId, targetLang, maxSeconds) {
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    // 400 على مسار الفيديو يعني غالبًا فيديو خاص/محذوف أو غير مدعوم
-    throw err('gemini-video-failed', `Gemini HTTP ${res.status} ${body.slice(0, 200)}`);
+    const snippet = body.slice(0, 200);
+    // 404 أو "model not found" يعني أن اسم النموذج غير متاح لهذا المفتاح —
+    // إعادة المحاولة بالاسم نفسه عبث، لذا نميّزه ليُجرَّب النموذج الاحتياطي.
+    if (res.status === 404 || /not found|not supported|unsupported model/i.test(snippet)) {
+      throw err('gemini-model-unavailable', `النموذج ${model} غير متاح: HTTP ${res.status} ${snippet}`);
+    }
+    throw err('gemini-video-failed', `Gemini HTTP ${res.status} ${snippet}`);
   }
 
   const text = extractText(await res.json());
@@ -206,8 +211,17 @@ async function translateYouTubeVideo(videoId, targetLang) {
   } catch (e) {
     // الفيديو الطويل لا تنفع معه إعادة المحاولة — نرفعه فورًا
     if (e && e.code === 'video-too-long') throw e;
-    // محاولة واحدة إضافية: أغلب الإخفاقات هنا تنسيقية لا جوهرية
-    captions = await callGemini(videoId, targetLang, maxSeconds);
+
+    // نموذج الفيديو غير متاح لهذا المفتاح ⇒ نجرّب GEMINI_MODEL العادي مرة
+    // واحدة. أسماء النماذج تتغيّر، ولا يصح أن يسقط المسار كله بسببها.
+    if (e && e.code === 'gemini-model-unavailable' && config.GEMINI_MODEL &&
+        config.GEMINI_MODEL !== (config.GEMINI_VIDEO_MODEL || config.GEMINI_MODEL)) {
+      console.error('[geminiVideo] ' + e.message + ' — يُجرَّب ' + config.GEMINI_MODEL);
+      captions = await callGemini(videoId, targetLang, maxSeconds, config.GEMINI_MODEL);
+    } else {
+      // محاولة واحدة إضافية: أغلب الإخفاقات هنا تنسيقية لا جوهرية
+      captions = await callGemini(videoId, targetLang, maxSeconds);
+    }
   }
 
   cacheSet(cacheKey, 'video', targetLang, JSON.stringify(captions));
