@@ -38,6 +38,13 @@ const ERROR_STATUS = {
   'ytdlp-missing': 500,
 };
 
+// إزالة أي مفتاح API من نص الخطأ قبل إرساله للعميل (احتياط لا غنى عنه)
+function scrubSecrets(t) {
+  return String(t || '')
+    .replace(/AIza[0-9A-Za-z_-]{10,}/g, '[مفتاح محجوب]')
+    .replace(/key=[^&\s"]+/gi, 'key=[محجوب]');
+}
+
 // ===== استجابة خطأ موحدة =====
 function sendError(res, e) {
   // رمز الخطأ يجب أن يكون سلسلة معروفة. عمليات execFile الفاشلة تحمل code
@@ -46,7 +53,13 @@ function sendError(res, e) {
   const code = typeof raw === 'string' && ERROR_STATUS[raw] ? raw : 'server-error';
   const status = ERROR_STATUS[code] || 500;
   console.error('[translate] error:', code, '→', e && e.message);
-  return res.status(status).json({ error: code });
+  const payload = { error: code };
+  // أخطاء Gemini وحدها تحمل تفصيلًا: سجلّ الخادم غير متاح على الاستضافة
+  // المدارة، وبلا هذا التفصيل يستحيل تشخيص سبب الفشل من الخارج.
+  if (code.startsWith('gemini-') && e && e.message) {
+    payload.detail = scrubSecrets(e.message).slice(0, 300);
+  }
+  return res.status(status).json(payload);
 }
 
 // ===== GET /api/providers — قائمة المزوّدين وحالتهم (للواجهة) =====
