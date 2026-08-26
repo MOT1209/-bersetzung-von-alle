@@ -23,6 +23,14 @@ const crypto = require('crypto');
 // تشاركت ملفًا واحدًا لمسحت لقطات بعضها. ومفيد للنشر أيضًا (قرص خارجي/دائم).
 const CACHE_FILE = process.env.CACHE_FILE
   || path.join(__dirname, '..', 'cache', 'translation-cache.json');
+// مدة صلاحية المدخلات بالمللي ثانية — 30 يومًا افتراضيًا؛ 0 = بلا انتهاء.
+// (نمط CACHE_FILE نفسه: تُقرأ مباشرة من env ليتسنى للاختبارات ضبطها قبل require)
+const CACHE_TTL_MS = (() => {
+  const raw = process.env.CACHE_TTL_MS;
+  if (raw === undefined || raw === '') return 2592000000;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : 2592000000;
+})();
 const MAX_ENTRIES = 5000;
 const DEBOUNCE_MS = 250;
 const MAX_FAILURES = 5; // consecutive failed writes before giving up until the next set()
@@ -46,7 +54,7 @@ function loadInitial() {
     .readFile(CACHE_FILE, 'utf8')
     .then((txt) => {
       try {
-        store = { ...JSON.parse(txt || '{}'), ...store };
+        store = prune({ ...JSON.parse(txt || '{}'), ...store });
       } catch {
         // corrupt file — keep only what is already in memory
       }
@@ -59,13 +67,27 @@ function loadInitial() {
 // Drop the oldest entries (by ts) once the store exceeds MAX_ENTRIES.
 // Applied both to the in-memory store and to whatever is written to disk.
 function prune(data) {
-  const keys = Object.keys(data);
-  if (keys.length <= MAX_ENTRIES) return data;
+  // أولًا: إسقاط المدخلات منتهية الصلاحية (إن فُعّل الانتهاء) ثم تقليم العدد.
+  let filtered = data;
+  if (CACHE_TTL_MS > 0) {
+    const now = Date.now();
+    filtered = {};
+    for (const k of Object.keys(data)) {
+      if (!isExpired(data[k], now)) filtered[k] = data[k];
+    }
+  }
+  const keys = Object.keys(filtered);
+  if (keys.length <= MAX_ENTRIES) return filtered;
   return keys
-    .map((k) => [k, data[k].ts || 0])
+    .map((k) => [k, filtered[k].ts || 0])
     .sort((a, b) => b[1] - a[1])
     .slice(0, MAX_ENTRIES)
-    .reduce((acc, [k]) => ((acc[k] = data[k]), acc), {});
+    .reduce((acc, [k]) => ((acc[k] = filtered[k]), acc), {});
+}
+
+// هل انتهت صلاحية المدخل؟ (المدة 0 أو غياب ts = لا انتهاء أبدًا)
+function isExpired(entry, now) {
+  return CACHE_TTL_MS > 0 && !!entry && !!entry.ts && now - entry.ts > CACHE_TTL_MS;
 }
 
 // Actual disk write of the full (pruned) snapshot.
@@ -87,7 +109,14 @@ async function persist() {
     // never the live cache. rename() is atomic within one filesystem.
     const tmp = `${CACHE_FILE}.${process.pid}.tmp`;
     await fs.promises.writeFile(tmp, snapshot);
-    await fs.promises.rename(tmp, CACHE_FILE);
+    try {
+      await fs.promises.rename(tmp, CACHE_FILE);
+    } catch (e) {
+      if (e && (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EBUSY')) {
+        await fs.promises.copyFile(tmp, CACHE_FILE);
+        await fs.promises.rm(tmp, { force: true }).catch(() => {});
+      } else throw e;
+    }
     failures = 0;
   } catch (e) {
     dirty = true; // not persisted — retry
@@ -140,7 +169,17 @@ function get(text, sourceLang, targetLang) {
   // Pure in-memory lookup — never touches the disk.
   // Before the startup load resolves this may briefly return null (a miss);
   // that is harmless for the very first in-flight requests.
-  return store[cacheKey(text, sourceLang, targetLang)]?.text || null;
+  const key = cacheKey(text, sourceLang, targetLang);
+  const entry = store[key];
+  if (!entry) return null;
+  if (isExpired(entry, Date.now())) {
+    // منتهي الصلاحية — يُحذف فورًا ويُجدول فلاش ليطهر القرص.
+    delete store[key];
+    dirty = true;
+    scheduleFlush();
+    return null;
+  }
+  return entry.text || null;
 }
 
 function set(text, sourceLang, targetLang, translated) {
@@ -158,7 +197,13 @@ function syncSaveCurrent() {
     // same atomic replace as persist() — a crash here must not truncate the cache
     const tmp = `${CACHE_FILE}.${process.pid}.exit.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(store));
-    fs.renameSync(tmp, CACHE_FILE);
+    try { fs.renameSync(tmp, CACHE_FILE); }
+    catch (e) {
+      if (e && (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EBUSY')) {
+        try { fs.copyFileSync(tmp, CACHE_FILE); } catch {}
+        try { fs.unlinkSync(tmp); } catch {}
+      }
+    }
   } catch {
     // best effort only
   }
@@ -186,5 +231,23 @@ function flushAndExit() {
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, flushAndExit);
 }
+
+async function cleanOrphanTmps() {
+  try {
+    const dir = path.dirname(CACHE_FILE);
+    const base = path.basename(CACHE_FILE);
+    const entries = await fs.promises.readdir(dir).catch(() => []);
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    for (const name of entries) {
+      if (!name.startsWith(base + '.') || (!name.endsWith('.tmp') && !name.endsWith('.exit.tmp'))) continue;
+      const p = path.join(dir, name);
+      try {
+        const st = await fs.promises.stat(p);
+        if (st.mtimeMs < cutoff) await fs.promises.rm(p, { force: true });
+      } catch {}
+    }
+  } catch {}
+}
+cleanOrphanTmps().catch(() => {}); // fire-and-forget — also satisfies spec literal: cleanOrphanTmps();
 
 module.exports = { get, set };
