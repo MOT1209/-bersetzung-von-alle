@@ -20,7 +20,9 @@ before(async () => {
   await once(server, 'listening');
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => server.close());
+after(async () => {
+  if (server) await new Promise((r) => server.close(r));
+});
 
 test('POST /api/translate-smart بلا مفتاح → 503 smart-unavailable', async () => {
   const res = await fetch(`${baseUrl}/api/translate-smart`, {

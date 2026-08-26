@@ -54,7 +54,7 @@ function err(code, message) {
 /** "MM:SS" أو "HH:MM:SS" (ويقبل الكسور) → ثوانٍ. يُرجع null عند التعذّر. */
 function parseTimestamp(ts) {
   if (typeof ts === 'number' && Number.isFinite(ts)) return ts >= 0 ? ts : null;
-  const s = String(ts == null ? '' : ts).trim();
+  const s = String(ts === null || ts === undefined ? '' : ts).trim();
   if (!s) return null;
   const parts = s.split(':');
   if (parts.length < 2 || parts.length > 3) return null;
@@ -83,7 +83,7 @@ function validateAndNormalize(items, maxSeconds) {
     const it = items[i] || {};
     const start = parseTimestamp(it.start);
     const end = parseTimestamp(it.end);
-    const translated = String(it.translated == null ? '' : it.translated).trim();
+    const translated = String(it.translated === null || it.translated === undefined ? '' : it.translated).trim();
 
     if (start === null) throw err('gemini-video-failed', `طابع بداية غير صالح في العنصر ${i + 1}`);
     if (!translated) throw err('gemini-video-failed', `ترجمة فارغة في العنصر ${i + 1}`);
@@ -97,7 +97,7 @@ function validateAndNormalize(items, maxSeconds) {
     captions.push({
       start,
       duration,
-      original: String(it.original == null ? '' : it.original).trim(),
+      original: String(it.original === null || it.original === undefined ? '' : it.original).trim(),
       translated,
     });
     prevStart = start;

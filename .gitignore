@@ -34,3 +34,9 @@ server/ocr/traineddata/
 # عيّنات قياس التفريغ (صوت ومانيفست محلي)
 samples/stt/*
 !samples/stt/README.md
+
+# Reports / benchmarks (local, not tracked)
+turkish-ar.srt
+تقرير-الفحص.html
+تقرير-الفحص-الشامل.html
+bun.lock

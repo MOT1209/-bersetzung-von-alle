@@ -42,7 +42,7 @@ test('manifest.webmanifest JSON صالح و RTL', () => {
 test('sw.js موجود ويسجل الواجهة في الكاش', () => {
   const sw = fs.readFileSync(path.join(publicDir, 'sw.js'), 'utf8');
   assert.match(sw, /style\.css/);
-  assert.match(sw, /script\.js/);
+  assert.match(sw, /js\/app\.js/);
   assert.match(sw, /CACHE/);
 });
 

@@ -19,7 +19,9 @@ process.env.RATE_LIMIT_MAX_HEAVY = '1000';
 
 // ===== الحالة 1: بلا ADMIN_TOKEN → المسار معطّل بالكامل (503) =====
 // تأكد أن require يحدث هنا بينما ADMIN_TOKEN غير مضبوط.
-delete process.env.ADMIN_TOKEN;
+// نضبطه كسلسلة فارغة لا حذفه: dotenv لا يلغي القيم الموجودة مسبقًا،
+// فحذفه كان يسمح لـ dotenv بإعادة قراءته من ملف .env الحقيقي (إن وُجد فيه).
+process.env.ADMIN_TOKEN = '';
 const app = require('../server/server');
 
 let server;

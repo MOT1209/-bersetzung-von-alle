@@ -17,7 +17,7 @@ function buildTinyPdf(text, { compress = true, asArray = false } = {}) {
   }
 
   const streamData = Buffer.from(content, 'latin1');
-  const filter = compress ? `/Filter /FlateDecode ` : '';
+  const filter = compress ? '/Filter /FlateDecode ' : '';
   const streamBytes = compress ? zlib.deflateSync(streamData) : streamData;
 
   const head =

@@ -37,7 +37,7 @@ function toLowerTurkish(t) {
  * @param {string} lang - ar | tr | de | en (غيرها يُعامَل معاملة عامة)
  */
 function normalize(text, lang) {
-  let t = String(text == null ? '' : text);
+  let t = String(text === null || text === undefined ? '' : text);
   const l = String(lang || '').toLowerCase().slice(0, 2);
 
   t = l === 'tr' ? toLowerTurkish(t) : t.toLowerCase();

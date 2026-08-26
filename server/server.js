@@ -1,6 +1,8 @@
-// server/server.js — الخادم الرئيسي لأداة الترجمة AraLink
+﻿// server/server.js — الخادم الرئيسي لأداة الترجمة AraLink
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
 const path = require('path');
 const crypto = require('crypto');
 const config = require('./config');
@@ -12,8 +14,35 @@ const { getAllLanguages } = require('./languages');
 
 const app = express();
 
+// trust proxy: في الإنتاج فقط (خلف بروكسي Render) حتى يعكس req.ip عنوان الزائر الحقيقي
+// ويبقى حد الطلبات لكل IP فعّالًا. محليًا يبقى معطّلًا فيُستخدم عنوان المقبس الحقيقي.
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
+
 // ===== وسيطات عامة =====
-app.use(cors());
+// CORS allowlist (CORS_ORIGIN in .env). Empty = same-origin only:
+// no Origin header -> pass through without CORS headers; allowed origin or '*' -> reflected; others rejected.
+function corsOrigin(origin, callback) {
+  const allowed = (config.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!origin) return callback(null, false); // no Origin header -> pass through without CORS headers
+  callback(null, allowed.includes('*') || allowed.includes(origin));
+}
+app.use(cors({ origin: corsOrigin }));
+
+// ===== ترويسات الأمان (helmet) =====
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ['\'self\''],
+      scriptSrc: ['\'self\'', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+      styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://fonts.googleapis.com'],
+      fontSrc: ['\'self\'', 'https://fonts.gstatic.com'],
+      imgSrc: ['\'self\'', 'data:', 'blob:'],
+      mediaSrc: ['\'self\'', 'blob:', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+      frameSrc: ['\'self\'', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+      connectSrc: ['\'self\''],
+    },
+  },
+}));
 
 // ===== مفتاح API اختياري للطلاب (ARALINK_API_KEY في .env) =====
 // إن ضُبط: الطلبات التي تحمل المفتاح الصحيح تحصل على حد أعلى (×3)
@@ -77,6 +106,9 @@ app.use('/api/video-local', heavyLimiter);
 app.use('/api', require('./routes-local-video'));
 
 app.use(express.json({ limit: '2mb' }));
+
+// ===== ضغط الاستجابات (يقلل حجم HTML/CSS/JS/JSON 60-80%) =====
+app.use(compression());
 
 // ===== الملفات الثابتة (الواجهة فقط — لا يُنشر جذر المشروع) =====
 const publicDir = path.join(__dirname, '..', 'public');
@@ -152,7 +184,7 @@ if (require.main === module) {
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`❌ المنفذ ${config.PORT} مستخدم من تطبيق آخر.`);
-      console.error(`   جرّب منفذًا مختلفًا:  PORT=3999 npm run dev`);
+      console.error('   جرّب منفذًا مختلفًا:  PORT=3999 npm run dev');
       process.exit(1);
     }
     throw err;

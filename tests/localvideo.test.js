@@ -51,7 +51,9 @@ before(async () => {
   await once(server, 'listening');
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => server.close());
+after(async () => {
+  if (server) await new Promise((r) => server.close(r));
+});
 
 function b64(s) {
   return Buffer.from(s).toString('base64');

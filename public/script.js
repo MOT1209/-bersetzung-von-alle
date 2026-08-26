@@ -129,7 +129,6 @@ const ERROR_MESSAGES = {
   'gemini-rate-limited': 'حصة Gemini مستنزفة مؤقتًا — انتظر دقيقة ثم أعد المحاولة',
   'gemini-video-failed': 'تعذّر تحليل الفيديو عبر Gemini — قد يكون خاصًا أو غير مدعوم',
   'gemini-model-unavailable': 'نموذج Gemini المحدد غير متاح لمفتاحك — راجع GEMINI_VIDEO_MODEL',
-  'video-too-long': 'الفيديو أطول من الحد المسموح — جرّب مقطعًا أقصر',
   'input-too-large': 'المدخلات كبيرة جدًا — قسّم النص أو الرابط وعد المحاولة',
   'smart-unavailable': 'الترجمة الذكية تحتاج مفتاح Gemini — أضِفه من الإعدادات أو استخدم الترجمة العادية',
   'server-error': 'حدث خطأ غير متوقع',

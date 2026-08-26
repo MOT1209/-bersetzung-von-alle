@@ -20,8 +20,8 @@ before(async () => {
   baseUrl = `http://127.0.0.1:${port}`;
 });
 
-after(() => {
-  server.close();
+after(async () => {
+  if (server) await new Promise((r) => server.close(r));
 });
 
 test('GET /api/health → 200', async () => {

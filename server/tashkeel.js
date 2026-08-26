@@ -55,7 +55,7 @@ function diacritizeArabicRun(run) {
 // ===== التشكيل القواعدي (احتياطي بلا شبكة) =====
 // لا يلمس اللاتيني/الأرقام/الروابط إطلاقًا — يعالج المقاطع العربية فقط داخل كل كلمة
 function diacritizeBasic(text) {
-  const str = String(text == null ? '' : text);
+  const str = String(text === null || text === undefined ? '' : text);
   return str
     .split(/(\s+)/) // كلمات مع فواصلها (مسافات/أسطر) — نحافظ على البنية حرفيًا
     .map((token) => {
@@ -72,7 +72,7 @@ function diacritizeBasic(text) {
 // إن وُجد مفتاح Gemini → قطع ≤8000 (على حدود الأسطر) عبر Gemini بالتتابع،
 // وعند أي فشل (خطأ/مهلة/تغيّر عدد الأسطر) → الاحتياطي القواعدي للقطعة كلها.
 async function diacritize(text) {
-  const src = String(text == null ? '' : text);
+  const src = String(text === null || text === undefined ? '' : text);
   const lines = src.split('\n');
   const hasArabic = (s) => ARABIC_RE.test(s);
 
