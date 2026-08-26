@@ -8,7 +8,12 @@ function extractVideoId(url) {
   return m ? m[1] : null;
 }
 
-// ===== جلب الترجمات =====
+// ===== جلب الترجمات (مع مهلة لكل محاولة) =====
+const YT_FETCH_TIMEOUT_MS = 15000;
+function timedFetch(url, init = {}) {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(YT_FETCH_TIMEOUT_MS) });
+}
+
 async function getTranscript(videoId, preferLang) {
   const attempts = [];
   if (preferLang && preferLang !== 'auto') attempts.push(preferLang);
@@ -17,7 +22,7 @@ async function getTranscript(videoId, preferLang) {
   let lastErr = null;
   for (const lang of attempts) {
     try {
-      const list = await YoutubeTranscript.fetchTranscript(videoId, { lang });
+      const list = await YoutubeTranscript.fetchTranscript(videoId, { lang, fetch: timedFetch });
       if (list && list.length) return list;
     } catch (e) {
       lastErr = e;
@@ -26,7 +31,7 @@ async function getTranscript(videoId, preferLang) {
 
   // محاولة أخيرة بدون تحديد لغة
   try {
-    const list = await YoutubeTranscript.fetchTranscript(videoId);
+    const list = await YoutubeTranscript.fetchTranscript(videoId, { fetch: timedFetch });
     if (list && list.length) return list;
   } catch (e) {
     lastErr = e;

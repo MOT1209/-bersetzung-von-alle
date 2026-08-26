@@ -14,3 +14,5 @@ services:
         value: https://libretranslate.com
       - key: RATE_LIMIT_MAX
         value: "20"
+      - key: CORS_ORIGIN
+        sync: false            # قائمة بيضاء (فارغة = نفس الأصل فقط) — يُضاف يدويًا عند الحاجة
