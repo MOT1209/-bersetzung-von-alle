@@ -6,7 +6,7 @@ const { extractVideoId, getTranscript, buildSrt } = require('./youtube');
 const { translateText, detectLanguage, applyGlossary, getProviders } = require('./translate');
 const translate = require('./translate'); // وصول وقت التنفيذ — يسمح بتزييف translateTextWithMeta في الاختبارات
 const { transcribeVideoAudio } = require('./audio');
-const { trackUsage, getUsage } = require('./usage'); // عدّاد استخدام بسيط
+const { trackUsage } = require('./usage'); // عدّاد استخدام بسيط
 const { logInfo } = require('./logger');
 
 const router = express.Router();
@@ -160,12 +160,6 @@ router.post('/translate-smart', async (req, res) => {
   }
 });
 
-// ===== GET /api/stats — عدّاد الاستخدام =====
-router.get('/stats', async (req, res) => {
-  try {
-    res.json(await getUsage());
-  } catch (e) {
-    res.status(500).json({ error: 'server-error' });
   }
 });
 

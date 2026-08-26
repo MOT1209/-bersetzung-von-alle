@@ -5,10 +5,12 @@ import {
   result, cacheBadge, sourceNotice,
   batchInput, batchBtn, batchStatus, batchResults, smartBtn,
   showError, hideError, showProgress, hideProgress, showToast,
+  metaTitle, metaLine,
 } from './ui.js';
-import { renderResult, renderTab } from './result.js';
+import { renderResult, renderTab, renderContextBadge } from './result.js';
 import { teardownPlayers } from './media.js';
 import { saveToHistory, getGlossary } from './features.js';
+import { streamTranslate, supportsStreaming } from './stream.js';
 
 function safeGetLocal(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
@@ -34,12 +36,8 @@ export async function runTranslate() {
     result.hidden = true;
     showProgress('جاري الترجمة…');
 
-    let res;
-    if (state.mode === 'url') {
-      res = await postJson('/api/translate', { url, targetLang: target, glossary, provider });
-    } else if (state.mode === 'text') {
-      res = await postJson('/api/translate-text', { text, targetLang: target, glossary, provider });
-    } else {
+    // File mode — no streaming
+    if (state.mode === 'file') {
       const fd = new FormData();
       fd.append('file', state.file.file);
       fd.append('targetLang', target);
@@ -51,26 +49,88 @@ export async function runTranslate() {
       });
       let d = null;
       try { d = await r.json(); } catch {}
-      res = { status: r.status, data: d };
-    }
-
-    hideProgress();
-    const { status, data } = res;
-    if (!data || data.error) {
-      showError((data && data.error) || 'server-error', status);
+      hideProgress();
+      if (!d || d.error) { showError((d && d.error) || 'server-error', r.status); return; }
+      state.current = d;
+      state.activeTab = 'translated';
+      teardownPlayers();
+      saveToHistory(d, target);
+      renderResult(d);
       return;
     }
-    state.current = data;
-    state.activeTab = 'translated';
-    teardownPlayers();
-    saveToHistory(data, target);
-    renderResult(data);
+
+    // URL/Text mode — try SSE streaming first
+    if (supportsStreaming()) {
+      const resultBody = document.getElementById('result-body');
+      resultBody.innerHTML = '';
+      result.hidden = false;
+      let chunks = [];
+
+      const abort = streamTranslate({
+        url: state.mode === 'url' ? url : undefined,
+        text: state.mode === 'text' ? text : undefined,
+        targetLang: target,
+        glossary,
+        provider,
+      }, {
+        onInit: (data) => {
+          metaTitle.textContent = data.title || 'جاري الترجمة…';
+          metaLine.textContent = `من ${langName(data.sourceLang)} إلى ${langName(target)} · ${data.totalChunks} أجزاء`;
+          cacheBadge.hidden = true;
+          result.classList.remove('reveal');
+          void result.offsetWidth;
+          result.classList.add('reveal');
+        },
+        onChunk: (data) => {
+          chunks[data.index] = data.text;
+          resultBody.innerHTML = '';
+          chunks.filter(Boolean).forEach(t => {
+            const p = document.createElement('p');
+            p.className = 'blk streaming-blk';
+            p.textContent = t;
+            resultBody.appendChild(p);
+          });
+          resultBody.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        },
+        onProgress: (data) => {
+          const pct = Math.round((data.processed / data.total) * 100);
+          showProgress(`جاري الترجمة… ${pct}%`);
+        },
+        onDone: (data) => {
+          hideProgress();
+          state.current = data;
+          state.activeTab = 'translated';
+          teardownPlayers();
+          saveToHistory(data, target);
+          renderResult(data);
+        },
+        onError: (data) => {
+          hideProgress();
+          showError(data.error || 'server-error', data.status);
+        },
+      });
+      state.abortCtrl = abort;
+    } else {
+      // Fallback: traditional translation
+      const res = state.mode === 'url'
+        ? await postJson('/api/translate', { url, targetLang: target, glossary, provider })
+        : await postJson('/api/translate-text', { text, targetLang: target, glossary, provider });
+      hideProgress();
+      const { status, data } = res;
+      if (!data || data.error) { showError((data && data.error) || 'server-error', status); return; }
+      state.current = data;
+      state.activeTab = 'translated';
+      teardownPlayers();
+      saveToHistory(data, target);
+      renderResult(data);
+    }
   } catch {
     hideProgress();
     showError('server-error', 500);
   } finally {
     state.running = false;
     translateBtn.disabled = false;
+    state.abortCtrl = null;
   }
 }
 
@@ -85,7 +145,8 @@ export async function runSmartTranslate() {
     hideError();
     result.hidden = true;
     showProgress('🧠 جاري الترجمة الذكية (قد تستغرق دقيقة)…');
-    const { status, data } = await postJson('/api/translate-smart', { text, targetLang: targetLang.value });
+    const url = (state.mode === 'url') ? urlInput.value.trim() : undefined;
+    const { status, data } = await postJson('/api/translate-smart', { text, targetLang: targetLang.value, url });
     hideProgress();
     if (status === 503 && data && data.error === 'smart-unavailable') {
       state.running = false;
@@ -105,6 +166,8 @@ export async function runSmartTranslate() {
     cacheBadge.hidden = true;
     sourceNotice.hidden = true;
     renderTab('translated');
+    if (data.context) renderContextBadge(data.context);
+    showToast(data.context?.contentType ? `تمت الترجمة (${getContentTypeLabel(data.context.contentType)}) ✓` : 'تمت الترجمة ✓');
     smartBtn.disabled = false;
     state.running = false;
   } catch {
@@ -113,6 +176,11 @@ export async function runSmartTranslate() {
     smartBtn.disabled = false;
     showError('server-error', 500);
   }
+}
+
+function getContentTypeLabel(type) {
+  const labels = { technical: 'تقني', code: 'كود', medical: 'طبي', legal: 'قانوني', news: 'إخباري', academic: 'أكاديمي', general: 'عام' };
+  return labels[type] || 'عام';
 }
 
 /* ========== ترجمة الدفعات ========== */

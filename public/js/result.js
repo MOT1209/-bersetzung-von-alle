@@ -297,3 +297,21 @@ function langName(code) {
   const short = code.split('-')[0];
   return langs[short] || code;
 }
+
+/* ---------- Context Badge ---------- */
+export function renderContextBadge(context) {
+  const existing = document.querySelector('.context-badge');
+  if (existing) existing.remove();
+  if (!context || !context.contentType) return;
+  const badge = document.createElement('span');
+  badge.className = 'context-badge';
+  badge.textContent = getContentTypeLabel(context.contentType);
+  badge.title = `نوع المحتوى: ${context.contentType} (ثقة: ${Math.round(context.confidence * 100)}%)`;
+  const metaLineEl = document.getElementById('meta-line');
+  if (metaLineEl) metaLineEl.appendChild(badge);
+}
+
+function getContentTypeLabel(type) {
+  const labels = { technical: '📝 تقني', code: '💻 كود', medical: '🏥 طبي', legal: '⚖️ قانوني', news: '📰 إخباري', academic: '🎓 أكاديمي', general: '📄 عام' };
+  return labels[type] || '📄 عام';
+}

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>أرا لينك — لوحة التحكم</title>
+  <script src="theme-init.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    body { padding: 0; }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .stat-card { background: var(--card-bg, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 20px; }
+    .stat-value { font-size: 2rem; font-weight: 800; color: var(--primary, #6366f1); }
+    .stat-label { font-size: .85rem; color: var(--text-dim, #666); margin-top: 4px; }
+    .chart-container { position: relative; height: 250px; margin-top: 12px; }
+    .auth-overlay { position: fixed; inset: 0; background: var(--bg, #fff); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border, #e5e7eb); }
+    .header h1 { font-size: 1.2rem; font-weight: 700; margin: 0; }
+    .header a { color: var(--primary, #6366f1); text-decoration: none; font-size: .9rem; }
+    .error-msg { color: var(--error, #ef4444); text-align: center; padding: 40px; font-size: 1.1rem; }
+    @media (max-width: 640px) { .dashboard-grid { grid-template-columns: 1fr; padding: 12px; } }
+  </style>
+</head>
+<body>
+  <div id="auth-gate" class="auth-overlay">
+    <div class="stat-card" style="max-width: 360px; text-align: center;">
+      <h2 style="margin-bottom: 16px;">لوحة التحكم</h2>
+      <p style="color: var(--text-dim, #666); margin-bottom: 12px;">أدخل مفتاح الإدارة</p>
+      <input type="password" id="admin-token" class="input" placeholder="ADMIN_TOKEN" style="width: 100%; margin-bottom: 12px;">
+      <button id="auth-btn" class="btn-primary" style="width: 100%;">دخول</button>
+      <p id="auth-error" style="color: var(--error, #ef4444); margin-top: 8px; display: none;"></p>
+    </div>
+  </div>
+
+  <div id="dashboard" hidden>
+    <div class="header">
+      <h1>لوحة التحكم</h1>
+      <a href="/">العودة للرئيسية</a>
+    </div>
+    <div class="dashboard-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="total-count">—</div>
+        <div class="stat-label">إجمالي الترجمات</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="today-count">—</div>
+        <div class="stat-label">ترجمات اليوم</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="week-count">—</div>
+        <div class="stat-label">ترجمات الأسبوع</div>
+      </div>
+      <div class="stat-card">
+        <h3 style="margin: 0 0 8px; font-size: .95rem;">الترجمات خلال 7 أيام</h3>
+        <div class="chart-container"><canvas id="timeseries-chart"></canvas></div>
+      </div>
+      <div class="stat-card">
+        <h3 style="margin: 0 0 8px; font-size: .95rem;">التوزيع حسب النوع</h3>
+        <div class="chart-container"><canvas id="type-chart"></canvas></div>
+      </div>
+      <div class="stat-card">
+        <h3 style="margin: 0 0 8px; font-size: .95rem;">اللغات الأكثر استخدامًا</h3>
+        <div class="chart-container"><canvas id="lang-chart"></canvas></div>
+      </div>
+      <div class="stat-card">
+        <h3 style="margin: 0 0 8px; font-size: .95rem;">أنماط الاستخدام (ساعات)</h3>
+        <div class="chart-container"><canvas id="hourly-chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

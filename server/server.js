@@ -10,6 +10,7 @@ const translateRouter = require('./routes-translate');
 const ttsRouter = require('./routes-tts');
 const videoRouter = require('./routes-video');
 const settingsRouter = require('./routes-settings'); // إعدادات المفاتيح (.env) — محمي بـ ADMIN_TOKEN
+const statsRouter = require('./routes-stats'); // إحصائيات لوحة التحكم — محمية بـ ADMIN_TOKEN
 const { getAllLanguages } = require('./languages');
 
 const app = express();
@@ -33,7 +34,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ['\'self\''],
-      scriptSrc: ['\'self\'', 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+      scriptSrc: ['\'self\'', 'https://www.youtube.com', 'https://www.youtube-nocookie.com', 'https://cdn.jsdelivr.net'],
       styleSrc: ['\'self\'', '\'unsafe-inline\'', 'https://fonts.googleapis.com'],
       fontSrc: ['\'self\'', 'https://fonts.gstatic.com'],
       imgSrc: ['\'self\'', 'data:', 'blob:'],
@@ -142,6 +143,9 @@ function requireAdmin(req, res, next) {
   next();
 }
 app.use('/api/settings', heavyLimiter, requireAdmin, settingsRouter);
+
+// ===== إحصائيات لوحة التحكم (محمية بـ ADMIN_TOKEN + حد أثقل) =====
+app.use('/api/stats', heavyLimiter, requireAdmin, statsRouter);
 
 // ===== مسارات الترجمة (حد أساسي مطبّق أعلاه على /api كامل) =====
 app.use('/api', translateRouter);

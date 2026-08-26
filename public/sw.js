@@ -1,10 +1,11 @@
 /* sw.js — Service Worker لأرا لينك (PWA)
    استراتيجية: شبكة-أوّل مع تحديث خلفي (stale-while-revalidate) للملفات الثابتة
    لضمان ظهور النسخ المحدّثة بعد النشر. الكاش يبقى كاحتياطي أوفلاين فقط. */
-const CACHE = 'aralink-v3';
+const CACHE = 'aralink-v4';
 const PRECACHE = [
   '/',
   '/index.html',
+  '/admin.html',
   '/style.css',
   '/theme-init.js',
   '/js/app.js',
@@ -15,6 +16,8 @@ const PRECACHE = [
   '/js/result.js',
   '/js/features.js',
   '/js/translate.js',
+  '/js/stream.js',
+  '/js/dashboard.js',
   '/manifest.webmanifest',
   '/icons/icon.svg'
 ];

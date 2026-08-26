@@ -252,7 +252,14 @@ function renderParagraphsLocal(text) {
 }
 
 /* ========== إعدادات ========== */
-function openSettings()  { settingsModal.hidden = false; }
+function openSettings() {
+  settingsModal.hidden = false;
+  const dashboardLink = document.getElementById('dashboard-link');
+  if (dashboardLink) {
+    const adminToken = localStorage.getItem('aralink-admin-token');
+    dashboardLink.hidden = !adminToken;
+  }
+}
 function closeSettings() { settingsModal.hidden = true;  }
 
 async function saveSettings(e) {
