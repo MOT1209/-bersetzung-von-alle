@@ -494,9 +494,9 @@ body {
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 800;
-  color: #065f46;
-  background: #d1fae5;
-  border: 1px solid #a7f3d0;
+  color: color-mix(in srgb, var(--success) 65%, black);
+  background: color-mix(in srgb, var(--success) 14%, white);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, white);
   vertical-align: middle;
 }
 
@@ -699,7 +699,7 @@ body {
   background: var(--primary);
 }
 
-.history-badge.badge-youtube { background: #dc2626; }
+.history-badge.badge-youtube { background: var(--danger); }
 .history-badge.badge-article { background: var(--success); color: #064e3b; }
 
 .history-preview {
@@ -1088,8 +1088,6 @@ body {
   .hero-card { padding: 16px 14px; border-radius: 14px; }
   .mode-btn { padding: 8px 10px; font-size: .78rem; }
   .btn-primary, .btn-action { width: 100%; margin-top: 6px; }
-  .actions-row { flex-wrap: wrap; }
-  .result-tabs { gap: 4px; }
   .tab { padding: 8px 10px; font-size: .78rem; }
   .result-body { font-size: .95rem; }
   .cap-bar { font-size: .82rem; padding: 8px 10px; }

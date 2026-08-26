@@ -9,7 +9,6 @@ export const EXPORT_FORMATS = [
 
 export const MESSAGES = {
   'missing-url':           'الرجاء إدخال رابط موقع أو فيديو يوتيوب',
-  'empty-text':            'الرجاء إدخال نص للترجمة',
   'invalid-url':           'صيغة الرابط غير صحيحة — تأكد من بدء الرابط بـ http:// أو https://',
   'url-not-allowed':       'هذا النطاق غير مدعوم حاليًا',
   'unsupported-url':       'الرابط غير مدعوم — يُدعم يوتيوب والمواقع الإخبارية والمدونات فقط',

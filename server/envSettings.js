@@ -126,7 +126,18 @@ async function saveSettings(body) {
   for (const [key, value] of Object.entries(allowed)) {
     next = upsertEnvLine(next, key, value);
   }
-  await fs.writeFile(getEnvFilePath(), next, 'utf8');
+  const envFile = getEnvFilePath();
+  await fs.mkdir(path.dirname(envFile), { recursive: true });
+  const tmp = `${envFile}.${process.pid}.tmp`;
+  await fs.writeFile(tmp, next, 'utf8');
+  try {
+    await fs.rename(tmp, envFile);
+  } catch (e) {
+    if (e && (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EBUSY')) {
+      await fs.copyFile(tmp, envFile);
+      await fs.rm(tmp, { force: true }).catch(() => {});
+    } else throw e;
+  }
 
   // تطبيق فوري: process.env + كائن config (يُقرأ وقت الاستدعاء في translate.js)
   for (const [key, value] of Object.entries(allowed)) {

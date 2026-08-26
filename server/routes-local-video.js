@@ -5,6 +5,7 @@ const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { randomUUID } = require('crypto');
 const config = require('./config');
 
 const router = express.Router();
@@ -70,10 +71,7 @@ router.post('/video-local', express.json({ limit: '60mb' }), async (req, res) =>
   }
 
   // ملف مؤقت فريد (يُنظَّف قبل إرسال أي رد — لا سباق)
-  const tmpFile = path.join(
-    os.tmpdir(),
-    'aralink-local-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + format
-  );
+  const tmpFile = path.join(os.tmpdir(), 'aralink-local-' + randomUUID() + '.' + format);
 
   // يرسل الاستجابة بعد حذف الملف المؤقت أولًا — يضمن عدم بقاء ملفات بعد عودة fetch
   const respond = async (status, body) => {

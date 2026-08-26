@@ -1,5 +1,6 @@
 /* ---------- عناصر DOM + واجهة المستخدم ---------- */
 import { safeGet, safeSet } from './utils.js';
+import { MESSAGES } from './constants.js';
 
 /* ===== عناصر DOM ===== */
 export const $ = (id) => document.getElementById(id);
@@ -148,26 +149,5 @@ function mapErrorLocal(code, status) {
   if (status === 503 && code === 'smart-unavailable')
     return 'الترجمة الذكية غير متوفرة حاليًا — تحقق من إعدادات Gemini في ملف .env';
   if (status === 413) return 'حجم الملف يتجاوز الحد الأقصى (50 ميغابايت)';
-  const map = {
-    'missing-url':           'الرجاء إدخال رابط موقع أو فيديو يوتيوب',
-    'empty-text':            'الرجاء إدخال نص للترجمة',
-    'invalid-url':           'صيغة الرابط غير صحيحة — تأكد من بدء الرابط بـ http:// أو https://',
-    'url-not-allowed':       'هذا النطاق غير مدعوم حاليًا',
-    'unsupported-url':       'الرابط غير مدعوم — يُدعم يوتيوب والمواقع الإخبارية والمدونات فقط',
-    'unsupported-file-type': 'صيغة الملف غير مدعومة — يُدعم PDF وWord وPowerPoint وملفات النصوص فقط',
-    'file-too-large':        'حجم الملف يتجاوز الحد الأقصى (50 ميغابايت)',
-    'missing-lang':          'الرجاء اختيار لغة الهدف',
-    'missing-text':          'الرجاء إدخال نص للترجمة',
-    'no-content':            'لم يتم استخراج محتوى من هذا الرابط — قد تكون الصفحة خالية أو محمية',
-    'no-transcript':         'لا توجد ترجمة (transcript) لهذا الفيديو — تأكد من تفعيل الترجمة في فيديو يوتيوب',
-    'video-download-failed': 'تعذر تنزيل فيديو يوتيوب — حاول فيديو أقصر أو لاحقًا',
-    'video-too-long':        'فيديو يوتيوب طويل جدًا (≥ 6 ساعات) — يتجاوز الحد المسموح',
-    'extract-failed':        'تعذر استخراج المحتوى من هذا الرابط',
-    'tts-failed':            'تعذر تحويل النص إلى كلام — حاول لاحقًا',
-    'ocr-empty':             'لم يتم استخراج أي نص من الصورة',
-    'smart-unavailable':     'الترجمة الذكية غير متوفرة حاليًا — تحقق من إعدادات Gemini',
-    'server-error':          'خطأ غير متوقع — حاول لاحقًا',
-    'parsing-error':         'حدث خطأ أثناء تحليل الاستجابة',
-  };
-  return map[code] || 'خطأ غير متوقع — حاول لاحقًا';
+  return MESSAGES[code] || 'خطأ غير متوقع — حاول لاحقًا';
 }

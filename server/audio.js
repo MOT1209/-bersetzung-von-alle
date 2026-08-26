@@ -11,11 +11,13 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { downloadAudio } = require('./downloader');
 const config = require('./config');
+const { randomUUID } = require('crypto');
 
 const execFileAsync = promisify(execFile);
 
 // مجلد مؤقت بمسار Windows مطلق (لا نعتمد على /tmp)
 const TMP_DIR = path.join(os.tmpdir(), 'aralink');
+const SHERPA_TIMEOUT = 120000;
 
 // ===== اختيار محرك التفريغ =====
 // sherpa-onnx قد لا يكون مثبتًا (فشل npm) → نرجع تلقائيًا إلى transformers
@@ -87,7 +89,7 @@ async function ensureSherpaModel() {
   for (const name of missing) {
     const url = SHERPA_BASE + name;
     console.log('[audio] downloading sherpa model file: ' + name);
-    const res = await fetch(url, { redirect: 'follow' });
+    const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(120000) });
     if (!res.ok) throw new Error('model download failed: ' + name + ' (HTTP ' + res.status + ')');
     const buf = Buffer.from(await res.arrayBuffer());
     // نكتب لملف مؤقت ثم نعيد التسمية حتى لا نستخدم ملفًا ناقصًا
@@ -180,15 +182,30 @@ function segmentsFromResult(res, engine) {
 }
 
 // تفريغ عبر sherpa-onnx: يعيد { text, segments:[{start,duration,text}] }
+// watchdog: مهلة موحّدة 120s عبر Promise.race
 async function transcribeWithSherpa(audio, lang) {
   const recognizer = await getSherpaRecognizer(lang);
   const stream = recognizer.createStream();
+  let timeoutId = null;
   try {
     stream.acceptWaveform(16000, audio); // Float32Array في المدى [-1,1]
-    recognizer.decode(stream);
-    return recognizer.getResult(stream);
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        const err = new Error('sherpa recognize timeout');
+        err.code = 'fetch-failed';
+        reject(err);
+      }, SHERPA_TIMEOUT);
+    });
+    const workPromise = (async () => {
+      recognizer.decode(stream);
+      return recognizer.getResult(stream);
+    })();
+    workPromise.catch(() => {});
+    const result = await Promise.race([workPromise, timeoutPromise]);
+    return result;
   } finally {
-    stream.free();
+    if (timeoutId) clearTimeout(timeoutId);
+    try { stream.free(); } catch {}
   }
 }
 
@@ -241,7 +258,7 @@ async function transcribeMediaFile(mediaPath, label, lang) {
   await fs.mkdir(TMP_DIR, { recursive: true });
   // اسم ملف PCM مؤقت فريد (يُنظَّف في finally داخل هذه الدالة — لا يُلمس من الخارج)
   const tag = String(label || path.basename(mediaPath || 'media')).replace(/[^a-zA-Z0-9_-]/g, '_');
-  const pcmPath = path.join(TMP_DIR, `pcm-${tag}-${Date.now()}-${Math.random().toString(36).slice(2)}.f32`);
+  const pcmPath = path.join(TMP_DIR, `pcm-${tag}-${randomUUID()}.f32`);
 
   try {
     // 1) تحويل الملف → PCM خام مباشرة: 16 كيلوهرتز، قناة واحدة، float32 (بدون wav وسيط)
@@ -313,7 +330,7 @@ async function transcribeMediaFile(mediaPath, label, lang) {
 // الإرجاع: { chunks: [{ start, duration, text }] } (التوقيع لا يتغير أبدًا)
 async function transcribeVideoAudio(videoId, lang) {
   await fs.mkdir(TMP_DIR, { recursive: true });
-  const m4aPath = path.join(TMP_DIR, `audio-${videoId}-${Date.now()}-${Math.random().toString(36).slice(2,8)}.m4a`); // تحميل m4a فقط (لا wav)
+  const m4aPath = path.join(TMP_DIR, `audio-${videoId}-${randomUUID()}.m4a`); // تحميل m4a فقط (لا wav)
 
   try {
     // 1) تنزيل الصوت كـ m4a مباشرة عبر yt-dlp.exe (الثنائي المباشر — موثوق)

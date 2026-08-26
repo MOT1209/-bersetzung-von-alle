@@ -39,6 +39,8 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 - **Article/website fetching:** `server/fetchContent.js` — server-side fetch + cheerio/readability to extract main text
 - **Translation:** `server/translate.js` — Google Translate (free) with Gemini API fallback; `translate` npm package for detection
 - **Config:** `.env` for API keys (NEVER commit real keys)
+- **Files/OCR/PDF/TTS:** `server/files.js` + `server/routes-file.js` (11→8 formats), `server/ocr.js` (Tesseract.js), `server/pdf.js` (PDF parsing), `server/tts.js` (MS Edge TTS) + `server/cache.js`/`usage.js`/`logger.js`
+- **Extension:** `extension/` (Chrome Manifest V3: popup.js/background.js) — ترجمة فورية داخل المتصفح
 
 ## CONTENT EXTRACTION RULES
 
@@ -86,6 +88,8 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 │   ├── fetchContent.js← article/website extraction
 │   ├── youtube.js     ← YouTube transcript extraction
 │   ├── translate.js   ← translation + language detection
+│   ├── files.js       ← file import/export (11 formats) + ocr.js/pdf.js/tts.js/cache.js/usage.js
+│   ├── routes-*.js    ← file/ocr/tts/translate/video/settings routes
 │   └── config.js      ← env/config loading
 ├── .env               ← API keys (never commit)
 ├── specs/             ← feature specifications (wave-based)

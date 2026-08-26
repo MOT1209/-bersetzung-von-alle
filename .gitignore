@@ -40,3 +40,8 @@ turkish-ar.srt
 تقرير-الفحص.html
 تقرير-الفحص-الشامل.html
 bun.lock
+
+# Reports / benchmarks (wildcard - local generated reports)
+reports/
+reports/**
+coverage/

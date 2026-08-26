@@ -174,7 +174,10 @@ export function buildCaptionPanel() {
   if (!caps.length) { capPanel.hidden = true; return; }
   caps.forEach((c, i) => {
     const row = document.createElement('div');
-    row.className = 'cap-item';
+    row.className = 'cap-item cap-clickable';
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
+    row.setAttribute('aria-label', 'انتقل إلى ' + formatTime(c.start || 0));
     const t = document.createElement('span');
     t.className = 'cap-time';
     t.dir = 'ltr';
@@ -184,6 +187,17 @@ export function buildCaptionPanel() {
     s.textContent = c.translated || c.original || '';
     row.appendChild(t);
     row.appendChild(s);
+    row.addEventListener('click', () => {
+      if (ytPlayer && typeof ytPlayer.seekTo === 'function') {
+        try { ytPlayer.seekTo(c.start || 0, true); } catch {}
+      }
+    });
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        row.click();
+      }
+    });
     capPanelList.appendChild(row);
     capPanelItems.push(row);
   });

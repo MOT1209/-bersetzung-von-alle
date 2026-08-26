@@ -81,6 +81,12 @@
   في الإعدادات مع حقول DeepL وOpenAI.
 - **قيد v1 موثّق**: تصدير pptx/epub بـ txt/md/docx فقط (لا إعادة بناء الصيغة).
 
+
+## 🧩 الإضافات: امتداد المتصفح + OCR/TTS/PDF
+
+- **امتداد المتصفح**: مجلد `extension/` (Chrome Manifest V3) — ترجم أي صفحة بنقرة واحدة عبر `popup.js` + `background.js`.
+- **OCR/TTS/PDF**: استخراج النص من الصور (`server/ocr.js` + Tesseract.js) وملفات PDF (`server/pdf.js`) وتحويل النتيجة إلى صوت عربي (`server/tts.js` عبر MS Edge TTS) — مع معاينة وتصدير.
+
 ## 🛡️ الأمان (تحصين 2026)
 
 - **CORS**: متغير `CORS_ORIGIN` في `.env` — قائمة أصول مسموحة مفصولة بفواصل

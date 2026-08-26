@@ -337,8 +337,14 @@ async function translateTextWithMeta(text, targetLang, sourceLang, opts) {
   const chunks = chunkText(text);
   const results = [];
   let fromCacheCount = 0;
+  const DEADLINE = Date.now() + 120000;
 
   for (const chunk of chunks) {
+    if (Date.now() > DEADLINE) {
+      const err = new Error('translate timeout');
+      err.code = 'translate-failed';
+      throw err;
+    }
     // كاش: نفس النص+اللغتين يُرجع فورًا بدون استهلاك حصة
     const cached = cacheGet(chunk, sourceLang, targetLang);
     if (cached !== null) {

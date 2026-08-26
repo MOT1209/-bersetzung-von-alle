@@ -166,6 +166,7 @@ function parseCsv(text) {
 // ترميز خلية CSV: اقتباس إذا احتوت فاصلة أو اقتباسًا أو سطرًا جديدًا
 function escapeCsvCell(v) {
   const str = String(v ?? '');
+  if (/^[=+\-@\t\r]/.test(str)) return "'\"" + str.replace(/"/g, '""') + '"';
   if (/[",\n\r]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
   return str;
 }

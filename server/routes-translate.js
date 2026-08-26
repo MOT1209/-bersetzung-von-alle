@@ -160,9 +160,6 @@ router.post('/translate-smart', async (req, res) => {
   }
 });
 
-  }
-});
-
 // ===== POST /api/srt — بناء ملف SRT =====
 router.post('/srt', (req, res) => {
   const { captions } = req.body || {};

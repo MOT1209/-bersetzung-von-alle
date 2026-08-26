@@ -15,6 +15,8 @@ const DATA_DIR = path.join(__dirname, 'ocr', 'traineddata');
 // أسماء الملفات المطلوبة للعمل دون اتصال
 const REQUIRED_FILES = ['ara.traineddata.gz', 'eng.traineddata.gz'];
 
+const OCR_TIMEOUT = 60000;
+
 // ===== فحص جاهزية ملفات التدريب =====
 // إن لم توجد الملفات → خطأ برمز ocr-not-ready يوجّه إلى npm run download:ocr
 function ensureTraineddata() {
@@ -30,30 +32,45 @@ function ensureTraineddata() {
 
 // ===== تعرّف على صورة (Buffer) → { text, confidence } =====
 // worker جديد لكل طلب (نمط آمن — لا مشاركة حالة بين الطلبات)
+// مهلة موحّدة: createWorker + recognize محميّان بـ Promise.race مع OCR_TIMEOUT
 async function recognizeImage(buffer) {
   ensureTraineddata();
   let worker = null;
+  let timeoutId = null;
   try {
     let progress = 0;
-    worker = await createWorker(OCR_LANGS, 1, {
-      langPath: DATA_DIR,
-      cachePath: DATA_DIR,
-      cacheMethod: 'write',
-      logger: (m) => {
-        if (m.status === 'recognizing text') progress = m.progress;
-      },
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        const err = new Error('OCR timeout');
+        err.code = 'ocr-timeout';
+        reject(err);
+      }, OCR_TIMEOUT);
     });
-    const { data } = await worker.recognize(buffer);
-    return {
-      text: String(data.text || '').trim(),
-      confidence: typeof data.confidence === 'number' ? data.confidence : 0,
-    };
+    const workPromise = (async () => {
+      worker = await createWorker(OCR_LANGS, 1, {
+        langPath: DATA_DIR,
+        cachePath: DATA_DIR,
+        cacheMethod: 'write',
+        logger: (m) => {
+          if (m.status === 'recognizing text') progress = m.progress;
+        },
+      });
+      const { data } = await worker.recognize(buffer);
+      return {
+        text: String(data.text || '').trim(),
+        confidence: typeof data.confidence === 'number' ? data.confidence : 0,
+      };
+    })();
+    workPromise.catch(() => {});
+    const result = await Promise.race([workPromise, timeoutPromise]);
+    return result;
   } finally {
+    if (timeoutId) clearTimeout(timeoutId);
     if (worker) {
       try {
         await worker.terminate();
       } catch {
-        // تجاهل — التنظيف فقط
+        // تجاهل — التنظيف فقط (حتى عند انتهاء المهلة)
       }
     }
   }

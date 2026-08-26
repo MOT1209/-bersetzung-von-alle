@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -17,6 +17,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
@@ -29,5 +30,11 @@ jobs:
       - name: Run checks
         run: npm run check
 
+      - name: Run lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
+
+      - name: Docker build
+        run: docker build -t aralink:test .

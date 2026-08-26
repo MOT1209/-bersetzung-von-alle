@@ -5,6 +5,7 @@ const { promisify } = require('util');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 
 const execFileAsync = promisify(execFile);
 
@@ -59,7 +60,7 @@ async function concatMp3s(chunkBuffers) {
   if (chunkBuffers.length === 1) return chunkBuffers[0];
 
   const tmpDir = path.join(os.tmpdir(), 'aralink');
-  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const stamp = randomUUID().slice(0,8);
   const listPath = path.join(tmpDir, `list-${stamp}.txt`);
   const outPath = path.join(tmpDir, `out-${stamp}.mp3`);
   const chunkFiles = [];

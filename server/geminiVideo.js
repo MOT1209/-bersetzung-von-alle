@@ -19,6 +19,7 @@ const TIMEOUT_MS = 300000; // الفيديو أبطأ بكثير من النص
 // سقف انتظار الحصة: نحن داخل طلب HTTP، فلا يصح أن ننتظر دقيقة كاملة
 const MAX_RETRY_WAIT_MS = 20000;
 const RATE_LIMIT_ATTEMPTS = 2; // محاولتان إضافيتان بانتظار تصاعدي
+const OVERALL_TIMEOUT_MS = 480000; // حدّ إجمالي 8 دقائق لـ translateYouTubeVideo
 
 // مخطط مُقيَّد للمخرَج. التوثيق لا يؤكد دعمه على مسار الفيديو، لذا التحقق
 // الدفاعي أدناه إلزامي لا اعتماد عليه وحده.
@@ -208,61 +209,86 @@ function isAvailable() {
 async function translateYouTubeVideo(videoId, targetLang) {
   if (!isAvailable()) throw err('gemini-video-disabled', 'مسار Gemini للفيديو غير مفعّل');
 
-  const maxSeconds = Math.max(1, Number(config.MAX_VIDEO_MINUTES) || 20) * 60;
-
-  // الكاش أهم حماية للحصة: فيديو واحد لا يُعالَج مرتين للغة نفسها
-  const cacheKey = `gemini-video:${videoId}`;
-  const hit = cacheGet(cacheKey, 'video', targetLang);
-  if (hit) {
-    try {
-      const captions = JSON.parse(hit);
-      if (Array.isArray(captions) && captions.length) {
-        return { sourceLang: 'auto', captions, cached: true };
-      }
-    } catch {
-      // كاش تالف — نتجاهله ونعيد الطلب
-    }
+  const DEADLINE = Date.now() + OVERALL_TIMEOUT_MS;
+  function checkDeadline() {
+    if (Date.now() > DEADLINE) throw err('gemini-video-failed', 'انتهت مهلة معالجة الفيديو (8 دقائق)');
   }
+  let overallTimeoutId = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    overallTimeoutId = setTimeout(() => reject(err('gemini-video-failed', 'انتهت مهلة معالجة الفيديو (8 دقائق)')), OVERALL_TIMEOUT_MS);
+  });
+  // منع تحذير unhandledRejection لو انتهى العمل قبل المهلة
+  timeoutPromise.catch(() => {});
 
-  let captions;
-  try {
-    captions = await callGemini(videoId, targetLang, maxSeconds);
-  } catch (e) {
-    // الفيديو الطويل لا تنفع معه إعادة المحاولة — نرفعه فورًا
-    if (e && e.code === 'video-too-long') throw e;
+  const workPromise = (async () => {
+    const maxSeconds = Math.max(1, Number(config.MAX_VIDEO_MINUTES) || 20) * 60;
 
-    // تجاوز الحصة: خطأ مؤقت. ننتظر المهلة التي تقترحها Google (أو انتظارًا
-    // تصاعديًا) ونعيد المحاولة. الإعادة الفورية هنا تفشل حتمًا للسبب نفسه.
-    if (e && e.code === 'gemini-rate-limited') {
-      let lastErr = e;
-      for (let attempt = 1; attempt <= RATE_LIMIT_ATTEMPTS; attempt++) {
-        const wait = Math.min(lastErr.retryAfterMs || attempt * 5000, MAX_RETRY_WAIT_MS);
-        console.error(`[geminiVideo] حصة مستنزفة — انتظار ${Math.round(wait / 1000)}ث (محاولة ${attempt})`);
-        await sleep(wait);
-        try {
-          captions = await callGemini(videoId, targetLang, maxSeconds);
-          lastErr = null;
-          break;
-        } catch (e2) {
-          lastErr = e2;
-          if (e2 && e2.code !== 'gemini-rate-limited') throw e2;
+    // الكاش أهم حماية للحصة: فيديو واحد لا يُعالَج مرتين للغة نفسها
+    const cacheKey = `gemini-video:${videoId}`;
+    const hit = cacheGet(cacheKey, 'video', targetLang);
+    if (hit) {
+      try {
+        const captions = JSON.parse(hit);
+        if (Array.isArray(captions) && captions.length) {
+          return { sourceLang: 'auto', captions, cached: true };
         }
+      } catch {
+        // كاش تالف — نتجاهله ونعيد الطلب
       }
-      if (lastErr) throw lastErr; // ما زالت الحصة مستنزفة → رمز واضح للمستخدم
-    } else if (e && e.code === 'gemini-model-unavailable' && config.GEMINI_MODEL &&
-        config.GEMINI_MODEL !== (config.GEMINI_VIDEO_MODEL || config.GEMINI_MODEL)) {
-      // نموذج الفيديو غير متاح لهذا المفتاح ⇒ نجرّب GEMINI_MODEL العادي مرة
-      // واحدة. أسماء النماذج تتغيّر، ولا يصح أن يسقط المسار كله بسببها.
-      console.error('[geminiVideo] ' + e.message + ' — يُجرَّب ' + config.GEMINI_MODEL);
-      captions = await callGemini(videoId, targetLang, maxSeconds, config.GEMINI_MODEL);
-    } else {
-      // محاولة واحدة إضافية: أغلب الإخفاقات هنا تنسيقية لا جوهرية
-      captions = await callGemini(videoId, targetLang, maxSeconds);
     }
-  }
 
-  cacheSet(cacheKey, 'video', targetLang, JSON.stringify(captions));
-  return { sourceLang: 'auto', captions, cached: false };
+    let captions;
+    try {
+      checkDeadline();
+      captions = await callGemini(videoId, targetLang, maxSeconds);
+    } catch (e) {
+      // الفيديو الطويل لا تنفع معه إعادة المحاولة — نرفعه فورًا
+      if (e && e.code === 'video-too-long') throw e;
+      checkDeadline();
+
+      // تجاوز الحصة: خطأ مؤقت. ننتظر المهلة التي تقترحها Google (أو انتظارًا
+      // تصاعديًا) ونعيد المحاولة. الإعادة الفورية هنا تفشل حتمًا للسبب نفسه.
+      if (e && e.code === 'gemini-rate-limited') {
+        let lastErr = e;
+        for (let attempt = 1; attempt <= RATE_LIMIT_ATTEMPTS; attempt++) {
+          checkDeadline();
+          const wait = Math.min(lastErr.retryAfterMs || attempt * 5000, MAX_RETRY_WAIT_MS);
+          console.error(`[geminiVideo] حصة مستنزفة — انتظار ${Math.round(wait / 1000)}ث (محاولة ${attempt})`);
+          await sleep(wait);
+          checkDeadline();
+          try {
+            captions = await callGemini(videoId, targetLang, maxSeconds);
+            lastErr = null;
+            break;
+          } catch (e2) {
+            lastErr = e2;
+            if (e2 && e2.code !== 'gemini-rate-limited') throw e2;
+          }
+        }
+        if (lastErr) throw lastErr; // ما زالت الحصة مستنزفة → رمز واضح للمستخدم
+      } else if (e && e.code === 'gemini-model-unavailable' && config.GEMINI_MODEL &&
+          config.GEMINI_MODEL !== (config.GEMINI_VIDEO_MODEL || config.GEMINI_MODEL)) {
+        // نموذج الفيديو غير متاح لهذا المفتاح ⇒ نجرّب GEMINI_MODEL العادي مرة
+        // واحدة. أسماء النماذج تتغيّر، ولا يصح أن يسقط المسار كله بسببها.
+        console.error('[geminiVideo] ' + e.message + ' — يُجرَّب ' + config.GEMINI_MODEL);
+        checkDeadline();
+        captions = await callGemini(videoId, targetLang, maxSeconds, config.GEMINI_MODEL);
+      } else {
+        // محاولة واحدة إضافية: أغلب الإخفاقات هنا تنسيقية لا جوهرية
+        checkDeadline();
+        captions = await callGemini(videoId, targetLang, maxSeconds);
+      }
+    }
+
+    cacheSet(cacheKey, 'video', targetLang, JSON.stringify(captions));
+    return { sourceLang: 'auto', captions, cached: false };
+  })();
+
+  try {
+    return await Promise.race([workPromise, timeoutPromise]);
+  } finally {
+    if (overallTimeoutId) clearTimeout(overallTimeoutId);
+  }
 }
 
 module.exports = {
