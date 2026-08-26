@@ -136,7 +136,6 @@ router.post('/translate-smart', async (req, res) => {
     return res.status(400).json({ error: 'invalid-text' });
   }
   try {
-    const config = require('./config');
     if (!config.GEMINI_API_KEY) {
       return res.status(503).json({ error: 'smart-unavailable' });
     }
@@ -350,11 +349,11 @@ async function handleYouTube(res, videoId, targetLang, videoLang, glossary, opts
 // ===== معالجة مقال =====
 // opts اختياري: { provider?, providers? } — يُمرَّر إلى سلسلة المزوّدين
 async function handleArticle(res, url, targetLang, glossary, opts) {
-  const { title, blocks } = await fetchArticleContent(url);
+  const { title, blocks } = await require('./fetchContent').fetchArticleContent(url);
 
   // كشف لغة المصدر من أول 5 كتل
   const sample = blocks.slice(0, 5).map((b) => b.content).join(' ');
-  const sourceLang = await detectLanguage(sample);
+  const sourceLang = await translate.detectLanguage(sample);
 
   // ترجمة الكتل في دفعات غير متزامنة (5 كتل في المرة) للحفاظ على استجابة الواجهة
   const translatedBlocks = [];
@@ -365,7 +364,7 @@ async function handleArticle(res, url, targetLang, glossary, opts) {
     const slice = blocks.slice(i, i + chunkSize);
     const results = await Promise.all(
       slice.map(async (b) => {
-        const { translated, chunksFromCache, chunksTotal } = await translateTextWithMeta(b.content, targetLang, sourceLang, opts);
+        const { translated, chunksFromCache, chunksTotal } = await translate.translateTextWithMeta(b.content, targetLang, sourceLang, opts);
         totalChunks += chunksTotal;
         cachedChunks += chunksFromCache;
         return translated;
