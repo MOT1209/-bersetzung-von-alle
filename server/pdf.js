@@ -2,13 +2,14 @@
 // الفكرة: نجد تدفقات FlateDecode (المضغوطة بـ zlib) ونفك ضغطها بـ zlib المدمج في Node،
 // ثم نستخرج السلاسل النصية من عوامل عرض النص Tj و TJ في دفق المحتوى.
 const zlib = require('zlib');
+const MAX_DECOMPRESSED = 32 * 1024 * 1024;
 
 // ===== فك ضغط بمحاولات متعددة (zlib / raw / gzip) — يعيد null عند الفشل =====
 function tryDecompress(buf) {
   const attempts = [
-    () => zlib.inflateSync(buf), // FlateDecode القياسي (غلاف zlib)
-    () => zlib.inflateRawSync(buf), // بدون رأس zlib — بعض المولّدات تكتب raw
-    () => zlib.gunzipSync(buf), // بعض المولّدات تستخدم gzip
+    () => zlib.inflateSync(buf, { maxOutputLength: MAX_DECOMPRESSED }), // FlateDecode القياسي (غلاف zlib)
+    () => zlib.inflateRawSync(buf, { maxOutputLength: MAX_DECOMPRESSED }), // بدون رأس zlib — بعض المولّدات تكتب raw
+    () => zlib.gunzipSync(buf, { maxOutputLength: MAX_DECOMPRESSED }), // بعض المولّدات تستخدم gzip
   ];
   for (const fn of attempts) {
     try {

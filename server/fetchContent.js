@@ -17,6 +17,23 @@ const FETCH_HEADERS = {
   'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
 };
 
+const MAX_PDF_BYTES = 25 * 1024 * 1024;
+async function readPdfBufferLimited(res) {
+  const lenHeader = res.headers.get('content-length');
+  if (lenHeader && Number(lenHeader) > MAX_PDF_BYTES) {
+    const err = new Error('input-too-large');
+    err.code = 'input-too-large';
+    throw err;
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_PDF_BYTES) {
+    const err = new Error('input-too-large');
+    err.code = 'input-too-large';
+    throw err;
+  }
+  return buf;
+}
+
 async function fetchWithSafeRedirects(startUrl, timeoutMs = 15000) {
   let currentUrl = startUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -88,7 +105,7 @@ async function fetchArticleContent(url) {
   const isPdfUrl = /\.pdf($|\?)/i.test(url);
   if (isPdfUrl || contentType.includes('pdf')) {
     try {
-      const buf = Buffer.from(await res.arrayBuffer());
+      const buf = await readPdfBufferLimited(res);
       const text = extractPdfText(buf); // يعيد '' إن كان النص قصيرًا جدًا أو غير قابل للقراءة
       if (!text) {
         const err = new Error('pdf-unsupported');
@@ -106,6 +123,7 @@ async function fetchArticleContent(url) {
       return { title, text, blocks, source: 'pdf' };
     } catch (e) {
       if (e.code === 'pdf-unsupported') throw e;
+      if (e.code === 'input-too-large') throw e;
       const err = new Error('pdf-unsupported');
       err.code = 'pdf-unsupported';
       throw err;
