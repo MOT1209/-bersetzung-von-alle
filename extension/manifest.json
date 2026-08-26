@@ -3,8 +3,7 @@
   "name": "أرا لينك — مترجم الروابط",
   "version": "1.0.0",
   "description": "ترجم الصفحة الحالية أو أي رابط فورًا عبر أرا لينك: افتح الإضافة واضغط زرًا واحدًا.",
-  "default_locale": null,
-  "permissions": ["activeTab", "tabs"],
+  "permissions": ["activeTab"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "أرا لينك — ترجم هذا الرابط",

@@ -1,12 +1,20 @@
 /* sw.js — Service Worker لأرا لينك (PWA)
    استراتيجية: شبكة-أوّل مع تحديث خلفي (stale-while-revalidate) للملفات الثابتة
    لضمان ظهور النسخ المحدّثة بعد النشر. الكاش يبقى كاحتياطي أوفلاين فقط. */
-const CACHE = 'aralink-v2';
+const CACHE = 'aralink-v3';
 const PRECACHE = [
   '/',
   '/index.html',
   '/style.css',
-  '/script.js',
+  '/theme-init.js',
+  '/js/app.js',
+  '/js/constants.js',
+  '/js/utils.js',
+  '/js/ui.js',
+  '/js/media.js',
+  '/js/result.js',
+  '/js/features.js',
+  '/js/translate.js',
   '/manifest.webmanifest',
   '/icons/icon.svg'
 ];
@@ -30,17 +38,20 @@ self.addEventListener('fetch', (e) => {
   // لا نتطفل على الواجهات/النطاقات الأخرى أبدًا
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // الطلبات الديناميكية (API) → شبكة أولاً مع كاش احتياطي بسيط
+  // الطلبات الديناميكية (API) — لا نكاش إلا قائمة اللغات (خاص/كبير)
   if (url.pathname.startsWith('/api/')) {
-    e.respondWith(
-      fetch(e.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
-          return res;
-        })
-        .catch(() => caches.match(e.request))
-    );
+    // Only cache the languages list — everything else (video/translations) is private or huge
+    if (url.pathname === '/api/languages' || url.pathname === '/api/languages/') {
+      e.respondWith(
+        fetch(e.request)
+          .then((res) => {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+            return res;
+          })
+          .catch(() => caches.match(e.request))
+      );
+    }
     return;
   }
 

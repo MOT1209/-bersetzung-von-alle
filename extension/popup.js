@@ -2,7 +2,12 @@
 // يفتح أرا لينك في تبويب جديد مع ?url=<الرابط> — الواجهة تلتقطه وتبدأ الترجمة تلقائيًا
 
 const HOST_KEY = 'aralinkHost';
-let host = localStorage.getItem(HOST_KEY) || 'http://localhost:3999';
+let host = 'http://localhost:3999';
+chrome.storage.local.get(HOST_KEY, (res) => {
+  if (res && res[HOST_KEY]) host = res[HOST_KEY];
+  const inp = document.getElementById('host-input');
+  if (inp) inp.value = host;
+});
 
 function aralinkUrl(targetUrl) {
   return host + '/?url=' + encodeURIComponent(targetUrl);
@@ -39,7 +44,7 @@ hostInput.addEventListener('change', () => {
   const v = hostInput.value.trim().replace(/\/+$/, '');
   if (/^https?:\/\/[^\s]+$/i.test(v)) {
     host = v;
-    localStorage.setItem(HOST_KEY, v);
+    chrome.storage.local.set({ [HOST_KEY]: v });
     document.getElementById('status').textContent = '✓ حُفظ العنوان';
   } else {
     document.getElementById('status').textContent = '⚠️ عنوان غير صالح';
