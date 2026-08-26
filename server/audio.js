@@ -245,7 +245,7 @@ async function transcribeMediaFile(mediaPath, label, lang) {
 
   try {
     // 1) تحويل الملف → PCM خام مباشرة: 16 كيلوهرتز، قناة واحدة، float32 (بدون wav وسيط)
-    await execFileAsync('ffmpeg', ['-y', '-i', mediaPath, '-ar', '16000', '-ac', '1', '-f', 'f32le', pcmPath]);
+    await execFileAsync('ffmpeg', ['-y', '-i', mediaPath, '-ar', '16000', '-ac', '1', '-f', 'f32le', pcmPath], { timeout: 180000 });
 
     // 2) قراءة العينات مباشرة في Float32Array (لا يوجد AudioContext في Node)
     const buf = await fs.readFile(pcmPath);
@@ -313,7 +313,7 @@ async function transcribeMediaFile(mediaPath, label, lang) {
 // الإرجاع: { chunks: [{ start, duration, text }] } (التوقيع لا يتغير أبدًا)
 async function transcribeVideoAudio(videoId, lang) {
   await fs.mkdir(TMP_DIR, { recursive: true });
-  const m4aPath = path.join(TMP_DIR, `audio-${videoId}.m4a`); // تحميل m4a فقط (لا wav)
+  const m4aPath = path.join(TMP_DIR, `audio-${videoId}-${Date.now()}-${Math.random().toString(36).slice(2,8)}.m4a`); // تحميل m4a فقط (لا wav)
 
   try {
     // 1) تنزيل الصوت كـ m4a مباشرة عبر yt-dlp.exe (الثنائي المباشر — موثوق)

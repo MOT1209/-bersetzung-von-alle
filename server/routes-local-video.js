@@ -89,8 +89,8 @@ router.post('/video-local', express.json({ limit: '60mb' }), async (req, res) =>
     let durationSec = 0;
     try {
       durationSec = await impl.probeDuration(tmpFile);
-    } catch {
-      // ffprobe فشل (ملف تالف؟) — نكمل بدون حد مدة صارم؛ التفريغ سيفشل لاحقًا بخطأ واضح
+    } catch (e) {
+      return await respond(400, { error: 'invalid-file' });
     }
     if (durationSec > config.LOCAL_VIDEO_MAX_MIN * 60) {
       return await respond(422, { error: 'video-too-long', maxMinutes: config.LOCAL_VIDEO_MAX_MIN });

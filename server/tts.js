@@ -76,10 +76,10 @@ async function concatMp3s(chunkBuffers) {
 
     const args = ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outPath];
     try {
-      await execFileAsync('ffmpeg', args);
+      await execFileAsync('ffmpeg', args, { timeout: 60000 });
     } catch (err) {
       // احتياط: إعادة ترميز إذا فشل النسخ المباشر (عدم تطابق باراميترات الصوت)
-      await execFileAsync('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c:a', 'libmp3lame', '-b:a', '64k', outPath]);
+      await execFileAsync('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c:a', 'libmp3lame', '-b:a', '64k', outPath], { timeout: 60000 });
     }
 
     return fs.readFileSync(outPath);
