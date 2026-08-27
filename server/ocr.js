@@ -38,7 +38,6 @@ async function recognizeImage(buffer) {
   let worker = null;
   let timeoutId = null;
   try {
-    let progress = 0;
     const timeoutPromise = new Promise((_, reject) => {
       timeoutId = setTimeout(() => {
         const err = new Error('OCR timeout');
@@ -51,9 +50,7 @@ async function recognizeImage(buffer) {
         langPath: DATA_DIR,
         cachePath: DATA_DIR,
         cacheMethod: 'write',
-        logger: (m) => {
-          if (m.status === 'recognizing text') progress = m.progress;
-        },
+        logger: () => {},
       });
       const { data } = await worker.recognize(buffer);
       return {

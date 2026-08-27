@@ -6,7 +6,6 @@ const { once } = require('node:events');
 const express = require('express');
 const fs = require('fs');
 const os = require('os');
-const path = require('path');
 
 process.env.RATE_LIMIT_MAX = '1000';
 process.env.RATE_LIMIT_MAX_HEAVY = '1000';
@@ -27,7 +26,7 @@ const FAKE_CHUNKS = [
 
 before(() => {
   audioMod.transcribeMediaFile = async () => ({ chunks: FAKE_CHUNKS });
-  translateRoutes.translateLines = async (lines, targetLang) => ({
+  translateRoutes.translateLines = async (lines, _targetLang) => ({
     sourceLang: 'en',
     captions: lines.map((l) => ({ ...l, translated: 'تر: ' + l.original })),
     cached: false,

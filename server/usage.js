@@ -47,8 +47,9 @@ async function trackUsage({ type = 'unknown', sourceLang = 'unknown', targetLang
   } catch {
     // العدّاد احتياطي — لا يكسر الطلب أبدًا
   }
-  // Log timestamped entry for dashboard statistics (best-effort, non-blocking)
-  logEntry({ type, sourceLang, targetLang, provider: provider || 'unknown' }).catch(() => {});
+  // Log timestamped entry for dashboard statistics (best-effort — serialised in
+  // stats.js; awaited so a read right after trackUsage sees this entry)
+  await logEntry({ type, sourceLang, targetLang, provider: provider || 'unknown' }).catch(() => {});
 }
 
 module.exports = { getUsage, trackUsage };

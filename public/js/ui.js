@@ -8,7 +8,6 @@ export const urlInput        = $('url-input');
 export const textInput        = $('text-input');
 export const targetLang       = $('target-lang');
 export const langSearch       = $('lang-search');
-export const langList         = $('lang-list');
 export const translateBtn     = $('translate-btn');
 export const retryBtn         = $('retry-btn');
 export const result           = $('result');
@@ -21,7 +20,7 @@ export const cacheBadge       = $('cache-badge');
 export const copyBtn          = $('copy-btn');
 export const shareBtn         = $('share-btn');
 export const shareView        = $('share-view');
-export const shareCloseBtn    = $('share-close');
+export const shareCloseBtn    = $('share-close-btn');
 export const shareLink        = $('share-link');
 export const exportRow        = $('export-row');
 export const ttsPlayer        = $('tts-player');
@@ -44,12 +43,9 @@ export const textModeEl       = $('text-mode');
 export const fileModeEl       = $('file-mode');
 export const smartBtn         = $('smart-btn');
 export const errorEl          = $('error');
-export const errorMsg         = $('error-msg');
-export const errorDetail      = $('error-detail');
-export const retryWrap        = $('retry-wrap');
-export const progressWrap     = $('progress-wrap');
-export const progressBar      = $('progress-bar');
-export const progressText     = $('progress-text');
+export const errorMessage     = $('error-message');
+export const progress         = $('progress');
+export const progressLabel    = $('progress-label');
 export const themeToggle      = $('theme-toggle');
 export const settingsBtn      = $('settings-btn');
 export const settingsCancelBtn = $('settings-cancel-btn');
@@ -58,14 +54,14 @@ export const settingsModal    = $('settings-modal');
 export const settingsForm     = $('settings-form');
 export const glossaryFrom     = $('glossary-from');
 export const glossaryTo       = $('glossary-to');
-export const glossaryAddBtn   = $('glossary-add');
+export const glossaryAddBtn   = $('glossary-add-btn');
 export const glossaryListEl   = $('glossary-list');
-export const clearHistoryBtn  = $('clear-history');
+export const clearHistoryBtn  = $('clear-history-btn');
 export const historyListEl    = $('history-list');
 export const tashkeelBtn      = $('tashkeel-btn');
 export const ruleDomain       = $('rule-domain');
 export const ruleSelector     = $('rule-selector');
-export const ruleAddBtn       = $('rule-add');
+export const ruleAddBtn       = $('rule-add-btn');
 export const ruleListEl       = $('rule-list');
 
 /* ===== قائمة اللغات ===== */
@@ -83,22 +79,15 @@ export function populateLangSelector(languages) {
   else if (languages['ar'])      targetLang.value = 'ar';
 }
 
-export function filterLanguages(languages) {
+export function filterLanguages() {
   const q = (langSearch.value || '').trim().toLowerCase();
-  const items = langList.querySelectorAll('.lang-item');
-  let anyVisible = false;
-  items.forEach((el) => {
-    const match = !q || el.dataset.name.toLowerCase().includes(q) || el.dataset.code.includes(q);
-    el.hidden = !match;
-    if (match) anyVisible = true;
-  });
-  if (langList.firstChild) langList.firstChild.remove?.();
-  if (!anyVisible && q) {
-    const d = document.createElement('div');
-    d.className = 'lang-hint';
-    d.textContent = 'لا توجد نتائج';
-    langList.prepend(d);
+  let firstVisible = null;
+  for (const opt of targetLang.options) {
+    const match = !q || opt.textContent.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q);
+    opt.hidden = !match;
+    if (match && !firstVisible) firstVisible = opt;
   }
+  if (q && firstVisible) targetLang.value = firstVisible.value;
 }
 
 /* ===== الثيم ===== */
@@ -119,20 +108,19 @@ export function toggleTheme() {
 
 /* ===== عرض/إخفاء ===== */
 export function showProgress(text) {
-  progressWrap.hidden = false;
-  progressBar.style.width = '0%';
-  progressText.textContent = text || '';
-  requestAnimationFrame(() => { progressBar.style.width = '100%'; });
+  result.hidden = true;
+  errorEl.hidden = true;
+  progressLabel.textContent = text || '';
+  progress.hidden = false;
 }
-export function hideProgress() { progressWrap.hidden = true; }
+export function hideProgress() { progress.hidden = true; }
 
 export function showError(code, status) {
-  const msg = mapErrorLocal(code, status);
-  errorMsg.textContent = msg;
-  errorDetail.textContent = (status ? 'الكود: ' + status : '') + (code ? ' [' + code + ']' : '');
-  errorEl.hidden = false;
-  retryWrap.hidden = false;
+  progress.hidden = true;
   result.hidden = true;
+  errorMessage.textContent = mapErrorLocal(code, status);
+  errorEl.hidden = false;
+  errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 export function hideError() { errorEl.hidden = true; }
 

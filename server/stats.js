@@ -28,30 +28,46 @@ function countBy(arr, key) {
 
 // ===== public API =====
 
+// Serialise all writes through one promise chain. Without this, concurrent
+// logEntry() calls each read the same base array and the later write clobbers
+// the earlier one (lost translations in the dashboard).
+let writeQueue = Promise.resolve();
+
+async function appendEntry(entry) {
+  const entries = await getLogEntries();
+  entries.push({ ...entry, timestamp: Date.now() });
+  // Keep last 10 000 entries to prevent unbounded growth
+  if (entries.length > 10000) entries.splice(0, entries.length - 10000);
+  await fs.mkdir(path.dirname(LOG_FILE), { recursive: true });
+  const tmp = `${LOG_FILE}.${process.pid}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(entries), 'utf8');
+  try {
+    await fs.rename(tmp, LOG_FILE);
+  } catch (e) {
+    if (e && (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EBUSY')) {
+      await fs.copyFile(tmp, LOG_FILE);
+      await fs.rm(tmp, { force: true }).catch(() => {});
+    } else throw e;
+  }
+}
+
 /**
  * Append a single stats entry with an automatic timestamp.
  * Called from usage.js trackUsage so every translation is logged.
+ * Returns a promise that resolves once this entry is persisted — await it
+ * (or flushStats()) when you need read-after-write consistency.
  */
-async function logEntry(entry) {
-  try {
-    const entries = await getLogEntries();
-    entries.push({ ...entry, timestamp: Date.now() });
-    // Keep last 10 000 entries to prevent unbounded growth
-    if (entries.length > 10000) entries.splice(0, entries.length - 10000);
-    await fs.mkdir(path.dirname(LOG_FILE), { recursive: true });
-    const tmp = `${LOG_FILE}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(entries), 'utf8');
-    try {
-      await fs.rename(tmp, LOG_FILE);
-    } catch (e) {
-      if (e && (e.code === 'EPERM' || e.code === 'EACCES' || e.code === 'EBUSY')) {
-        await fs.copyFile(tmp, LOG_FILE);
-        await fs.rm(tmp, { force: true }).catch(() => {});
-      } else throw e;
-    }
-  } catch {
+function logEntry(entry) {
+  const done = writeQueue.then(() => appendEntry(entry)).catch(() => {
     // Stats are best-effort — never break the main flow
-  }
+  });
+  writeQueue = done;
+  return done;
+}
+
+/** Resolve once every queued logEntry write has been flushed to disk. */
+function flushStats() {
+  return writeQueue;
 }
 
 /**
@@ -120,4 +136,4 @@ async function getHourly() {
   return { hours };
 }
 
-module.exports = { logEntry, getSummary, getTimeseries, getProviders, getLanguages, getHourly };
+module.exports = { logEntry, flushStats, getSummary, getTimeseries, getProviders, getLanguages, getHourly };

@@ -39,7 +39,12 @@ samples/stt/*
 turkish-ar.srt
 تقرير-الفحص.html
 تقرير-الفحص-الشامل.html
+خطة-التطوير-والتحسين.html
 bun.lock
+
+# Local process logs (server stdout/stderr dumps)
+*.out.txt
+*.err.txt
 
 # Reports / benchmarks (wildcard - local generated reports)
 reports/

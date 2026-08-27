@@ -283,10 +283,13 @@ export async function shareResult() {
     return;
   }
   const url = location.origin + location.pathname + '#share=' + encodeURIComponent(text.slice(0, 2000));
-  shareLink.value = url;
+  if (shareLink) { shareLink.value = url; shareLink.hidden = false; }
+  const body = document.getElementById('share-body');
+  if (body) body.textContent = text.slice(0, 4000);
   shareView.hidden = false;
+  shareView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   try { await navigator.clipboard.writeText(url); showToast('تم نسخ رابط المشاركة ✓'); }
-  catch {}
+  catch { showToast('انسخ الرابط يدويًا من الحقل أعلاه'); }
 }
 
 /* ---------- helpers ---------- */

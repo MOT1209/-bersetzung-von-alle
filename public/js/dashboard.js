@@ -78,6 +78,41 @@ function renderHourly(data) {
   });
 }
 
+function renderQuality(data) {
+  const body = document.getElementById('quality-body');
+  const updated = document.getElementById('quality-updated');
+  if (!body) return;
+  if (!data || !data.available) {
+    body.textContent = 'لا يوجد تقرير بعد — شغّل: node scripts/bench-translate.js';
+    return;
+  }
+  if (updated && data.generatedAt) {
+    updated.textContent = '· آخر تحديث: ' + new Date(data.generatedAt).toLocaleString('ar');
+  }
+  const langs = data.langs || [];
+  const rows = (data.summary || []).map((s) => {
+    const perLang = langs.map((l) => `<td style="text-align:center">${s.perLang && s.perLang[l] != null ? s.perLang[l] : '—'}</td>`).join('');
+    return `<tr>
+      <td style="font-weight:700">${s.provider}</td>
+      <td style="text-align:center;font-weight:700">${s.avgScore != null ? s.avgScore : '—'}</td>
+      <td style="text-align:center">${s.avgWer != null ? s.avgWer : '—'}</td>
+      <td style="text-align:center">${s.succeeded}/${s.samples}</td>
+      ${perLang}
+    </tr>`;
+  }).join('');
+  body.innerHTML = `<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="border-bottom:1px solid var(--border,#e5e7eb)">
+      <th style="text-align:right;padding:6px">المزوّد</th>
+      <th style="padding:6px">الدرجة</th>
+      <th style="padding:6px">WER</th>
+      <th style="padding:6px">نجاح</th>
+      ${langs.map((l) => `<th style="padding:6px">${l}</th>`).join('')}
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p style="color:var(--text-dim,#666);font-size:.8rem;margin-top:8px">الدرجة = 1 − WER (1 = مطابق للترجمة المرجعية). ${data.refsetSize} جملة مرجعية.</p>`;
+}
+
 async function init() {
   const token = localStorage.getItem(TOKEN_KEY);
 
@@ -107,6 +142,10 @@ async function init() {
     renderTypeChart(summary.byType || {});
     renderLangChart(languages);
     renderHourly(hourly);
+
+    // جودة الترجمة — اختياري، لا يكسر اللوحة إن غاب التقرير
+    try { renderQuality(await fetchStats('quality')); }
+    catch { renderQuality(null); }
 
     document.getElementById('auth-gate').hidden = true;
     document.getElementById('dashboard').hidden = false;

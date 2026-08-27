@@ -25,7 +25,8 @@ module.exports = [
       },
     },
     rules: {
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // caughtErrors: 'none' — لا نُلزم استخدام مُعامل catch؛ إبقاؤه (catch (e)) شائع للتشخيص
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrors: 'none', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
       'no-console': 'off',
       eqeqeq: ['error', 'always'],
       'no-var': 'error',

@@ -36,7 +36,8 @@ No feature changes. Same-origin behavior for users must remain identical.
   - `app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);`
   - `app.use(helmet({ contentSecurityPolicy: false }));`
 - Resulting headers: `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Strict-Transport-Security` (only when production + HTTPS).
-- CSP deliberately disabled — the app loads `https://www.youtube.com/iframe_api` and embeds `www.youtube.com` iframes, and `public/index.html` runs an inline theme script. Full CSP is out of scope for this wave.
+- CSP was deliberately disabled *in this wave* — the app loads `https://www.youtube.com/iframe_api` and embeds `www.youtube.com` iframes.
+  > **Update (later wave):** CSP is now **enabled** in `server/server.js` with explicit directives (`self` + YouTube + Google Fonts + `cdn.jsdelivr.net` for scripts). The inline theme script was moved to `public/theme-init.js`. See `tests/securityHeaders.test.js`.
 
 ### Wave 3 — Translation cache TTL
 
@@ -74,7 +75,7 @@ Docs:
 
 ## Out of scope
 
-- Strict CSP (requires moving the inline theme script from `public/index.html` to an external file) — future wave.
+- ~~Strict CSP~~ — **done in a later wave** (theme script externalised to `public/theme-init.js`, directives in `server/server.js`).
 - Multi-instance rate limiting (the in-memory limiter in `server/server.js` is per-process; fine for a single Render instance).
 - UI/design improvements from the audit report.
 

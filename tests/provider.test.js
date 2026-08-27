@@ -13,7 +13,6 @@ const zenRequests = [];
 let deeplServer;
 let zenServer;
 let translate; // يُملأ في before بعد ضبط env (يُستورد config/translate بعدها)
-let config;
 
 before(async () => {
   // 1) أنشئ الخوادم أولاً (المنفذ معروف بعد listen فقط)
@@ -49,7 +48,6 @@ before(async () => {
 
   // 3) استيراد بعد ضبط env (dotenv لا يلغي القيم الموجودة مسبقًا)
   translate = require('../server/translate');
-  config = require('../server/config');
 });
 
 after(async () => {

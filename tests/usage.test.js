@@ -6,11 +6,16 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-// ملف عدّاد مؤقت + حدود عالية حتى لا تتأثر بحد الطلبات
+// ملف عدّاد مؤقت + ملف إحصاءات مؤقت + حدود عالية حتى لا تتأثر بحد الطلبات
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aralink-usage-'));
 process.env.USAGE_FILE = path.join(tmpDir, 'usage.json');
+// STATS_LOG يعزل إحصاءات لوحة التحكم عن ملف cache/stats-log.json الحقيقي
+process.env.STATS_LOG = path.join(tmpDir, 'stats-log.json');
 process.env.RATE_LIMIT_MAX = '1000';
 process.env.RATE_LIMIT_MAX_HEAVY = '1000';
+// /api/stats محمية بـ requireAdmin (ADMIN_TOKEN) — نضبط مفتاحًا للاختبار
+process.env.ADMIN_TOKEN = 'test-admin-token';
+const ADMIN_HEADERS = { 'x-admin-token': process.env.ADMIN_TOKEN };
 
 const { trackUsage, getUsage } = require('../server/usage');
 const app = require('../server/server');
@@ -48,8 +53,12 @@ test('trackUsage: يتجاهل القيم الناقصة بأمان', tseq, asyn
   assert.equal(u.byType.unknown, 1);
 });
 
-test('GET /api/stats → يعيد العدّاد', tseq, async () => {
-  const res = await fetch(`${baseUrl}/api/stats`);
+test('GET /api/stats/summary → يعيد العدّاد (يتطلب ADMIN_TOKEN)', tseq, async () => {
+  // بدون مفتاح → 401 (محمي بـ requireAdmin)
+  const noAuth = await fetch(`${baseUrl}/api/stats/summary`);
+  assert.equal(noAuth.status, 401);
+  // بالمفتاح → 200 والعدّاد من stats-log
+  const res = await fetch(`${baseUrl}/api/stats/summary`, { headers: ADMIN_HEADERS });
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.total, 4);

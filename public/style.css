@@ -420,6 +420,19 @@ body {
 
 .share-view[hidden] { display: none; }
 
+.share-link-input {
+  width: 100%;
+  margin: 12px 0;
+  padding: 10px 12px;
+  font-size: .9rem;
+  direction: ltr;
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+}
+.share-link-input[hidden] { display: none; }
+
 .share-header {
   display: flex;
   align-items: center;

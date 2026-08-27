@@ -1,5 +1,5 @@
 /* ---------- منطق الترجمة الأساسي ---------- */
-import { state, postJson, mapError } from './utils.js';
+import { state, postJson, mapError, langName } from './utils.js';
 import {
   urlInput, textInput, targetLang, translateBtn, retryBtn,
   result, cacheBadge, sourceNotice,
@@ -23,7 +23,7 @@ export async function runTranslate() {
   const url       = urlInput.value.trim();
 
   if (state.mode === 'url' && !url)                    return showError('missing-url');
-  if (state.mode === 'text' && !text)                  return showError('empty-text');
+  if (state.mode === 'text' && !text)                  return showError('missing-text');
   if (state.mode === 'file' && !state.file)            return showToast('اختر ملفًا أولًا');
   if (!target)                                         return showError('missing-lang');
   if (state.mode === 'url' && !/^https?:\/\//i.test(url)) return showError('invalid-url');
@@ -36,21 +36,16 @@ export async function runTranslate() {
     result.hidden = true;
     showProgress('جاري الترجمة…');
 
-    // File mode — no streaming
+    // File mode — no streaming. الخادم يتوقّع JSON base64 (routes-file.js)
     if (state.mode === 'file') {
-      const fd = new FormData();
-      fd.append('file', state.file.file);
-      fd.append('targetLang', target);
-      if (glossary) fd.append('glossary', JSON.stringify(glossary));
-      const r = await fetch('/api/translate-file', {
-        method: 'POST',
-        body: fd,
-        signal: AbortSignal.timeout(300000)
+      const { status, data: d } = await postJson('/api/translate-file', {
+        format: state.file.ext,
+        content: state.file.base64,
+        targetLang: target,
+        provider,
       });
-      let d = null;
-      try { d = await r.json(); } catch {}
       hideProgress();
-      if (!d || d.error) { showError((d && d.error) || 'server-error', r.status); return; }
+      if (!d || d.error) { showError((d && d.error) || 'server-error', status); return; }
       state.current = d;
       state.activeTab = 'translated';
       teardownPlayers();

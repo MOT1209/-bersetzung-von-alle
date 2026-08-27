@@ -67,11 +67,11 @@
 منفذة بالكامل ✅ — ترقية أرا لينك إلى منصة ترجمة حقيقية:
 
 - **6 مزوّدات موحّدة كلها مجانية**: Google / MyMemory / Libre / Gemini / DeepL (Free) /
-  OpenAI-compatible (Ollama وLM Studio محليان بلا مفتاح).
+  `zen` (بوابة opencode zen المتوافقة مع OpenAI — تصلح أيضًا لـ Ollama وLM Studio المحليين).
 - **`GET /api/providers`** يعيد كل المزوّدين وحالتهم؛ والطلب يقبل `provider` (فرض واحد) أو
   `providers` (ترتيب مخصّص) مع بقاء الاحتياط التلقائي.
-- **مفاتيح اختيارية** عبر `.env`: `DEEPL_API_KEY`، `OPENAI_BASE_URL`
-  (مثال Ollama: `http://localhost:11434/v1`)، `OPENAI_MODEL`، `PROVIDER_ORDER`.
+- **مفاتيح اختيارية** عبر `.env`: `DEEPL_API_KEY`، و`ZEN_API_KEY` مع
+  `ZEN_BASE_URL` (مثال Ollama: `http://localhost:11434/v1`) و`ZEN_MODEL`، و`PROVIDER_ORDER`.
 - **ترجمة ملفات**: 11 صيغة إدخال (txt, md, docx, xlsx, csv, srt, vtt, json, xml, epub, pptx)
   و8 صيغ إخراج (txt, md, docx, srt, vtt, json, csv, xml) — مع الحفاظ على البنية:
   توقيتات SRT/VTT، مفاتيح JSON/XML، صفوف CSV/XLSX.
@@ -87,14 +87,30 @@
 - **امتداد المتصفح**: مجلد `extension/` (Chrome Manifest V3) — ترجم أي صفحة بنقرة واحدة عبر `popup.js` + `background.js`.
 - **OCR/TTS/PDF**: استخراج النص من الصور (`server/ocr.js` + Tesseract.js) وملفات PDF (`server/pdf.js`) وتحويل النتيجة إلى صوت عربي (`server/tts.js` عبر MS Edge TTS) — مع معاينة وتصدير.
 
+## 📊 لوحة جودة الترجمة
+
+قياس موضوعي لكل مزوّد ترجمة بدل الانطباع:
+
+```bash
+npm run bench:translate                 # كل المزوّدين المتاحين
+npm run bench:translate -- --provider google --lang ar,fr
+```
+
+يترجم `samples/translation/refset.json` (جُمل مرجعية) عبر كل مزوّد، يقارن الناتج
+بالترجمة الصحيحة عبر **WER** (تطبيع خاص بالعربية والتركية في `server/wer.js`)،
+ويكتب `cache/quality-report.json`. تعرضه لوحة التحكم (`/admin.html`) كجدول
+درجة/WER لكل مزوّد ولغة عبر `GET /api/stats/quality` (محمي بـ `ADMIN_TOKEN`).
+الدرجة = `1 − WER` (1 = مطابق). ⚠️ القياس يستهلك حصص الترجمة — شغّله يدويًا.
+
 ## 🛡️ الأمان (تحصين 2026)
 
 - **CORS**: متغير `CORS_ORIGIN` في `.env` — قائمة أصول مسموحة مفصولة بفواصل
   (مثال: `https://app.example.com`)، وافتراضيًا (فارغ) = **نفس الأصل فقط**، وتُحجب
   طلبات المتصفحات من نطاقات أخرى تلقائيًا.
-- **رؤوس أمان**: `helmet` مع تعطيل CSP (لازم لتشغيل مشغّل يوتيوب) → حماية clickjacking
-  عبر `X-Frame-Options` و`X-Content-Type-Options: nosniff`؛ و`trust proxy` عند
-  `NODE_ENV=production` لضبط `req.ip` خلف Render.
+- **رؤوس أمان**: `helmet` مع **CSP مُفعّلة بتوجيهات صريحة** (`server/server.js`) — تسمح
+  فقط بـ `self` + مشغّل يوتيوب (`www.youtube.com` / `youtube-nocookie.com`) + خطوط Google
+  + `cdn.jsdelivr.net` للسكربتات؛ إضافةً إلى `X-Frame-Options` و`X-Content-Type-Options: nosniff`
+  و`Referrer-Policy` و`HSTS`. و`trust proxy` عند `NODE_ENV=production` لضبط `req.ip` خلف Render.
 
 ## 🚀 طريقة الاستخدام
 
@@ -124,9 +140,10 @@ npm run dev        # يبدأ الخادم على http://localhost:3000
 ```text
 /                    ← أداة ترجمة، وليست تطبيق Next.js
 ├── public/          ← الملفات المنشورة عبر HTTP (وهي وحدها)
-│   ├── index.html   ← الواجهة (RTL عربي)
+│   ├── index.html   ← الواجهة (RTL عربي) — تحمّل js/app.js كوحدة
 │   ├── style.css    ← نظام التصميم
-│   └── script.js    ← منطق الواجهة
+│   ├── js/          ← وحدات ES: app.js (المدخل) + ui/translate/result/media/features/stream/dashboard
+│   └── script.js    ← الملف الأحادي القديم (مُستبدَل — لا يُحرَّر)
 ├── server/
 │   ├── server.js    ← خادم Express
 │   ├── fetchContent.js ← استخراج المقالات

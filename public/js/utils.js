@@ -44,7 +44,10 @@ export function buildTranslationState(defaults) {
     batchRunning: false,
     abortCtrl:    null,
     resultForExport: null,
-    cache:        defaults.cache || null,
+    cache:        defaults && defaults.cache || null,
     ...defaults,
   };
 }
+
+// حالة تطبيق مفردة تتقاسمها كل الوحدات (app/translate/result/media/features)
+export const state = buildTranslationState({});

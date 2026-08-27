@@ -165,7 +165,7 @@ app.use('/api/ocr', heavyLimiter);
 app.use('/api', require('./routes-ocr'));
 
 // ===== معالجة الأخطاء العامة =====
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   // أخطاء المحلل (body-parser) تحمل status/statusCode صحيحًا، وكان ابتلاعها في
   // 500 يخفي السبب الحقيقي: تجاوز الحجم كان يظهر «خطأ خادم» بدل 413.
   const status = err && (err.status || err.statusCode);

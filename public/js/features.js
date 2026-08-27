@@ -314,18 +314,17 @@ export function initSettings() {
 /* ========== وضع الملف ========== */
 export function setupFileMode() {
   const fileInput  = document.getElementById('file-input');
-  const uploadArea = document.getElementById('upload-area');
-  const fileNameEl = document.getElementById('file-name');
+  const dropZone   = document.getElementById('drop-zone');
 
-  if (uploadArea) {
-    uploadArea.addEventListener('dragover',  (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-    uploadArea.addEventListener('dragleave', ()  => uploadArea.classList.remove('drag-over'));
-    uploadArea.addEventListener('drop', (e) => {
+  if (dropZone) {
+    dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
       e.preventDefault();
-      uploadArea.classList.remove('drag-over');
+      dropZone.classList.remove('drag-over');
       if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
     });
-    uploadArea.addEventListener('click', () => fileInput?.click());
+    dropZone.addEventListener('click', () => fileInput?.click());
   }
 
   fileInput?.addEventListener('change', (e) => {
@@ -333,19 +332,44 @@ export function setupFileMode() {
   });
 }
 
+// صيغ الإدخال التي يدعمها الخادم (routes-file.js → SUPPORTED_IMPORT)
+const FILE_FORMAT_NAMES = {
+  txt: 'نص TXT', md: 'ماركداون MD', docx: 'مستند Word DOCX', xlsx: 'جدول Excel XLSX',
+  csv: 'CSV', srt: 'ترجمات SRT', vtt: 'ترجمات VTT', json: 'JSON', xml: 'XML',
+  epub: 'كتاب EPUB', pptx: 'عرض PowerPoint PPTX',
+};
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' بايت';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' كيلوبايت';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' ميغابايت';
+}
+
 function handleFile(file) {
-  const name = (file.name || '').toLowerCase();
-  const allowed = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.txt'];
-  if (!allowed.some((ext) => name.endsWith(ext))) {
-    showToast('صيغة الملف غير مدعومة — يُدعم PDF وWord وPowerPoint وملفات النصوص فقط');
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!FILE_FORMAT_NAMES[ext]) {
+    showToast('صيغة الملف غير مدعومة — يُدعم: ' + Object.keys(FILE_FORMAT_NAMES).join('، '));
     return;
   }
-  if (file.size > 50 * 1024 * 1024) {
-    showToast('حجم الملف يتجاوز الحد الأقصى (50 ميغابايت)');
+  // base64 يضخّم ~33% وحدّ جسم الراوتر 15MB — نبقى تحت ~10MB للملف الخام
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('حجم الملف يتجاوز الحد الأقصى (10 ميغابايت)');
     return;
   }
-  state.file = { file, name: file.name };
-  const fileNameEl = document.getElementById('file-name');
-  if (fileNameEl) fileNameEl.textContent = file.name;
-  showToast('تم اختيار الملف: ' + file.name);
+  // الخادم يتوقّع JSON: { format, content(base64), targetLang } — نقرأ الملف base64
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.file = { name: file.name, ext, base64: String(reader.result).split(',')[1] || '' };
+    const fileMeta = document.getElementById('file-meta');
+    if (fileMeta) {
+      fileMeta.textContent = '📎 ' + file.name + ' (' + formatSize(file.size) + ') — ' + FILE_FORMAT_NAMES[ext];
+      fileMeta.hidden = false;
+    }
+    const dropText = document.getElementById('drop-text');
+    if (dropText) dropText.hidden = true;
+    showToast('تم اختيار الملف: ' + file.name);
+  };
+  reader.onerror = () => showToast('تعذر قراءة الملف');
+  reader.readAsDataURL(file);
 }

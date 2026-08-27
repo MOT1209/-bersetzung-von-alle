@@ -300,7 +300,7 @@ registerProvider({
   label: 'opencode zen (متوافق OpenAI)',
   requiresKey: true,
   isAvailable: () => Boolean(config.ZEN_API_KEY && config.ZEN_BASE_URL),
-  translate: async (text, targetLang, sourceLang) => {
+  translate: async (text, targetLang, _sourceLang) => {
     const url = config.ZEN_BASE_URL.replace(/\/+$/, '') + '/chat/completions';
     const headers = { 'Content-Type': 'application/json' };
     if (config.ZEN_API_KEY) headers.Authorization = `Bearer ${config.ZEN_API_KEY}`;

@@ -4,7 +4,7 @@ const express = require('express');
 const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript } = require('./youtube');
 const translate = require('./translate');
-const { translateText, detectLanguage, applyGlossary } = translate;
+const { detectLanguage, applyGlossary } = translate;
 const { transcribeVideoAudio } = require('./audio');
 const { trackUsage } = require('./usage');
 

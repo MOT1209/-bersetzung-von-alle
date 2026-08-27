@@ -1,7 +1,6 @@
 // server/routes-translate.js — مسارات API للترجمة
 const express = require('express');
 const config = require('./config');
-const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript, buildSrt } = require('./youtube');
 const { translateText, detectLanguage, applyGlossary, getProviders } = require('./translate');
 const translate = require('./translate'); // وصول وقت التنفيذ — يسمح بتزييف translateTextWithMeta في الاختبارات

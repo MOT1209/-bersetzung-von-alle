@@ -1,0 +1,90 @@
+[
+  {
+    "id": "greet-01",
+    "source": "Good morning. I hope you have a wonderful day.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "صباح الخير. أتمنى لك يوماً رائعاً.",
+      "fr": "Bonjour. J'espère que vous passerez une merveilleuse journée.",
+      "de": "Guten Morgen. Ich hoffe, du hast einen wunderbaren Tag.",
+      "es": "Buenos días. Espero que tengas un día maravilloso."
+    }
+  },
+  {
+    "id": "news-01",
+    "source": "The government announced a new plan to reduce air pollution in major cities.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "أعلنت الحكومة عن خطة جديدة للحد من تلوث الهواء في المدن الكبرى.",
+      "fr": "Le gouvernement a annoncé un nouveau plan pour réduire la pollution de l'air dans les grandes villes.",
+      "de": "Die Regierung kündigte einen neuen Plan an, um die Luftverschmutzung in Großstädten zu verringern.",
+      "es": "El gobierno anunció un nuevo plan para reducir la contaminación del aire en las grandes ciudades."
+    }
+  },
+  {
+    "id": "tech-01",
+    "source": "Click the button to save your changes before closing the window.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "انقر على الزر لحفظ تغييراتك قبل إغلاق النافذة.",
+      "fr": "Cliquez sur le bouton pour enregistrer vos modifications avant de fermer la fenêtre.",
+      "de": "Klicken Sie auf die Schaltfläche, um Ihre Änderungen zu speichern, bevor Sie das Fenster schließen.",
+      "es": "Haz clic en el botón para guardar los cambios antes de cerrar la ventana."
+    }
+  },
+  {
+    "id": "daily-01",
+    "source": "She bought fresh bread and milk from the small shop near her house.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "اشترت خبزاً طازجاً وحليباً من المتجر الصغير القريب من منزلها.",
+      "fr": "Elle a acheté du pain frais et du lait à la petite boutique près de chez elle.",
+      "de": "Sie kaufte frisches Brot und Milch im kleinen Laden in der Nähe ihres Hauses.",
+      "es": "Compró pan fresco y leche en la pequeña tienda cerca de su casa."
+    }
+  },
+  {
+    "id": "travel-01",
+    "source": "The train to the airport leaves every twenty minutes from platform three.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "يغادر القطار المتجه إلى المطار كل عشرين دقيقة من الرصيف رقم ثلاثة.",
+      "fr": "Le train pour l'aéroport part toutes les vingt minutes du quai numéro trois.",
+      "de": "Der Zug zum Flughafen fährt alle zwanzig Minuten von Gleis drei ab.",
+      "es": "El tren al aeropuerto sale cada veinte minutos desde el andén número tres."
+    }
+  },
+  {
+    "id": "science-01",
+    "source": "Water boils at one hundred degrees Celsius at normal atmospheric pressure.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "يغلي الماء عند مئة درجة مئوية تحت الضغط الجوي الطبيعي.",
+      "fr": "L'eau bout à cent degrés Celsius à une pression atmosphérique normale.",
+      "de": "Wasser kocht bei normalem Luftdruck bei einhundert Grad Celsius.",
+      "es": "El agua hierve a cien grados Celsius a presión atmosférica normal."
+    }
+  },
+  {
+    "id": "opinion-01",
+    "source": "Reading books every day is one of the best habits a person can build.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "قراءة الكتب كل يوم من أفضل العادات التي يمكن للمرء أن يبنيها.",
+      "fr": "Lire des livres chaque jour est l'une des meilleures habitudes qu'une personne puisse prendre.",
+      "de": "Jeden Tag Bücher zu lesen ist eine der besten Gewohnheiten, die ein Mensch entwickeln kann.",
+      "es": "Leer libros todos los días es uno de los mejores hábitos que una persona puede desarrollar."
+    }
+  },
+  {
+    "id": "business-01",
+    "source": "Please send me the report by the end of the week so we can review it together.",
+    "sourceLang": "en",
+    "targets": {
+      "ar": "أرسل لي التقرير قبل نهاية الأسبوع حتى نتمكن من مراجعته معاً.",
+      "fr": "Merci de m'envoyer le rapport d'ici la fin de la semaine afin que nous puissions l'examiner ensemble.",
+      "de": "Bitte senden Sie mir den Bericht bis Ende der Woche, damit wir ihn gemeinsam durchsehen können.",
+      "es": "Por favor, envíame el informe antes del fin de semana para que podamos revisarlo juntos."
+    }
+  }
+]

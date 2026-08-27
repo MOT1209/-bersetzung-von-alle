@@ -129,8 +129,22 @@ test('cache: الكتابة ذرّية (لا بقايا .tmp والملف JSON �
   const parsed = await waitForDisk((j) => j[k0]);
   assert.equal(parsed[k0].text, 'ذ-0');
 
-  // لا ملفات مؤقتة متبقية بعد نجاح rename
+  // لا ملفات مؤقتة متبقية بعد نجاح rename.
+  // الكتابة ذرّية لكن الطابور مصفّر، فقد تصادَفُ كتابةً قيد التنفيذ (مؤقّت في
+  // منتصف writeFile) لحظة الفحص. ننتظر هدوء الطابور: فترة خالية من .tmp ثابتة.
   const dir = path.dirname(CACHE_FILE);
-  const leftovers = fs.readdirSync(dir).filter((f) => f.includes('.tmp'));
+  const quietMs = 350;
+  const deadline = Date.now() + 3000;
+  let leftovers;
+  for (;;) {
+    leftovers = fs.readdirSync(dir).filter((f) => f.includes('.tmp'));
+    if (leftovers.length === 0) {
+      await new Promise((r) => setTimeout(r, quietMs));
+      leftovers = fs.readdirSync(dir).filter((f) => f.includes('.tmp'));
+      if (leftovers.length === 0) break;
+    }
+    assert.ok(Date.now() < deadline, 'الطابور لم يهدأ: المؤقتات لم تُنظَّف');
+    await new Promise((r) => setTimeout(r, 50));
+  }
   assert.deepEqual(leftovers, [], `ملفات مؤقتة متبقية: ${leftovers.join(', ')}`);
 });

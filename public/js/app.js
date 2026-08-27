@@ -9,7 +9,7 @@ import {
 } from './ui.js';
 import { runTranslate, runSmartTranslate, runBatch } from './translate.js';
 import {
-  renderResult, renderTab, renderCompareView,
+  renderResult, renderTab, renderCompare,
   handleOcrResult, copyResult, shareResult,
 } from './result.js';
 import {

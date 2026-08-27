@@ -147,10 +147,11 @@
     <!-- عرض المشاركة: نص مترجم وصل عبر رابط #share=... -->
     <section id="share-view" class="share-view reveal" aria-label="نص مترجم مشارَك" hidden>
       <div class="share-header">
-        <h2 class="share-title">📖 نص مترجم مشارَك</h2>
+        <h2 class="share-title">🔗 رابط المشاركة</h2>
         <button type="button" id="share-close-btn" class="btn-secondary">إغلاق</button>
       </div>
-      <p class="share-note">هذا النص وصل إليك مترجمًا عبر رابط مشاركة — يُعرض مباشرة دون إعادة ترجمة.</p>
+      <p class="share-note">انسخ الرابط لمشاركة هذه الترجمة — يفتحها المستلم مباشرة دون إعادة ترجمة.</p>
+      <input id="share-link" class="share-link-input" type="text" readonly aria-label="رابط المشاركة" hidden>
       <div id="share-body" class="result-body"></div>
     </section>
 

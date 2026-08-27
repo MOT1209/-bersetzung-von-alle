@@ -33,13 +33,14 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 
 ## ARCHITECTURE (follow unless user says otherwise)
 
-- **Frontend:** `public/index.html` + `public/style.css` + `public/script.js` — Arabic RTL, dark theme (see DESIGN.md). Only `public/` is served over HTTP; never move frontend assets to the project root.
+- **Frontend:** `public/index.html` + `public/style.css` + ES modules under `public/js/` (entry: `public/js/app.js`, loaded as `<script type="module">`). Arabic RTL, dark theme (see DESIGN.md). Only `public/` is served over HTTP; never move frontend assets to the project root. NOTE: `public/script.js` is the pre-modular monolith — superseded and slated for removal; do not edit it.
 - **Backend:** Node.js + Express in `server/` — handles fetching (CORS), transcript extraction, translation
 - **YouTube:** `server/youtube.js` — uses `youtube-transcript` npm package
 - **Article/website fetching:** `server/fetchContent.js` — server-side fetch + cheerio/readability to extract main text
-- **Translation:** `server/translate.js` — Google Translate (free) with Gemini API fallback; `translate` npm package for detection
+- **Translation:** `server/translate.js` — unified provider registry (Google → MyMemory → Libre → Gemini → DeepL → zen), auto-fallback + per-engine cooldown; language detection via the free Google endpoint
 - **Config:** `.env` for API keys (NEVER commit real keys)
 - **Files/OCR/PDF/TTS:** `server/files.js` + `server/routes-file.js` (11→8 formats), `server/ocr.js` (Tesseract.js), `server/pdf.js` (PDF parsing), `server/tts.js` (MS Edge TTS) + `server/cache.js`/`usage.js`/`logger.js`
+- **Translation quality:** `server/quality.js` + `server/wer.js` — offline WER benchmark of every provider against `samples/translation/refset.json`. Run `npm run bench:translate` → writes `cache/quality-report.json`; the admin dashboard reads it via `GET /api/stats/quality` (ADMIN_TOKEN-gated). Never run in CI (consumes free translation quota).
 - **Extension:** `extension/` (Chrome Manifest V3: popup.js/background.js) — ترجمة فورية داخل المتصفح
 
 ## CONTENT EXTRACTION RULES
@@ -80,9 +81,11 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 ```text
 /                      ← project root (this is a translation tool, not a Next.js app)
 ├── public/            ← the ONLY directory served over HTTP
-│   ├── index.html     ← main UI (RTL Arabic)
+│   ├── index.html     ← main UI (RTL Arabic) — loads js/app.js as a module
 │   ├── style.css      ← design system styles
-│   └── script.js      ← frontend logic (API calls, result rendering)
+│   ├── js/            ← ES modules: app.js (entry), ui.js, translate.js, result.js,
+│   │                    media.js, features.js, stream.js, dashboard.js, utils.js, constants.js
+│   └── script.js      ← LEGACY pre-modular monolith (superseded — do not edit)
 ├── server/
 │   ├── server.js      ← Express app (routes, proxy, static serving of public/)
 │   ├── fetchContent.js← article/website extraction

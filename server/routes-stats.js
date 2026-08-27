@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { getSummary, getTimeseries, getProviders, getLanguages, getHourly } = require('./stats');
+const { loadReport } = require('./quality');
 
 // GET /api/stats/summary — totals, today, week, byType
 router.get('/summary', async (req, res, next) => {
@@ -54,6 +55,13 @@ router.get('/hourly', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// GET /api/stats/quality — آخر تقرير جودة ترجمة (scripts/bench-translate.js)
+router.get('/quality', (req, res) => {
+  const report = loadReport();
+  if (!report) return res.json({ available: false });
+  res.json({ available: true, ...report });
 });
 
 module.exports = router;
