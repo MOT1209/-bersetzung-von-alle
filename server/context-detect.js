@@ -124,11 +124,15 @@ function detectContext(url, text) {
   // 2. Keyword scoring
   const scores = {};
   for (const [type, config] of Object.entries(CONTENT_TYPES)) {
-    scores[type] = config.keywords.filter(kw => textSample.includes(kw)).length;
+    scores[type] = config.keywords.filter(kw => matchesKeyword(textSample, kw)).length;
   }
 
   // 3. Code detection (high priority)
-  const codePatterns = /(?:function|class|import|const|let|def|return|module|async|await|=>|<\/?[a-z]+>)/i;
+  // حدود الكلمات إلزامية هنا: بدونها كانت جملٌ إنجليزية عادية تُصنَّف «كودًا»
+  // لأن الكلمة المحجوزة تقع داخل كلمة عادية — const في "constant"، وimport في
+  // "important"، وlet في "completely"، وdef في "defendant". النتيجة توجيه ترجمة
+  // خاطئ لنصوص قانونية وطبية شائعة.
+  const codePatterns = /\b(?:function|class|import|const|let|def|return|module|async|await)\b|=>|<\/?[a-z]+>/i;
   if (codePatterns.test(textSample)) scores.code += 5;
 
   // 4. Pick highest score
@@ -143,6 +147,20 @@ function detectContext(url, text) {
     suggestedPrompt: SYSTEM_PROMPTS[bestScore > 0 ? bestType : 'general'],
     metadata: buildMetadata(textSample),
   };
+}
+
+// مطابقة كلمة مفتاحية: الكلمات الأبجدية الخالصة تحتاج حدود كلمة حتى لا تطابق
+// داخل كلمة أطول (const داخل constant). أما المفاتيح التي تحمل رموزًا أو مسافة
+// ('=>', 'this.', 'new ', 'print(') فتُطابَق نصًا كما هي — الرموز حدٌّ كافٍ.
+const KEYWORD_RE_CACHE = new Map();
+function matchesKeyword(sample, kw) {
+  if (!/^[a-z]+$/i.test(kw)) return sample.includes(kw);
+  let re = KEYWORD_RE_CACHE.get(kw);
+  if (!re) {
+    re = new RegExp(`\\b${kw}\\b`, 'i');
+    KEYWORD_RE_CACHE.set(kw, re);
+  }
+  return re.test(sample);
 }
 
 function buildMetadata(textSample) {

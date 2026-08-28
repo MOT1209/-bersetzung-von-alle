@@ -14,6 +14,23 @@ import { streamTranslate, supportsStreaming } from './stream.js';
 
 function safeGetLocal(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
+/* ========== المسار التقليدي (بلا بثّ) ==========
+   يُستخدم في حالتين: متصفح بلا دعم streaming، أو فشل بنيوي في مسار البثّ
+   (‏404/‏شبكة) — فلا يرى المستخدم خطأً بسبب عطل في البثّ وحده. */
+async function runClassic({ url, text, target, glossary, provider }) {
+  const res = state.mode === 'url'
+    ? await postJson('/api/translate', { url, targetLang: target, glossary, provider })
+    : await postJson('/api/translate-text', { text, targetLang: target, glossary, provider });
+  hideProgress();
+  const { status, data } = res;
+  if (!data || data.error) { showError((data && data.error) || 'server-error', status); return; }
+  state.current = data;
+  state.activeTab = 'translated';
+  teardownPlayers();
+  saveToHistory(data, target);
+  renderResult(data);
+}
+
 /* ========== الترجمة الأساسية ========== */
 export async function runTranslate() {
   const provider  = safeGetLocal('preferredProvider') || undefined;
@@ -100,24 +117,25 @@ export async function runTranslate() {
           renderResult(data);
         },
         onError: (data) => {
+          // فشل بنيوي في البثّ (المسار غير مركَّب، انقطاع شبكة) ≠ خطأ ترجمة.
+          // نعيد المحاولة بالمسار التقليدي بصمت بدل إفشال الطلب، فلا يكسر
+          // عطلٌ في البثّ وحده وظيفةَ المنتج الأساسية.
+          if (data.error === 'stream-failed' || data.error === 'network-error') {
+            const rb = document.getElementById('result-body');
+            if (rb) rb.innerHTML = '';
+            result.hidden = true;
+            showProgress('جاري الترجمة…');
+            runClassic({ url, text, target, glossary, provider })
+              .catch(() => { hideProgress(); showError('server-error', 500); });
+            return;
+          }
           hideProgress();
           showError(data.error || 'server-error', data.status);
         },
       });
       state.abortCtrl = abort;
     } else {
-      // Fallback: traditional translation
-      const res = state.mode === 'url'
-        ? await postJson('/api/translate', { url, targetLang: target, glossary, provider })
-        : await postJson('/api/translate-text', { text, targetLang: target, glossary, provider });
-      hideProgress();
-      const { status, data } = res;
-      if (!data || data.error) { showError((data && data.error) || 'server-error', status); return; }
-      state.current = data;
-      state.activeTab = 'translated';
-      teardownPlayers();
-      saveToHistory(data, target);
-      renderResult(data);
+      await runClassic({ url, text, target, glossary, provider });
     }
   } catch {
     hideProgress();

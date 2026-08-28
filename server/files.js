@@ -382,10 +382,38 @@ async function translateList(uniqueTexts, targetLang, translateFn) {
   }
   if (cur.length) batches.push(cur);
 
+  // إعادة المحاولة لكل عنصر من الدفعة على حدة (تُستخدم عند فشل ترجمة الدفعة كاملة
+  // أو عند اختلاف عدد الأسطر) — أي فشل فردي يُتجاهل ويُبقى العنصر بدون ترجمة
+  async function translateBatchIndividually(batch, targetLang, translateFn, map) {
+    for (const item of batch) {
+      try {
+        const single = await translateFn(item, targetLang, 'auto');
+        const singleText =
+          single && typeof single === 'object' && 'translated' in single
+            ? String(single.translated || '')
+            : String(single || '');
+        // لا نُسجّل ترجمة فارغة — نترك العنصر بدون قيمة في الخريطة ليُحفظ كما هو
+        if (singleText.trim()) map.set(item, singleText);
+      } catch (e) {
+        // فشل منفرد — نُبقي العنصر بدون ترجمة (translateStructured سيُبقي النص الأصلي)
+      }
+    }
+  }
+
   for (let b = 0; b < batches.length; b++) {
     const batch = batches[b];
     const chunk = batch.join('\n');
-    const raw = await translateFn(chunk, targetLang, 'auto');
+    let raw;
+    try {
+      raw = await translateFn(chunk, targetLang, 'auto');
+    } catch (e) {
+      // فشل استدعاء ترجمة الدفعة بالكامل (شبكة/مزود/تحديد حصص) — لا نُجهض الملف كله؛
+      // ننتقل للمعالجة المفردة أدناه (نفس مسار اختلاف عدد الأسطر)
+      await translateBatchIndividually(batch, targetLang, translateFn, map);
+      // تأخير بين الدفعات (حماية حصص Google المجانية)
+      if (b < batches.length - 1) await new Promise((r) => setTimeout(r, 250));
+      continue;
+    }
     // translateFn قد يعيد نصًا أو { translated } (عند استخدام translateTextWithMeta)
     const translatedText =
       raw && typeof raw === 'object' && 'translated' in raw ? raw.translated : String(raw ?? '');
@@ -396,19 +424,7 @@ async function translateList(uniqueTexts, targetLang, translateFn) {
     } else {
       // اختلف عدد الأسطر — نُعيد المحاولة لكل عنصر منفرداً لتجنّب ربط عدة عناصر بنفس النص
       // (السلوك السابق كان يفسد كل خلية من الثانية فما فوق بنص الدفعة الكاملة)
-      for (const item of batch) {
-        try {
-          const single = await translateFn(item, targetLang, 'auto');
-          const singleText =
-            single && typeof single === 'object' && 'translated' in single
-              ? String(single.translated || '')
-              : String(single || '');
-          // لا نُسجّل ترجمة فارغة — نترك العنصر بدون قيمة في الخريطة ليُحفظ كما هو
-          if (singleText.trim()) map.set(item, singleText);
-        } catch (e) {
-          // فشل منفرد — نُبقي العنصر بدون ترجمة (translateStructured سيُبقي النص الأصلي)
-        }
-      }
+      await translateBatchIndividually(batch, targetLang, translateFn, map);
     }
     // تأخير بين الدفعات (حماية حصص Google المجانية)
     if (b < batches.length - 1) await new Promise((r) => setTimeout(r, 250));

@@ -1,10 +1,16 @@
 // server/routes-sse.js — بث الترجمة عبر SSE (Server-Sent Events)
 // يمكّن الواجهة من عرض الترجمة فورًا مع التقدّم بدلاً من انتظار النتيجة كاملة.
 const express = require('express');
-const { fetchArticleContent } = require('./fetchContent');
 const { extractVideoId, getTranscript } = require('./youtube');
-const translate = require('./translate');
-const { detectLanguage, applyGlossary } = translate;
+const translate = require('./translate'); // وصول وقت التنفيذ (نمط routes-translate.js)
+const fetchContent = require('./fetchContent');
+
+// أغلفة وصول وقت التنفيذ: تفكيك الدوال وقت الاستيراد يجمّد المرجع الأصلي،
+// فيصبح المسار غير قابل للتزييف في الاختبارات (نفس الخلل الذي عولج في
+// routes-translate.js بالالتزام efd81ed). الوصول عبر الوحدة يبقيه حيًّا.
+const detectLanguage = (...a) => translate.detectLanguage(...a);
+const applyGlossary = (...a) => translate.applyGlossary(...a);
+const fetchArticleContent = (...a) => fetchContent.fetchArticleContent(...a);
 const { transcribeVideoAudio } = require('./audio');
 const { trackUsage } = require('./usage');
 
@@ -45,8 +51,12 @@ router.post('/translate-stream', async (req, res) => {
   res.flushHeaders();
 
   // 2) كشف انقطاع العميل
+  // لا تستخدم req.on('close') هنا: منذ Node 16 يُطلق IncomingMessage الحدث
+  // 'close' فور اكتمال قراءة جسم الطلب — وexpress.json يستهلكه قبل بلوغ هذا
+  // المعالج، فيصبح disconnected=true دائمًا وكل sendEvent يُهمَل، فيعود البثّ
+  // فارغًا. حدث res هو الذي يعبّر فعلاً عن انقطاع الاتصال.
   let disconnected = false;
-  req.on('close', () => { disconnected = true; });
+  res.on('close', () => { disconnected = true; });
 
   // 3) مساعد إرسال الأحداث
   function sendEvent(event, data) {

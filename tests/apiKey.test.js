@@ -53,12 +53,25 @@ test('المفتاح الخاطئ لا يرفع الحد', async () => {
   assert.equal(r4.statusCode, 429);
 });
 
-test('المفتاح عبر ?api_key= يعمل أيضًا', async () => {
+// الأمان: المفتاح في مسار الاستعلام يظهر في سجلات الخادم وسجل المتصفح وترويسة
+// Referrer، فلا يصلح مصادقةً. قُبِل سابقًا وأُلغي عمدًا — وهذا الاختبار يمنع عودته.
+test('المفتاح عبر ?api_key= لا يُقبل (ترويسة x-api-key فقط)', async () => {
+  const limiter = createRateLimiter({ windowMs: 60000, max: 2 });
+  for (let i = 0; i < 2; i++) {
+    const r = await call(limiter, fakeReq({}, { api_key: 'test-secret-key' }));
+    assert.ok(r.ok, `الطلب ${i + 1} ضمن الحد العادي يجب أن يمر`);
+  }
+  // الحد العادي (2) لا الحد المرفوع (6) — أي أن الاستعلام لم يمنح أي امتياز
+  const r3 = await call(limiter, fakeReq({}, { api_key: 'test-secret-key' }));
+  assert.equal(r3.statusCode, 429, '?api_key= رفع الحد — يجب تجاهله تمامًا');
+});
+
+test('الترويسة وحدها ترفع الحد حتى مع وجود استعلام خاطئ', async () => {
   const limiter = createRateLimiter({ windowMs: 60000, max: 2 });
   for (let i = 0; i < 6; i++) {
-    const r = await call(limiter, fakeReq({}, { api_key: 'test-secret-key' }));
-    assert.ok(r.ok, `طلب ?api_key=${i + 1} يجب أن يمر`);
+    const r = await call(limiter, fakeReq({ 'x-api-key': 'test-secret-key' }, { api_key: 'wrong' }));
+    assert.ok(r.ok, `الطلب الموقّع بالترويسة ${i + 1} يجب أن يمر (حد 6)`);
   }
-  const r7 = await call(limiter, fakeReq({}, { api_key: 'test-secret-key' }));
+  const r7 = await call(limiter, fakeReq({ 'x-api-key': 'test-secret-key' }, { api_key: 'wrong' }));
   assert.equal(r7.statusCode, 429);
 });

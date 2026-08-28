@@ -50,9 +50,16 @@ app.use(helmet({
 // إن ضُبط: الطلبات التي تحمل المفتاح الصحيح تحصل على حد أعلى (×3)
 // إن لم يُضبط: الخدمة مفتوحة بحد عام واحد (الوضع الحالي — مناسب للمضيافات المجانية)
 const ARALINK_API_KEY = process.env.ARALINK_API_KEY || '';
+let warnedApiKeyInQuery = false; // تحذير لمرة واحدة فقط دون كشف قيمة المفتاح
 function isApiKeyValid(req) {
   if (!ARALINK_API_KEY) return false;
-  const k = req.headers['x-api-key'] || req.query.api_key;
+  // الأمان: المفتاح يُقبل من ترويسة x-api-key فقط؛ أي api_key في مسار query
+  // يُتجاهل ولا يُعتدّ به كمصادقة لأنه يظهر في سجلات الخادم وسجل المتصفح وReferrer.
+  if (req.query && req.query.api_key !== undefined && !warnedApiKeyInQuery) {
+    warnedApiKeyInQuery = true;
+    console.warn('[api-key] request used disallowed ?api_key= query param — header x-api-key only.');
+  }
+  const k = req.headers['x-api-key'];
   return typeof k === 'string' && k === ARALINK_API_KEY;
 }
 
@@ -102,6 +109,13 @@ app.use('/api/video-local', heavyLimiter);
 app.use('/api', require('./routes-local-video'));
 
 app.use(express.json({ limit: '2mb' }));
+
+// ===== بثّ الترجمة عبر SSE — قبل compression عمدًا =====
+// الموضع ليس اعتباطيًا: يحتاج req.body (بعد express.json)، ويجب أن يسبق
+// compression لأن 'text/event-stream' نوع قابل للضغط، فيخزّن الضاغط الأحداث
+// مؤقتًا وتصل الترجمة دفعة واحدة في النهاية — أي يعمل الطلب ويضيع البثّ صامتًا.
+// حد الطلبات مغطّى بخط الأساس على '/api' أعلاه (مطابق لـ /api/translate).
+app.use('/api', require('./routes-sse'));
 
 // ===== ضغط الاستجابات (يقلل حجم HTML/CSS/JS/JSON 60-80%) =====
 app.use(compression());

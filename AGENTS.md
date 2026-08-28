@@ -70,6 +70,13 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 - Minimum check: `node --check` on server files + manual browser test of the flow (paste link → translated output)
 - If the project does not have any testing tools available, ask the user whether testing should be skipped.
 
+### MOUNTING ROUTERS (learned the hard way)
+
+- **Every new router in `server/routes-*.js` MUST be mounted in `server.js` AND covered by a test that hits its path.** `routes-sse.js` shipped in Wave 3 unmounted; `/api/translate-stream` returned 404 and the whole translate flow was dead in the browser while 248 unit tests passed. `tests/smoke.test.js` now fails if a path the frontend calls has no registered route — keep it passing, don't weaken it.
+- **Streaming routes (SSE) must be mounted BEFORE `app.use(compression())`** — `text/event-stream` is compressible, so the compressor buffers the events and the stream arrives in one lump. `tests/sse.test.js` asserts no `Content-Encoding` on the stream.
+- **Detect client disconnect with `res.on('close')`, never `req.on('close')`** — since Node 16 the request emits `close` as soon as its body is read, and `express.json()` reads it before the handler runs.
+- **Access cross-module functions at runtime** (`translate.detectLanguage(...)`, not a destructured import) so tests can stub them — see `routes-translate.js` and `routes-sse.js`.
+
 ## UI DESIGN
 
 - Always follow the UI design system when creating or reviewing components or pages.

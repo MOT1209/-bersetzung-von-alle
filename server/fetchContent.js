@@ -18,6 +18,45 @@ const FETCH_HEADERS = {
 };
 
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
+const MAX_HTML_BYTES = 10 * 1024 * 1024; // 10 MB — hard cap for HTML/text responses
+
+/**
+ * Read a fetch Response body as text with a streaming byte cap.
+ * Uses Content-Length for early rejection when present, then streams chunks
+ * via the async iterator and aborts immediately if the accumulated size
+ * exceeds `maxBytes`. Throws an error with `code = 'input-too-large'`
+ * (→ HTTP 413) on overflow so callers can map it uniformly.
+ */
+async function readBodyLimited(res, maxBytes) {
+  const lenHeader = res.headers.get('content-length');
+  if (lenHeader && Number(lenHeader) > maxBytes) {
+    const err = new Error('input-too-large');
+    err.code = 'input-too-large';
+    throw err;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        const err = new Error('input-too-large');
+        err.code = 'input-too-large';
+        throw err;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    // Ensure the reader is released even on error / abort
+    reader.releaseLock();
+  }
+  return decoder.decode(Buffer.concat(chunks));
+}
+
 async function readPdfBufferLimited(res) {
   const lenHeader = res.headers.get('content-length');
   if (lenHeader && Number(lenHeader) > MAX_PDF_BYTES) {
@@ -130,7 +169,7 @@ async function fetchArticleContent(url) {
     }
   }
 
-  const html = await res.text();
+  const html = await readBodyLimited(res, MAX_HTML_BYTES);
 
   // قاعدة استخراج مخصصة لهذا النطاق؟ (مواقع لا تلتقطها الأداة العامة)
   const rule = await getRuleForUrl(url);
