@@ -4,8 +4,8 @@
     "source": "Good morning. I hope you have a wonderful day.",
     "sourceLang": "en",
     "targets": {
-      "ar": "صباح الخير. أتمنى لك يوماً رائعاً.",
-      "fr": "Bonjour. J'espère que vous passerez une merveilleuse journée.",
+      "ar": ["صباح الخير. أتمنى لك يوماً رائعاً.", "صباح الخير. أتمنى أن يكون يومك رائعاً."],
+      "fr": ["Bonjour. J'espère que vous passerez une merveilleuse journée.", "Bonjour. J'espère que tu passeras une merveilleuse journée."],
       "de": "Guten Morgen. Ich hoffe, du hast einen wunderbaren Tag.",
       "es": "Buenos días. Espero que tengas un día maravilloso."
     }

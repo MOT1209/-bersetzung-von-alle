@@ -47,6 +47,21 @@ test('scoreOne: ترجمة مختلفة → درجة أقل من 1', () => {
   assert.ok(r.wer > 0);
 });
 
+test('bestScore: يأخذ أفضل درجة من عدة صياغات مرجعية', () => {
+  const refs = ['le chat dort', 'un chat qui dort'];
+  const r = quality.bestScore(refs, 'un chat qui dort', 'fr');
+  assert.equal(r.score, 1); // مطابق للصياغة الثانية
+  const single = quality.bestScore('le chat dort', 'le chat dort', 'fr');
+  assert.equal(single.score, 1); // نص واحد يعمل أيضًا
+});
+
+test('runBenchmark: يقبل مصفوفة مراجع لكل لغة', async () => {
+  const rs = [{ id: 'm1', source: 'hello', sourceLang: 'en', targets: { fr: ['salut', 'bonjour'] } }];
+  const p = { id: 'p', fn: async () => 'bonjour' };
+  const report = await quality.runBenchmark({ providers: [p], refset: rs, delayMs: 0 });
+  assert.equal(report.summary[0].avgScore, 1);
+});
+
 test('runBenchmark: مزوّد مثالي يتفوّق على مزوّد رديء', async () => {
   const perfect = { id: 'perfect', fn: async (text, lang) => REFSET.find((e) => e.source === text).targets[lang] };
   const garbage = { id: 'garbage', fn: async () => 'xxxxx yyyyy zzzzz' };

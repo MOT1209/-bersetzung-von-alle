@@ -107,6 +107,9 @@ npm run bench:translate -- --provider google --lang ar,fr
 - **CORS**: متغير `CORS_ORIGIN` في `.env` — قائمة أصول مسموحة مفصولة بفواصل
   (مثال: `https://app.example.com`)، وافتراضيًا (فارغ) = **نفس الأصل فقط**، وتُحجب
   طلبات المتصفحات من نطاقات أخرى تلقائيًا.
+- **حد الطلبات القابل للتوسّع**: عدّادات لكل IP عبر `server/store.js` — ذاكرة
+  لكل عملية افتراضيًا، أو Redis مشترك بضبط `REDIS_URL` (لازم عند تشغيل أكثر من
+  نسخة خادم). `redis` تبعية اختيارية وأي فشل اتصال يسقط تلقائيًا للذاكرة.
 - **رؤوس أمان**: `helmet` مع **CSP مُفعّلة بتوجيهات صريحة** (`server/server.js`) — تسمح
   فقط بـ `self` + مشغّل يوتيوب (`www.youtube.com` / `youtube-nocookie.com`) + خطوط Google
   + `cdn.jsdelivr.net` للسكربتات؛ إضافةً إلى `X-Frame-Options` و`X-Content-Type-Options: nosniff`

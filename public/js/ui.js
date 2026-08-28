@@ -66,8 +66,12 @@ export const ruleListEl       = $('rule-list');
 
 /* ===== قائمة اللغات ===== */
 export function populateLangSelector(languages) {
+  // الخادم يرسل مصفوفة [{code,nameAr},...] أو خريطة {code:name} — نوحّدها لخريطة.
+  const map = Array.isArray(languages)
+    ? Object.fromEntries(languages.map((l) => [l.code, l.nameAr]))
+    : (languages || {});
   targetLang.innerHTML = '';
-  const sorted = Object.entries(languages).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
+  const sorted = Object.entries(map).sort((a, b) => a[1].localeCompare(b[1], 'ar'));
   for (const [code, name] of sorted) {
     const opt = document.createElement('option');
     opt.value = code;
@@ -75,8 +79,8 @@ export function populateLangSelector(languages) {
     targetLang.appendChild(opt);
   }
   const saved = safeGet('aralink-lang');
-  if (saved && languages[saved]) targetLang.value = saved;
-  else if (languages['ar'])      targetLang.value = 'ar';
+  if (saved && map[saved]) targetLang.value = saved;
+  else if (map['ar'])      targetLang.value = 'ar';
 }
 
 export function filterLanguages() {

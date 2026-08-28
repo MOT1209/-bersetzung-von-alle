@@ -6,6 +6,7 @@ const compression = require('compression');
 const path = require('path');
 const crypto = require('crypto');
 const config = require('./config');
+const { createStore, closeAll: closeStore } = require('./store');
 const translateRouter = require('./routes-translate');
 const ttsRouter = require('./routes-tts');
 const videoRouter = require('./routes-video');
@@ -55,31 +56,25 @@ function isApiKeyValid(req) {
   return typeof k === 'string' && k === ARALINK_API_KEY;
 }
 
-// ===== حد الطلبات البسيط (في الذاكرة — بدون مكتبات خارجية) =====
-// يمنع استنزاف حصص الترجمة المجانية عبر إساءة استخدام واجهة API
+// ===== حد الطلبات =====
+// يمنع استنزاف حصص الترجمة المجانية عبر إساءة استخدام واجهة API.
+// العدّادات تمرّ عبر server/store.js: ذاكرة داخل العملية افتراضيًا، أو Redis
+// مشترك عند ضبط REDIS_URL (لازم عند تشغيل أكثر من نسخة خادم). فشل المتجر
+// = سقوط تلقائي للذاكرة + السماح بالطلب (fail-open) فلا ينهار الخادم.
 function createRateLimiter({ windowMs, max, keyedMultiplier = 3 }) {
-  const hits = new Map(); // ip → { count, resetAt }
-  // تنظيف دوري للإدخالات المنتهية (unref حتى لا يمنع إغلاق العملية)
-  setInterval(() => {
-    const now = Date.now();
-    for (const [ip, h] of hits) {
-      if (h.resetAt < now) hits.delete(ip);
-    }
-  }, windowMs).unref();
+  const store = createStore();
 
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const now = Date.now();
-    let h = hits.get(ip);
-    if (!h || h.resetAt < now) {
-      h = { count: 0, resetAt: now + windowMs };
-      hits.set(ip, h);
-    }
-    h.count++;
     const limit = isApiKeyValid(req) ? max * keyedMultiplier : max;
-    if (h.count > limit) {
-      res.setHeader('Retry-After', Math.ceil((h.resetAt - now) / 1000));
-      return res.status(429).json({ error: 'rate-limited' });
+    try {
+      const { count, resetAt } = await store.incr(ip, windowMs);
+      if (count > limit) {
+        res.setHeader('Retry-After', Math.max(1, Math.ceil((resetAt - Date.now()) / 1000)));
+        return res.status(429).json({ error: 'rate-limited' });
+      }
+    } catch (e) {
+      console.error('[rate-limit] store error — allowing request:', e && e.message);
     }
     next();
   };
@@ -193,7 +188,13 @@ if (require.main === module) {
     }
     throw err;
   });
+
+  // إغلاق اتصال Redis المشترك (إن وُجد) عند الإيقاف — بلا Redis لا شيء يحدث
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => { closeStore().catch(() => {}); });
+  }
 }
 
 module.exports = app;
 module.exports.createRateLimiter = createRateLimiter; // للاختبار المباشر (وحدة بلا شبكة)
+module.exports.closeStore = closeStore;

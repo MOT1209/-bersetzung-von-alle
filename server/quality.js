@@ -29,6 +29,17 @@ function loadRefset(file = REFSET_FILE) {
   return data;
 }
 
+// المرجع قد يكون نصًا واحدًا أو مصفوفة صياغات مقبولة — نأخذ أفضل درجة
+function bestScore(references, hypothesis, lang) {
+  const refs = Array.isArray(references) ? references : [references];
+  let best = null;
+  for (const ref of refs) {
+    const s = scoreOne(ref, hypothesis, lang);
+    if (!best || s.score > best.score) best = s;
+  }
+  return best;
+}
+
 // ===== حساب درجة جملة واحدة =====
 function scoreOne(reference, hypothesis, lang) {
   const { wer, ref, hyp, distance } = wordErrorRate(reference, hypothesis, lang);
@@ -52,7 +63,7 @@ async function benchmarkProvider(id, translateFn, refset, opts = {}) {
       const row = { id: entry.id, lang, ok: false };
       try {
         const hypothesis = await translateFn(entry.source, lang, entry.sourceLang || 'en');
-        Object.assign(row, scoreOne(reference, String(hypothesis || ''), lang), { ok: true, hypothesis });
+        Object.assign(row, bestScore(reference, String(hypothesis || ''), lang), { ok: true, hypothesis });
       } catch (e) {
         row.error = (e && e.message) || String(e);
       }
@@ -137,6 +148,7 @@ function loadReport(file = REPORT_FILE) {
 module.exports = {
   loadRefset,
   scoreOne,
+  bestScore,
   aggregate,
   benchmarkProvider,
   runBenchmark,

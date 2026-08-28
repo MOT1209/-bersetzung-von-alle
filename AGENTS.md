@@ -39,6 +39,7 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 - **Article/website fetching:** `server/fetchContent.js` — server-side fetch + cheerio/readability to extract main text
 - **Translation:** `server/translate.js` — unified provider registry (Google → MyMemory → Libre → Gemini → DeepL → zen), auto-fallback + per-engine cooldown; language detection via the free Google endpoint
 - **Config:** `.env` for API keys (NEVER commit real keys)
+- **Rate-limit store:** `server/store.js` — pluggable KV for rate-limit counters. Memory (per-process) by default; set `REDIS_URL` to share counters across server instances. `redis` is an optionalDependency; any connect failure logs once and falls back to memory (never crashes). Cache (`cache.js`) and stats/usage stay file-based (fine for a single instance).
 - **Files/OCR/PDF/TTS:** `server/files.js` + `server/routes-file.js` (11→8 formats), `server/ocr.js` (Tesseract.js), `server/pdf.js` (PDF parsing), `server/tts.js` (MS Edge TTS) + `server/cache.js`/`usage.js`/`logger.js`
 - **Translation quality:** `server/quality.js` + `server/wer.js` — offline WER benchmark of every provider against `samples/translation/refset.json`. Run `npm run bench:translate` → writes `cache/quality-report.json`; the admin dashboard reads it via `GET /api/stats/quality` (ADMIN_TOKEN-gated). Never run in CI (consumes free translation quota).
 - **Extension:** `extension/` (Chrome Manifest V3: popup.js/background.js) — ترجمة فورية داخل المتصفح
