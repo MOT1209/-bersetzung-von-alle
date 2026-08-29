@@ -17,6 +17,7 @@ const PRECACHE = [
   '/js/features.js',
   '/js/translate.js',
   '/js/stream.js',
+  '/js/dub.js',
   '/js/dashboard.js',
   '/manifest.webmanifest',
   '/icons/icon.svg'
@@ -58,9 +59,35 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // الملفات الثابتة → stale-while-revalidate:
-  // قدّم نسخة الكاش فوراً (سرعة + أوفلاين)، ثم احصل على النسخة الحديثة من الشبكة
-  // وخدّث الكاش للزيارات التالية. يضمن ظهور التحديثات دون إعادة تحميل قسري.
+  // شيفرة التطبيق (HTML/JS/CSS) → شبكة-أوّل، والكاش احتياطي أوفلاين فقط.
+  //
+  // كانت هنا stale-while-revalidate تعيد نسخة الكاش فورًا: فتظهر كل تعديلة
+  // متأخرةً بزيارة كاملة، وقد تختلط واجهة قديمة بمسار خادم جديد. الفارق في
+  // السرعة على أصلٍ محلي لا يساوي هذا الالتباس.
+  const isAppShell =
+    e.request.mode === 'navigate' ||
+    /\.(html|js|css)$/.test(url.pathname) ||
+    url.pathname === '/';
+
+  if (isAppShell) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
+          return res;
+        })
+        // أوفلاين: نسخة الكاش، وللتنقّل نعود إلى الصفحة الرئيسية المخزّنة
+        .catch(() => caches.match(e.request).then(
+          (cached) => cached || (e.request.mode === 'navigate' ? caches.match('/index.html') : undefined)
+        ))
+    );
+    return;
+  }
+
+  // بقية الأصول (أيقونات، manifest) ثابتة فعلًا → stale-while-revalidate
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const networkFetch = fetch(e.request).then((res) => {
