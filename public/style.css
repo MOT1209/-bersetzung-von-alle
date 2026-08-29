@@ -308,65 +308,47 @@ body {
   background: rgba(248, 113, 113, .08);
 }
 
-.btn-srt {
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--accent);
-  background: transparent;
-  border: 1px solid rgba(34, 211, 238, .45);
-  border-radius: var(--radius-md);
-  padding: 8px 16px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .18s ease, border-color .18s ease;
-}
-
-.btn-srt:hover { background: rgba(34, 211, 238, .1); border-color: var(--accent); }
-
-/* الدبلجة سارية: حالة واضحة لأن الصوت الأصلي مكتوم — يجب أن يعرف المستخدم لماذا */
-#dub-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #0b1220;
-  font-weight: 700;
-}
-
-/* زر الاستماع بالعربية */
-.btn-listen {
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--success);
-  background: transparent;
-  border: 1px solid rgba(52, 211, 153, .45);
-  border-radius: var(--radius-md);
-  padding: 8px 16px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .18s ease, border-color .18s ease, opacity .18s ease;
-}
-
-.btn-listen:hover:not(:disabled) { background: rgba(52, 211, 153, .1); border-color: var(--success); }
-
-.btn-listen:disabled { opacity: .55; cursor: not-allowed; }
-
-/* زر نسخ / مشاركة النتيجة */
+/* ===== أزرار إجراءات النتيجة =====
+   ثلاث عائلات متطابقة الهندسة ومختلفة اللون فقط — واللون هو ما يحمل المعنى:
+   .btn-listen أخضر = إخراج صوتي · .btn-srt سماوي = ملفات الفيديو/الترجمة ·
+   .btn-action رمادي = عمليات على النص. توحيد الهندسة في قاعدة واحدة يمنع
+   انحراف الأبعاد بين العائلات كلما أُضيف زر جديد. */
+.btn-srt,
+.btn-listen,
 .btn-action {
   font-family: inherit;
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text-muted);
+  line-height: 1.2;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 8px 16px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background .18s ease, border-color .18s ease, color .18s ease;
+  transition: background .18s ease, border-color .18s ease, color .18s ease, opacity .18s ease;
 }
 
-.btn-action:hover { color: var(--text); border-color: var(--primary); background: rgba(99, 102, 241, .08); }
+.btn-srt:disabled,
+.btn-listen:disabled,
+.btn-action:disabled { opacity: .55; cursor: not-allowed; }
+
+.btn-srt    { color: var(--accent);     border-color: rgba(34, 211, 238, .45); }
+.btn-listen { color: var(--success);    border-color: rgba(52, 211, 153, .45); }
+.btn-action { color: var(--text-muted); border-color: var(--border); }
+
+.btn-srt:hover:not(:disabled)    { background: rgba(34, 211, 238, .1); border-color: var(--accent); }
+.btn-listen:hover:not(:disabled) { background: rgba(52, 211, 153, .1); border-color: var(--success); }
+.btn-action:hover:not(:disabled) { color: var(--text); border-color: var(--primary); background: rgba(99, 102, 241, .08); }
+
+/* الدبلجة سارية: حالة مملوءة لأن الصوت الأصلي مكتوم — يجب أن يعرف المستخدم لماذا */
+#dub-btn.active {
+  background: var(--success);
+  border-color: var(--success);
+  color: #06231a;
+}
+
+#dub-btn.active:hover:not(:disabled) { background: var(--success); }
 
 /* ===== شريط التقدم ===== */
 .progress {
@@ -525,9 +507,48 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 12px 16px;
   flex-wrap: wrap;
 }
+
+/* حاوية الإجراءات: بدونها كانت الأزرار أبناءً مباشرين لـ .result-header، فيوزّع
+   space-between الأزرارَ نفسها وتتباعد فجواتها عشوائيًا عند اللفّ. الآن الصفّ
+   مجموعتان فقط: التبويبات ↔ الإجراءات. */
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+/* مجموعة دلالية واحدة (صوت / فيديو / نص) تبقى متلاصقة ولا تنكسر داخليًا */
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* مجموعة كل أزرارها hidden لا تترك فجوة (:empty لا يكفي — الأزرار موجودة) */
+.action-group:not(:has(> button:not([hidden]))) { display: none; }
+
+/* شارة حالة الدبلجة: كتم الصوت الأصلي تغييرٌ صامت — يجب أن يُشرح نصًّا */
+.dub-status {
+  margin: 10px 0 0;
+  padding: 6px 12px;
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--success);
+  background: rgba(52, 211, 153, .1);
+  border: 1px solid rgba(52, 211, 153, .35);
+  border-radius: 999px;
+  display: inline-block;
+}
+
+/* display الصريح أعلاه يتغلّب على [hidden] الافتراضي — بدون هذا تظهر شارة فارغة */
+.dub-status[hidden] { display: none; }
 
 /* تبويبات على شكل حبوب */
 .tabs {
@@ -902,9 +923,14 @@ body {
   .result-header { flex-direction: column; align-items: stretch; }
   .tabs { justify-content: stretch; }
   .tab { flex: 1; }
-  .btn-srt { width: 100%; }
-  .btn-listen { width: 100%; }
-  .btn-action { width: 100%; }
+  /* ثمانية أزرار بعرض كامل تصنع عمودًا طويلًا يدفع النتيجة خارج الشاشة —
+     شبكة عمودين تُبقي التجميع الدلالي مقروءًا في نصف الارتفاع. */
+  .result-actions { justify-content: stretch; gap: 8px; }
+  .action-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .action-group .btn-srt,
+  .action-group .btn-listen,
+  .action-group .btn-action { width: 100%; padding: 10px 12px; }
+  .export-buttons .btn-action { width: 100%; }
   .share-view { padding: 18px 16px; }
   .history { padding: 16px; }
   .history-item { align-items: flex-start; }
@@ -1108,7 +1134,10 @@ body {
 @media (max-width: 375px) {
   .hero-card { padding: 16px 14px; border-radius: 14px; }
   .mode-btn { padding: 8px 10px; font-size: .78rem; }
-  .btn-primary, .btn-action { width: 100%; margin-top: 6px; }
+  .btn-primary { width: 100%; margin-top: 6px; }
+  /* لا margin-top هنا: كان يُمنح لـ .btn-action وحدها فيتفاوت تباعد الأزرار
+     داخل المجموعة الواحدة — التباعد مسؤولية gap الشبكة وحدها. */
+  .action-group { grid-template-columns: 1fr; }
   .tab { padding: 8px 10px; font-size: .78rem; }
   .result-body { font-size: .95rem; }
   .cap-bar { font-size: .82rem; padding: 8px 10px; }

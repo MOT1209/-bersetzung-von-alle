@@ -137,14 +137,34 @@ const LANGUAGES = [
 
 const BY_CODE = new Map(LANGUAGES.map((l) => [l.code, l]));
 
-/** إرجاع قائمة اللغات الكاملة (للـ GET /api/languages) */
+// اللغات التي يقبلها محرّك النطق (gTTS / translate_tts) — مجموعة أصغر بكثير من
+// لغات الترجمة أعلاه. الخلط بينهما يعني نطقًا يفشل صامتًا: gTTS يردّ بخطأ HTTP
+// للغة لا يعرفها، فيصل المستخدم صوتٌ فارغ بلا تفسير.
+const TTS_LANGS = new Set([
+  'af', 'ar', 'bg', 'bn', 'bs', 'ca', 'cs', 'cy', 'da', 'de', 'el', 'en', 'eo',
+  'es', 'et', 'fi', 'fil', 'fr', 'gu', 'he', 'hi', 'hr', 'hu', 'hy', 'id', 'is',
+  'it', 'ja', 'jv', 'km', 'kn', 'ko', 'la', 'lv', 'mk', 'ml', 'mr', 'ms', 'my',
+  'ne', 'nl', 'no', 'pl', 'pt', 'ro', 'ru', 'si', 'sk', 'sq', 'sr', 'su', 'sv',
+  'sw', 'ta', 'te', 'th', 'tr', 'uk', 'ur', 'vi', 'zh-CN', 'zh-TW',
+]);
+
+/**
+ * إرجاع قائمة اللغات الكاملة (للـ GET /api/languages).
+ * كل لغة تحمل `tts` لتعرف الواجهة أيّ اللغات تصلح للنطق/الدبلجة — مصدر واحد
+ * للحقيقة بدل تكرار القائمة في الواجهة.
+ */
 function getAllLanguages() {
-  return LANGUAGES;
+  return LANGUAGES.map((l) => ({ ...l, tts: TTS_LANGS.has(l.code) }));
 }
 
 /** تحقق من أن رمز اللغة مدعوم */
 function isSupportedLang(code) {
   return BY_CODE.has(code);
+}
+
+/** تحقق من أن رمز اللغة يدعمه محرّك النطق (أضيق من isSupportedLang) */
+function isTtsSupported(code) {
+  return TTS_LANGS.has(code);
 }
 
 /** إرجاع الاسم العربي لرمز لغة (للشاشة) */
@@ -153,4 +173,4 @@ function langName(code) {
   return l ? l.nameAr : code;
 }
 
-module.exports = { getAllLanguages, isSupportedLang, langName, LANGUAGES };
+module.exports = { getAllLanguages, isSupportedLang, isTtsSupported, langName, LANGUAGES, TTS_LANGS };

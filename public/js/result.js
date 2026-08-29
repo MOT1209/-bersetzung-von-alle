@@ -5,7 +5,7 @@ import {
   result, resultEmbed, resultBody, metaTitle, metaLine, sourceNotice, cacheBadge,
   copyBtn, shareBtn, shareView, shareLink, shareCloseBtn, exportRow,
   srtBtn, listenBtn, localBtn, dubBtn, compareBtn, tashkeelBtn, tabs, targetLang,
-  showToast, showError, hideProgress, showProgress,
+  showToast, showError, hideProgress, showProgress, isTtsLang,
 } from './ui.js';
 import {
   buildWebVtt, vttClock, setupYtPlayer, buildCaptionPanel,
@@ -41,7 +41,10 @@ function renderYouTubeResult(data) {
 
   srtBtn.hidden    = false;
   listenBtn.hidden = false;
-  if (dubBtn) dubBtn.hidden = !(data.captions && data.captions.length);
+  // الدبلجة تحتاج ترجمات مؤقّتة ولغةً يعرفها محرّك النطق — لغات الترجمة أوسع
+  if (dubBtn) {
+    dubBtn.hidden = !(data.captions && data.captions.length) || !isTtsLang(targetLang.value);
+  }
   compareBtn.hidden = true;
   state.compare    = false;
   compareBtn.classList.remove('active');

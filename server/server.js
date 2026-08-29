@@ -163,8 +163,8 @@ app.use('/api', translateRouter);
 app.use('/api/tts', heavyLimiter);
 app.use('/api', ttsRouter);
 
-// ===== الدبلجة (نفس الحدّ الثقيل — كل طلب يولّد عدة مقاطع صوتية) =====
-app.use('/api/dub', heavyLimiter);
+// ===== الدبلجة (حدّ خاص أوسع — دفعات متتابعة طوال الفيديو لا طلب واحد) =====
+app.use('/api/dub', createRateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, max: config.RATE_LIMIT_MAX_DUB }));
 app.use('/api', require('./routes-dub'));
 
 // ===== مسارات بثّ الفيديو (الترجمات المدمجة) =====

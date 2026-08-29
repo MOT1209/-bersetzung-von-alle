@@ -124,15 +124,26 @@
           <button type="button" class="tab active" data-tab="translated" role="tab" aria-selected="true">الترجمة</button>
           <button type="button" class="tab" data-tab="original" role="tab" aria-selected="false">النص الأصلي</button>
         </div>
-        <button type="button" id="compare-btn" class="btn-action" hidden>↔️ مقارنة</button>
-        <button type="button" id="listen-btn" class="btn-listen" hidden>🔊 استمع بالعربية</button>
-        <button type="button" id="local-btn" class="btn-srt" hidden>▶ تشغيل بترجمات مدمجة</button>
-        <button type="button" id="dub-btn" class="btn-srt" hidden title="شغّل الفيديو بصوت مترجَم بدل الصوت الأصلي">🎙️ دبلجة</button>
-        <button type="button" id="srt-btn" class="btn-srt" hidden>تحميل SRT</button>
-        <button type="button" id="tashkeel-btn" class="btn-action" hidden title="أضف حركات التشكيل للنص العربي">✨ تشكيل</button>
-        <button type="button" id="copy-btn" class="btn-action" hidden>📋 نسخ</button>
-        <button type="button" id="share-btn" class="btn-action" hidden>🔗 مشاركة</button>
+        <!-- الإجراءات في حاوية واحدة: بدونها يوزّع space-between الأزرارَ نفسها،
+             فتتباعد الفجوات عشوائيًا عند اللفّ. مجموعات دلالية: صوت، فيديو، نص. -->
+        <div class="result-actions">
+          <div class="action-group" role="group" aria-label="الصوت">
+            <button type="button" id="listen-btn" class="btn-listen" hidden>🔊 استمع بالعربية</button>
+            <button type="button" id="dub-btn" class="btn-listen" hidden title="شغّل الفيديو بصوت مترجَم بدل الصوت الأصلي">🎙️ دبلجة</button>
+          </div>
+          <div class="action-group" role="group" aria-label="الفيديو والترجمات">
+            <button type="button" id="local-btn" class="btn-srt" hidden>▶️ تشغيل بترجمات مدمجة</button>
+            <button type="button" id="srt-btn" class="btn-srt" hidden>📄 تحميل SRT</button>
+          </div>
+          <div class="action-group" role="group" aria-label="النص">
+            <button type="button" id="compare-btn" class="btn-action" hidden>↔️ مقارنة</button>
+            <button type="button" id="tashkeel-btn" class="btn-action" hidden title="أضف حركات التشكيل للنص العربي">✨ تشكيل</button>
+            <button type="button" id="copy-btn" class="btn-action" hidden>📋 نسخ</button>
+            <button type="button" id="share-btn" class="btn-action" hidden>🔗 مشاركة</button>
+          </div>
+        </div>
       </div>
+      <p id="dub-status" class="dub-status" role="status" hidden></p>
 
       <p id="meta-title" class="meta-title"></p>
       <span id="cache-badge" class="cache-badge" hidden>⚡ من الذاكرة المؤقتة</span>
@@ -173,6 +184,9 @@
 
     <!-- مشغل الصوت (القراءة الصوتية) -->
     <audio id="tts-player" hidden></audio>
+    <!-- مشغل الدبلجة — عنصر دائم كـ tts-player: إنشاء Audio لكل مقطع يصطدم
+         بسياسة التشغيل التلقائي، وعنصرٌ واحد يُبدَّل مصدره لا يصطدم بها -->
+    <audio id="dub-player" hidden></audio>
 
   </main>
 

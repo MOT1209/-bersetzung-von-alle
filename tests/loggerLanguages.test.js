@@ -9,7 +9,9 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aralink-logger-'));
 process.env.LOG_FILE = path.join(tmpDir, 'errors.log');
 
 const { logError, logInfo } = require('../server/logger');
-const { getAllLanguages, isSupportedLang, langName, LANGUAGES } = require('../server/languages');
+const {
+  getAllLanguages, isSupportedLang, isTtsSupported, langName, LANGUAGES, TTS_LANGS,
+} = require('../server/languages');
 
 after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
@@ -74,6 +76,31 @@ test('isSupportedLang: يرفض غير المدعوم', () => {
   assert.equal(isSupportedLang('xx'), false);
   assert.equal(isSupportedLang(''), false);
   assert.equal(isSupportedLang(undefined), false);
+});
+
+test('getAllLanguages: كل لغة تحمل علم tts — الواجهة تُخفي زر الدبلجة بناءً عليه', () => {
+  const all = getAllLanguages();
+  for (const l of all) assert.equal(typeof l.tts, 'boolean', `اللغة ${l.code} بلا علم tts`);
+  assert.equal(all.find((l) => l.code === 'ar').tts, true);
+  assert.equal(all.find((l) => l.code === 'bho').tts, false);
+});
+
+test('isTtsSupported: أضيق من isSupportedLang — لغات ترجمة بلا نطق', () => {
+  // هذا الفارق هو سبب وجود الدالة: الخلط بينهما كان يعطي دبلجة صامتة
+  for (const c of ['bho', 'ckb', 'mni', 'doi', 'nso', 'ee', 'kri', 'ilo', 'dv']) {
+    assert.ok(isSupportedLang(c), `${c} يجب أن تكون لغة ترجمة مدعومة`);
+    assert.equal(isTtsSupported(c), false, `${c} لا ينطقها gTTS`);
+  }
+  for (const c of ['ar', 'en', 'tr', 'fr', 'de', 'ur']) {
+    assert.equal(isTtsSupported(c), true, `${c} يجب أن تكون مدعومة نطقًا`);
+  }
+  assert.equal(isTtsSupported(undefined), false);
+});
+
+test('كل لغة نطق هي أيضًا لغة ترجمة — لا رموز يتيمة', () => {
+  for (const c of TTS_LANGS) {
+    assert.ok(isSupportedLang(c), `رمز النطق ${c} غير موجود في قائمة الترجمة`);
+  }
 });
 
 test('langName: اسم عربي للمدعوم، والرمز نفسه لغيره', () => {

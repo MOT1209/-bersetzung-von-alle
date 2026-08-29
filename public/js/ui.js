@@ -30,6 +30,8 @@ export const listenBtn        = $('listen-btn');
 export const compareBtn       = $('compare-btn');
 export const localBtn         = $('local-btn');
 export const dubBtn           = $('dub-btn');
+export const dubPlayer        = $('dub-player');
+export const dubStatus        = $('dub-status');
 export const localPlayer      = $('local-player');
 export const capBar           = $('cap-bar');
 export const capPanel         = $('cap-panel');
@@ -66,8 +68,21 @@ export const ruleAddBtn       = $('rule-add-btn');
 export const ruleListEl       = $('rule-list');
 
 /* ===== قائمة اللغات ===== */
+// اللغات التي يدعمها محرّك النطق — يرسلها الخادم مع كل لغة (`tts`). مصدر واحد
+// للحقيقة: تكرار القائمة هنا يعني انحرافها عن الخادم بصمت.
+export const ttsLangs = new Set();
+
+export function isTtsLang(code) {
+  // قبل وصول قائمة اللغات لا نُخفي شيئًا — الخادم يبقى الحَكَم النهائي (422).
+  return ttsLangs.size === 0 || ttsLangs.has(code);
+}
+
 export function populateLangSelector(languages) {
-  // الخادم يرسل مصفوفة [{code,nameAr},...] أو خريطة {code:name} — نوحّدها لخريطة.
+  // الخادم يرسل مصفوفة [{code,nameAr,tts},...] أو خريطة {code:name} — نوحّدها لخريطة.
+  if (Array.isArray(languages)) {
+    ttsLangs.clear();
+    for (const l of languages) if (l && l.tts) ttsLangs.add(l.code);
+  }
   const map = Array.isArray(languages)
     ? Object.fromEntries(languages.map((l) => [l.code, l.nameAr]))
     : (languages || {});

@@ -5,7 +5,7 @@ import {
   translateBtn, retryBtn, targetLang, langSearch, urlInput, textInput,
   tabs, srtBtn, listenBtn, compareBtn, localBtn, dubBtn, copyBtn, shareBtn,
   shareCloseBtn, batchBtn, resultBody, modeBtns, smartBtn, themeToggle,
-  result, clearHistoryBtn,
+  result, clearHistoryBtn, isTtsLang,
 } from './ui.js';
 import { runTranslate, runSmartTranslate, runBatch } from './translate.js';
 import {
@@ -16,7 +16,7 @@ import {
   downloadSrt, listenToResult, playLocalVideo,
   handleResultDblClick, teardownPlayers, stopCaptionSync,
 } from './media.js';
-import { toggleDubbing } from './dub.js';
+import { toggleDubbing, stopDubbing } from './dub.js';
 import {
   saveToHistory, renderHistory, clearHistory, handleShareHash,
   initGlossary, initRules, initSettings, setupTashkeelButton,
@@ -115,7 +115,15 @@ clearHistoryBtn.addEventListener('click', clearHistory);
 
 /* ===== لغة الهدف ===== */
 langSearch.addEventListener('input', filterLanguages);
-targetLang.addEventListener('change', () => { try { localStorage.setItem('aralink-lang', targetLang.value); } catch {} });
+targetLang.addEventListener('change', () => {
+  try { localStorage.setItem('aralink-lang', targetLang.value); } catch {}
+  // النتيجة المعروضة تخصّ اللغة السابقة، لكن الدبلجة تُولَّد باللغة الحالية —
+  // فالزر يتبع اللغة المختارة الآن، ويختفي إن كان محرّك النطق لا يعرفها.
+  if (dubBtn && !dubBtn.hidden && !isTtsLang(targetLang.value)) {
+    stopDubbing();
+    dubBtn.hidden = true;
+  }
+});
 
 /* ===== الثيم ===== */
 themeToggle.addEventListener('click', toggleTheme);

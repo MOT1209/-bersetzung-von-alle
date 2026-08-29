@@ -55,6 +55,10 @@ module.exports = {
   RATE_LIMIT_MAX: Number(process.env.RATE_LIMIT_MAX) || 20, // طلبات/دقيقة/IP لمسارات الترجمة
   RATE_LIMIT_WINDOW_MS: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
   RATE_LIMIT_MAX_HEAVY: Number(process.env.RATE_LIMIT_MAX_HEAVY) || 10, // للمسارات الأثقل (TTS والفيديو)
+  // الدبلجة تُطلب على دفعات صغيرة متتابعة طوال الفيديو، لا مرة واحدة: حدّ العشرة
+  // يُستنفد خلال دقيقة مشاهدة واحدة فتتوقف الدبلجة بـ 429. الطلب نفسه محدود
+  // أصلًا بـ 40 مقطعًا، فالسقف الأعلى هنا لا يوسّع سطح الإساءة كثيرًا.
+  RATE_LIMIT_MAX_DUB: Number(process.env.RATE_LIMIT_MAX_DUB) || 60,
 
   // ===== فيديو محلي: أقصى مدة بالدقائق (الافتراضي 5 — STT بطيء ~5.5x المدة على هذا الجهاز) =====
   LOCAL_VIDEO_MAX_MIN: Number(process.env.LOCAL_VIDEO_MAX_MIN) || 5,
