@@ -69,6 +69,9 @@ let ytPlayer     = null;
 let capSyncTimer = null;
 let localVideoUrl = null;
 
+// الدبلجة تحتاج المشغّل نفسه (الوقت الحالي + كتم الصوت الأصلي)، وهو محلّي هنا.
+export function getYtPlayer() { return ytPlayer; }
+
 export function teardownPlayers() {
   try { resultEmbed.innerHTML = ''; } catch {}
   capPanel.hidden     = true;
@@ -124,7 +127,9 @@ export async function setupYtPlayer(videoId) {
   try {
     ytPlayer = new YT.Player(wrap, {
       videoId:    String(videoId),
-      playerVars: { rel: 0, playsinline: 1 },
+      // origin + enablejsapi: بدونهما يرسل widgetapi رسائل postMessage بأصل
+      // خاطئ، فيملأ الكونسول بتحذيرات 'target origin does not match'.
+      playerVars: { rel: 0, playsinline: 1, enablejsapi: 1, origin: window.location.origin },
       events: {
         onStateChange: (e) => {
           if (e.data === YT.PlayerState.PLAYING) startCaptionSync();

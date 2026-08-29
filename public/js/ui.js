@@ -29,6 +29,7 @@ export const srtBtn           = $('srt-btn');
 export const listenBtn        = $('listen-btn');
 export const compareBtn       = $('compare-btn');
 export const localBtn         = $('local-btn');
+export const dubBtn           = $('dub-btn');
 export const localPlayer      = $('local-player');
 export const capBar           = $('cap-bar');
 export const capPanel         = $('cap-panel');

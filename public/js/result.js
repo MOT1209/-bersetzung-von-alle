@@ -4,18 +4,23 @@ import { state, postJson, mapError } from './utils.js';
 import {
   result, resultEmbed, resultBody, metaTitle, metaLine, sourceNotice, cacheBadge,
   copyBtn, shareBtn, shareView, shareLink, shareCloseBtn, exportRow,
-  srtBtn, listenBtn, localBtn, compareBtn, tashkeelBtn, tabs, targetLang,
+  srtBtn, listenBtn, localBtn, dubBtn, compareBtn, tashkeelBtn, tabs, targetLang,
   showToast, showError, hideProgress, showProgress,
 } from './ui.js';
 import {
   buildWebVtt, vttClock, setupYtPlayer, buildCaptionPanel,
   startCaptionSync, teardownPlayers,
 } from './media.js';
+import { stopDubbing } from './dub.js';
 
 /* ---------- عرض النتيجة حسب النوع ---------- */
 export function renderResult(data) {
   if (!data || data.error) return showError(data && data.error, 400);
   state.current = data;
+
+  // نتيجة جديدة: أوقف أي دبلجة سارية وأخفِ زرّها — مقاطعها تخصّ الفيديو السابق
+  stopDubbing();
+  if (dubBtn) dubBtn.hidden = true;
 
   const origTab = document.querySelector('.tab[data-tab="original"]');
   if (origTab) origTab.hidden = (data.type === 'localvideo');
@@ -36,6 +41,7 @@ function renderYouTubeResult(data) {
 
   srtBtn.hidden    = false;
   listenBtn.hidden = false;
+  if (dubBtn) dubBtn.hidden = !(data.captions && data.captions.length);
   compareBtn.hidden = true;
   state.compare    = false;
   compareBtn.classList.remove('active');

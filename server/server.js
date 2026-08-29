@@ -163,6 +163,10 @@ app.use('/api', translateRouter);
 app.use('/api/tts', heavyLimiter);
 app.use('/api', ttsRouter);
 
+// ===== الدبلجة (نفس الحدّ الثقيل — كل طلب يولّد عدة مقاطع صوتية) =====
+app.use('/api/dub', heavyLimiter);
+app.use('/api', require('./routes-dub'));
+
 // ===== مسارات بثّ الفيديو (الترجمات المدمجة) =====
 app.use('/api/video', heavyLimiter);
 app.use('/api', videoRouter);

@@ -324,6 +324,14 @@ body {
 
 .btn-srt:hover { background: rgba(34, 211, 238, .1); border-color: var(--accent); }
 
+/* الدبلجة سارية: حالة واضحة لأن الصوت الأصلي مكتوم — يجب أن يعرف المستخدم لماذا */
+#dub-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1220;
+  font-weight: 700;
+}
+
 /* زر الاستماع بالعربية */
 .btn-listen {
   font-family: inherit;

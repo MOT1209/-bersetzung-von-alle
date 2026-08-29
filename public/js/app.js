@@ -3,7 +3,7 @@ import { state } from './utils.js';
 import {
   $, populateLangSelector, filterLanguages, applyTheme, currentTheme, toggleTheme,
   translateBtn, retryBtn, targetLang, langSearch, urlInput, textInput,
-  tabs, srtBtn, listenBtn, compareBtn, localBtn, copyBtn, shareBtn,
+  tabs, srtBtn, listenBtn, compareBtn, localBtn, dubBtn, copyBtn, shareBtn,
   shareCloseBtn, batchBtn, resultBody, modeBtns, smartBtn, themeToggle,
   result, clearHistoryBtn,
 } from './ui.js';
@@ -16,6 +16,7 @@ import {
   downloadSrt, listenToResult, playLocalVideo,
   handleResultDblClick, teardownPlayers, stopCaptionSync,
 } from './media.js';
+import { toggleDubbing } from './dub.js';
 import {
   saveToHistory, renderHistory, clearHistory, handleShareHash,
   initGlossary, initRules, initSettings, setupTashkeelButton,
@@ -104,6 +105,7 @@ tabs.forEach((tab) => {
 srtBtn.addEventListener('click', downloadSrt);
 listenBtn.addEventListener('click', listenToResult);
 localBtn.addEventListener('click', playLocalVideo);
+if (dubBtn) dubBtn.addEventListener('click', toggleDubbing);
 copyBtn.addEventListener('click', copyResult);
 shareBtn.addEventListener('click', shareResult);
 shareCloseBtn.addEventListener('click', () => { $('share-view').hidden = true; });
