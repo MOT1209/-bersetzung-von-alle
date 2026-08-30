@@ -5,7 +5,7 @@ import {
   translateBtn, retryBtn, targetLang, langSearch, urlInput, textInput,
   tabs, srtBtn, listenBtn, compareBtn, localBtn, dubBtn, copyBtn, shareBtn,
   shareCloseBtn, batchBtn, resultBody, modeBtns, smartBtn, themeToggle,
-  result, clearHistoryBtn, isTtsLang,
+  result, clearHistoryBtn, isTtsLang, hideError,
 } from './ui.js';
 import { runTranslate, runSmartTranslate, runBatch } from './translate.js';
 import {
