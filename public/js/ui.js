@@ -119,7 +119,14 @@ export function applyTheme(theme, save) {
 }
 
 export function currentTheme() {
-  return safeGet('aralink-theme') || 'dark';
+  const saved = safeGet('aralink-theme');
+  if (saved === 'light' || saved === 'dark') return saved;
+  // نفس منطق theme-init.js: بلا هذا كان الاحتياطي 'dark' يتجاوز تفضيل النظام
+  // فورَ الإقلاع، فيومض المستخدمُ الفاتحُ إلى الداكن بلا سبب.
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+  } catch { /* تجاهل */ }
+  return 'dark';
 }
 
 export function toggleTheme() {

@@ -27,6 +27,7 @@ export const MESSAGES = {
   'ocr-empty':             'لم يتم استخراج أي نص من الصورة',
   'smart-unavailable':     'الترجمة الذكية غير متوفرة حاليًا — تحقق من إعدادات Gemini',
   'server-error':          'خطأ غير متوقع — حاول لاحقًا',
+  'backend-unreachable':   'الخادم غير متاح — شغّل «npm run dev» وافتح http://localhost:3000 (فتح الملفات مباشرة أو عبر Live Server لا يشغّل الخادم)',
   'translate-failed':      'كل خدمات الترجمة رفضت الطلب (نفاد الحصة أو مفتاح غير صالح) — راجع مفاتيح .env أو أعد المحاولة بعد قليل',
   'parsing-error':         'حدث خطأ أثناء تحليل الاستجابة',
 };

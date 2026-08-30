@@ -1,109 +1,160 @@
 # Design System — AraLink (أداة الترجمة الذكية)
 
-This document defines the visual design system for the translation tool. All pages and components **must** follow these tokens and patterns.
+هذا المستند يعرّف نظام التصميم البصري لأداة الترجمة. كل الصفحات والمكوّنات
+**يجب** أن تتبع هذه الرموز والأنماط.
 
 ---
 
-## Product Personality
+## شخصية المنتج
 
-A modern, trustworthy, productivity tool. Dark-first, calm colors, generous spacing, crystal-clear feedback. The user's job is one action: paste a link → pick a language → read the result. Nothing else should compete for attention.
+أداة قراءة هادئة، لا لوحة تحكّم. منتجها الفعلي **نصٌّ عربيٌّ طويل يُقرأ**، فكل
+قرار بصري يخدم القراءة: لون مميّز واحد، هرمية بالمسافة والحجم لا بالحدود
+والظلال، وسلّم طباعي يجعل نصّ النتيجة أوضح عنصر في الصفحة. مهمة المستخدم فعل
+واحد: الصق رابطًا ← اختر لغة ← اقرأ. لا شيء آخر ينافس على الانتباه.
 
----
-
-## Core Layout
-
-- **Direction:** RTL (`dir="rtl"` on `<html>`), Arabic UI labels.
-- **Font:** "Cairo" or "Tajawal" from Google Fonts (headings 700/800 weight, body 400).
-- **Layout:** Single centered column, max-width 820px, generous vertical rhythm.
-- **Hero:** App name + tagline at top; the input card (URL field + language select + button) is the visual anchor.
-- **Result area:** appears below the input card after translation — two-tab view: "الترجمة" (translation) / "النص الأصلي" (original), or side-by-side on wide screens.
+الاتجاه: **فاتح افتراضيًا** (القراءة الطويلة)، ووضع داكن **مضبوط يدويًا** لا
+مقلوب آليًا. الاختيار محفوظ في `localStorage` (`aralink-theme`)، والافتراضي يتبع
+تفضيل النظام (`prefers-color-scheme`).
 
 ---
 
-## Colors
+## التخطيط
 
-Dark-first theme. Defined as CSS variables:
+- **الاتجاه:** RTL (`dir="rtl"` على `<html>`)، تسميات الواجهة بالعربية.
+- **الخط:** "Cairo" (العناوين 700، المتن 400).
+- **العرض:** عمود واحد، `max-width: 860px`.
+- **الترويسة:** شريط أفقي هادئ — الاسم يمين، أزرار الإعدادات/الوضع يسار، خطّ
+  سفلي فاصل. العنوان علامة لا لافتة.
+- **بطاقة الإدخال:** حقل الرابط + مبدّل اللغة + الزر. سطح أبيض/داكن بحدّ شعري
+  وظلّ خافت جدًا.
+- **منطقة النتيجة:** تظهر أسفل البطاقة — تبويبان «الترجمة» / «النص الأصلي»
+  بخطّ سفلي، ثم جسم النتيجة بعرض سطر محدود.
 
-| Token | Value | Usage |
+---
+
+## الألوان
+
+رموز CSS. لون مميّز **واحد** (نيلي هادئ)؛ ألوان الحالة محجوزة للحالات وحدها
+ولا تُستخدم للزينة.
+
+### فاتح (`:root`)
+
+| الرمز | القيمة | الاستخدام |
 |---|---|---|
-| `--bg` | `#0b1220` | Page background |
-| `--bg-card` | `#111a2e` | Cards, panels |
-| `--bg-input` | `#0d1526` | Input fields |
-| `--border` | `#1f2b45` | Borders, dividers |
-| `--text` | `#e6edf7` | Primary text |
-| `--text-muted` | `#8b9bb8` | Secondary text, placeholders |
-| `--primary` | `#6366f1` | Buttons, accents, focus |
-| `--primary-hover` | `#4f46e5` | Button hover |
-| `--accent` | `#22d3ee` | Links, highlights, progress |
-| `--success` | `#34d399` | Success states |
-| `--warning` | `#fbbf24` | Warnings |
-| `--danger` | `#f87171` | Errors |
-| `--gradient` | `linear-gradient(135deg,#6366f1,#8b5cf6)` | Hero title, primary CTA |
+| `--bg` | `#fbfaf8` | خلفية الصفحة |
+| `--bg-card` | `#ffffff` | البطاقات واللوحات |
+| `--bg-input` | `#f4f2ee` | الحقول |
+| `--bg-subtle` | `#f7f5f2` | أسطح ثانوية، حالات hover |
+| `--border` | `#e4e0d9` | الحدود والفواصل |
+| `--border-strong` | `#cdc7bd` | حدود hover |
+| `--text` | `#1c1a17` | النص الأساسي |
+| `--text-muted` | `#6b655c` | النص الثانوي، placeholder |
+| `--primary` | `#3d5a99` | الأزرار، التركيز، الحالة النشطة |
+| `--primary-hover` | `#2f4677` | hover الزر الأساسي |
+| `--primary-soft` | `rgba(61,90,153,.09)` | خلفية التركيز، الشارة النشطة |
+| `--accent` | = `--primary` | اسم موروث؛ صار درجةً من نفس العائلة |
+| `--success` | `#2f6b4f` | حالات النجاح |
+| `--warning` | `#8a6116` | التحذيرات |
+| `--danger` | `#a33232` | الأخطاء |
+| `--danger-soft` | `rgba(163,50,50,.07)` | خلفية بطاقة الخطأ |
+
+### داكن (`:root[data-theme='dark']`)
+
+يعيد تعريف الرموز نفسها فقط: `--bg #161513` · `--bg-card #1e1d1a` ·
+`--text #eceae6` · `--text-muted #a09a90` · `--primary #8fabe0`
+(أفتح للتباين على الداكن) · `--border #322f2b`.
+
+`--gradient` = `none` (أُزيل التدرّج البنفسجي القديم كليًا).
 
 ---
 
-## Typography
+## الطباعة
 
-- Headings: `font-weight: 800`, tight line-height (1.2).
-- Body: `font-size: 16px`, line-height 1.8 (Arabic needs taller line-height).
-- Small/helper text: `0.85rem`, muted color.
-- Monospace (`font-family: monospace`) for URLs and error codes.
+سلّم برموز، أساسه 16px:
 
----
+| الرمز | القيمة |
+|---|---|
+| `--step-0` | `1rem` — نصّ الواجهة |
+| `--step-1` | `1.125rem` — جسم النتيجة، عناوين فرعية |
+| `--step-2` | `1.3125rem` — عنوان النتيجة، عنوان التطبيق (جوال) |
+| `--step-3` | `1.625rem` — عنوان التطبيق |
+| `--step-4`..`--step-5` | `2rem` / `2.5rem` — احتياطي |
 
-## Components
-
-### Input Card (the hero)
-- White-translucent card (`background: rgba(17,26,46,.8)`, `backdrop-filter: blur(12px)`, radius 16px, border 1px `--border`).
-- URL input: full width, dark bg, `border-radius: 12px`, focus ring in `--primary`.
-- Language selector: custom `<select>` styled to match, with a searchable language list ("كل اللغات" = auto-detect target).
-- Primary button "ترجم الآن": gradient background, white text, `border-radius: 12px`, hover lifts (`transform: translateY(-1px)` + shadow).
-
-### Progress / States
-- **Loading:** three-pulse dots + step label ("جاري جلب المحتوى…", "جاري الترجمة…", "جاهز").
-- **Error:** inline alert card, `--danger` border, Arabic message + retry button. Never silent failures.
-- **Success:** green check badge + summary line ("تمت الترجمة من الإنجليزية إلى العربية").
-
-### Result Panel
-- Tabs (الترجمة / الأصلي) — pill-style toggle, active tab = `--primary` bg.
-- Translation body: white text on `--bg-card`, paragraphs preserved, `line-height: 1.9`.
-- YouTube mode: embedded player (`iframe`) + transcript below, each subtitle line translated, timestamped.
-- Download button: "تحميل SRT" when transcript mode.
-
-### Footer
-- Muted small text, Arabic, no clutter.
+- `--measure: 68ch` — عرض سطر القراءة المريح للعربية. جسم النتيجة يلتزم به.
+- جسم النتيجة: `--step-1` بارتفاع سطر `2` — أوسع من نصّ الواجهة عمدًا.
+- العناوين: وزن 700، `letter-spacing: -.01em`.
+- أحادي المسافة: `--font-mono` لأكواد الأخطاء وكتل الأوامر.
 
 ---
 
-## Spacing & Radius
+## المسافات والزوايا
 
-- Page padding: `32px` desktop / `16px` mobile.
-- Card padding: `24-28px`.
-- Radius scale: `8px` (small), `12px` (inputs/buttons), `16px` (cards).
-- Shadow: `0 12px 40px rgba(0,0,0,.35)` for elevated cards.
+رموز: `--space-1: 4px` … `--space-7: 48px`.
 
----
-
-## Motion
-
-- Transitions: `150-200ms ease` for hovers/focus.
-- Result reveal: fade + slight slide-up (`opacity 0→1`, `translateY 8px→0`).
-- No decorative animations — motion only communicates state.
+- حشو الصفحة: `--space-6` سطح المكتب / `--space-4` جوال.
+- حشو البطاقة: `--space-5`.
+- الزوايا: `--radius-sm: 6px` · `--radius-md: 10px` (حقول/أزرار) ·
+  `--radius-lg: 14px` (بطاقات).
+- الظلال خافتة جدًا: `--shadow-card` سطرٌ واحد بالكاد يُرى. الفصل بالحدّ
+  والمسافة لا بالارتفاع.
 
 ---
 
-## Accessibility
+## المكوّنات
 
-- All interactive elements keyboard-focusable with visible `--primary` ring.
-- Contrast: body text `#e6edf7` on `#0b1220` (well above AA).
-- Error messages via `role="alert"`.
-- Language select includes all ~100 languages, labeled in Arabic.
+### الأزرار
+
+- **`.btn-primary`**: خلفية `--primary` ممتلئة، نصّ أبيض (داكن `#14213d`).
+- **`.btn-secondary`**: شفاف بحدّ، hover يملأ بـ `--bg-subtle`.
+- **صفّ إجراءات النتيجة** (`.btn-srt` / `.btn-listen` / `.btn-action`): شكل
+  **واحد هادئ** — نصّ خافت، حدّ شعري، شفاف. لا لون لكل عائلة. المعنى من
+  التجميع في `.action-group` والترتيب، لا من الصبغ.
+- **`#dub-btn.active`**: الحالة الممتلئة الوحيدة في الصفّ (`--primary`) — لأن
+  الصوت الأصلي مكتوم، وهو تغيير صامت يجب أن يُرى.
+
+### التبويبات
+
+`.mode-toggle` و`.tabs`: خطّ سفلي (`border-bottom: 2px`) على النشط، لا حبّة
+ممتلئة. الصفحة تتكلم لهجة واحدة.
+
+### الحالات
+
+- **تحميل:** ثلاث نقاط نابضة صغيرة (`--primary`) + نصّ خطوة.
+- **خطأ:** بطاقة `role="alert"` بحدّ `--danger` وخلفية `--danger-soft`.
+  لا فشل صامت.
+- **الخادم غير متاح** (`#offline-banner`): يظهر حين يفشل `/api/health` — أي
+  حين فُتح التطبيق كملفات ثابتة بلا Node (Live Server، `file://`). يشرح
+  السبب والحلّ (`npm run dev` + `localhost:3000`) بدل الرسالة العامّة.
+
+### جسم النتيجة
+
+`.result-body`: `max-width: var(--measure)`، `--step-1`، سطر `2`. أهمّ عنصر
+في الصفحة.
 
 ---
 
-## What NOT to do
+## الحركة
 
-- No light mode for MVP (dark-only is intentional).
-- No sidebar navigation, no multi-page routing — single page app.
-- No autoplay of audio, no auto-scroll traps.
-- No English UI text (the product is Arabic-first; English only inside code).
+- انتقالات `150ms ease` للتحويم والتركيز.
+- ظهور النتيجة: تلاشٍ + انزلاق خفيف.
+- لا حركة زخرفية — الحركة تبلّغ حالة فقط.
+
+---
+
+## إمكانية الوصول
+
+- كل عنصر تفاعلي قابل للتركيز بلوحة المفاتيح، بحلقة `:focus-visible` ظاهرة
+  (`--primary`).
+- تباين المتن فوق AA في الوضعين.
+- رسائل الخطأ عبر `role="alert"`.
+- مبدّل اللغة يضمّ ~135 لغة موسومة بالعربية.
+
+---
+
+## ما لا يُفعل
+
+- لا تدرّجات بنفسجية، ولا توهّج خلفي، ولا `backdrop-filter`.
+- لا لون دلالي للزينة — الأخضر/الكهرماني/الأحمر للحالات فقط.
+- لا شريط جانبي، ولا توجيه متعدّد الصفحات.
+- لا تشغيل تلقائي للصوت، ولا فخاخ تمرير.
+- لا نصّ واجهة بالإنجليزية (المنتج عربي؛ الإنجليزية داخل الكود فقط).

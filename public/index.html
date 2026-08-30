@@ -21,15 +21,35 @@
 <body>
 
   <header class="site-header">
-    <div class="header-actions">
-      <button type="button" id="settings-btn" class="header-btn" aria-label="الإعدادات" title="الإعدادات">⚙️ الإعدادات</button>
-      <button type="button" id="theme-toggle" class="header-btn theme-toggle" aria-label="التبديل إلى الوضع الفاتح" title="تبديل الوضع الفاتح/الداكن">🌙</button>
+    <div class="app-brand">
+      <h1 class="app-title">أرا لينك</h1>
+      <p class="app-tagline">الصق أي رابط واحصل عليه مترجمًا</p>
     </div>
-    <h1 class="app-title">أرا لينك</h1>
-    <p class="app-tagline">الصق أي رابط واحصل عليه مترجمًا</p>
+    <div class="header-actions">
+      <button type="button" id="settings-btn" class="header-btn" aria-label="الإعدادات" title="الإعدادات">الإعدادات</button>
+      <!-- الأيقونة داخل .icon لأن applyTheme() في ui.js يبدّل نصّها؛ كانت الرموز
+           مكتوبة مباشرة في الزر فلم تكن تتبدّل أبدًا عند تغيير الوضع. -->
+      <button type="button" id="theme-toggle" class="header-btn theme-toggle" aria-label="تبديل الوضع الفاتح/الداكن" title="تبديل الوضع الفاتح/الداكن"><span class="icon">🌙</span></button>
+    </div>
   </header>
 
   <main class="container">
+
+    <!-- الخادم غير متاح: التطبيق مفتوح كملفات ثابتة (Live Server / file://) بلا
+         Node، فكل /api/* يفشل. بدون هذا الشريط تبدو الواجهة سليمة تمامًا
+         والأخطاء كلها تنهار إلى «خطأ غير متوقع» فيضيع السبب الحقيقي. -->
+    <section id="offline-banner" class="offline-banner" role="alert" hidden>
+      <h2 class="offline-title">الخادم غير متاح — التطبيق يعمل بلا واجهة برمجية</h2>
+      <p class="offline-text">
+        الترجمة والدبلجة والنطق كلها تحتاج خادم Node. يبدو أنك تفتح الملفات مباشرة
+        أو عبر Live Server، وهو يخدم الصفحات فقط بلا خادم.
+      </p>
+      <p class="offline-text">الطريقة الصحيحة للتشغيل، من مجلد المشروع:</p>
+      <pre class="offline-code" dir="ltr"><code>npm run dev</code></pre>
+      <p class="offline-text">
+        ثم افتح <a id="offline-link" class="offline-link" href="http://localhost:3000" dir="ltr">http://localhost:3000</a>
+      </p>
+    </section>
 
     <!-- مبدّل الوضع: رابط / نص سريع -->
     <div class="mode-toggle" role="tablist" aria-label="اختر وضع الترجمة">

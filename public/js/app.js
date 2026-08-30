@@ -23,13 +23,35 @@ import {
   setupFileMode, getGlossary,
 } from './features.js';
 
+/* ===== فحص توفّر الخادم =====
+   يُفتح التطبيق أحيانًا كملفات ثابتة (Live Server، أو نقرًا على index.html)،
+   فيفشل كل /api/* بينما تبدو الواجهة سليمة: قائمة اللغات تسقط إلى قائمة مضمّنة،
+   وكل الأخطاء تنهار إلى «خطأ غير متوقع». الفحص يجعل السبب ظاهرًا فورًا. */
+let backendOk = true;
+
+async function checkBackend() {
+  try {
+    const res = await fetch('/api/health', { cache: 'no-store' });
+    const data = await res.json();
+    backendOk = !!(data && data.ok);
+  } catch {
+    backendOk = false;
+  }
+  const banner = $('offline-banner');
+  if (banner) banner.hidden = backendOk;
+  return backendOk;
+}
+
 /* ===== تحميل اللغات ===== */
 async function loadLanguages() {
   try {
     const res  = await fetch('/api/languages');
     const data = await res.json();
-    if (data && data.languages) populateLangSelector(data.languages);
+    if (data && data.languages) return populateLangSelector(data.languages);
+    throw new Error('no-languages');
   } catch {
+    // قائمة مصغّرة حتى تبقى الواجهة قابلة للتصفّح — لكن الشريط أعلاه يوضّح
+    // أن الخادم غائب، فلا تُخفي هذه الحيلةُ العطلَ كما كانت تفعل سابقًا.
     populateLangSelector({
       ar:'العربية', en:'English', fr:'Français', es:'Español',
       de:'Deutsch', tr:'Türkçe', ur:'اردو',
@@ -142,6 +164,7 @@ compareBtn.addEventListener('click', () => {
 });
 
 /* ===== تحميلLangs + سجل + مشاركة ===== */
+checkBackend();
 loadLanguages();
 renderHistory();
 handleShareHash();
@@ -164,9 +187,12 @@ handleShareHash();
   } catch {}
 })();
 
-/* ===== تسجيل Service Worker ===== */
+/* ===== تسجيل Service Worker =====
+   مشروط بنجاح فحص الخادم: تسجيله على أصل بلا خادم (Live Server مثلًا) يخزّن
+   نسخة مكسورة تظلّ تُقدَّم بعد تشغيل الخادم الحقيقي — وهو سبب «لم يتغير شيء». */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  window.addEventListener('load', async () => {
+    if (!(await checkBackend())) return;
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
