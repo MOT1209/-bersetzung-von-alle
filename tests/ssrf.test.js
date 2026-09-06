@@ -8,7 +8,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const dns = require('node:dns');
 
-const { validatePublicUrl } = require('../server/ssrf');
+const { validatePublicUrl, ssrfSafeLookup } = require('../server/ssrf');
 
 async function expectBlocked(url, code = 'blocked-url') {
   await assert.rejects(
@@ -135,4 +135,110 @@ test('عنوان IPv4 عام حرفي → مسموح بلا DNS', async () => {
 test('https مقبول مثل http', async () => {
   const r = await validatePublicUrl('https://93.184.216.34/x?y=1');
   assert.equal(r.address, '93.184.216.34');
+});
+
+// ===== تثبيت الاتصال ضد إعادة ربط DNS (ssrfSafeLookup) =====
+// يُمرَّر كـ connect.lookup إلى undici، فيسلّم fetch العنوانَ المُتحقَّق نفسه بدل
+// إعادة حلّ DNS مستقلًّا. العقد: (hostname, options, callback) على نمط dns.lookup؛
+// undici ينادي بـ options.all=true فيتوقّع مصفوفة.
+function lookupAll(host) {
+  return new Promise((resolve, reject) => {
+    ssrfSafeLookup(host, { all: true }, (err, res) => (err ? reject(err) : resolve(res)));
+  });
+}
+function lookupSingle(host) {
+  return new Promise((resolve, reject) => {
+    ssrfSafeLookup(host, {}, (err, address, family) => (err ? reject(err) : resolve({ address, family })));
+  });
+}
+
+test('ssrfSafeLookup: اسم عام → يعيد العناوين المُتحقَّقة (all)', async () => {
+  const orig = dns.promises.lookup;
+  dns.promises.lookup = async () => [{ address: '93.184.216.34', family: 4 }];
+  try {
+    const list = await lookupAll('example.com');
+    assert.deepEqual(list, [{ address: '93.184.216.34', family: 4 }]);
+  } finally {
+    dns.promises.lookup = orig;
+  }
+});
+
+test('ssrfSafeLookup: صيغة المفرد تعيد أول عنوان مُتحقَّق', async () => {
+  const orig = dns.promises.lookup;
+  dns.promises.lookup = async () => [
+    { address: '93.184.216.34', family: 4 },
+    { address: '93.184.216.35', family: 4 },
+  ];
+  try {
+    const r = await lookupSingle('example.com');
+    assert.deepEqual(r, { address: '93.184.216.34', family: 4 });
+  } finally {
+    dns.promises.lookup = orig;
+  }
+});
+
+test('ssrfSafeLookup: اسم يُحلّ لعنوان داخلي → callback بخطأ blocked-url', async () => {
+  const orig = dns.promises.lookup;
+  dns.promises.lookup = async () => [{ address: '10.1.2.3', family: 4 }];
+  try {
+    await assert.rejects(() => lookupAll('intranet.example'), (e) => e.code === 'blocked-url');
+  } finally {
+    dns.promises.lookup = orig;
+  }
+});
+
+test('ssrfSafeLookup: إعادة ربط — عام يخفي داخليًا → يرفض الكل (blocked-url)', async () => {
+  const orig = dns.promises.lookup;
+  dns.promises.lookup = async () => [
+    { address: '93.184.216.34', family: 4 },
+    { address: '169.254.169.254', family: 4 },
+  ];
+  try {
+    await assert.rejects(() => lookupAll('rebind.example'), (e) => e.code === 'blocked-url');
+  } finally {
+    dns.promises.lookup = orig;
+  }
+});
+
+test('ssrfSafeLookup: فشل DNS → callback بخطأ invalid-url', async () => {
+  const orig = dns.promises.lookup;
+  dns.promises.lookup = async () => { throw new Error('ENOTFOUND'); };
+  try {
+    await assert.rejects(() => lookupAll('does-not-exist.invalid'), (e) => e.code === 'invalid-url');
+  } finally {
+    dns.promises.lookup = orig;
+  }
+});
+
+test('ssrfSafeLookup: عنوان حرفي عام يمرّ بلا DNS', async () => {
+  const r = await lookupSingle('93.184.216.34');
+  assert.deepEqual(r, { address: '93.184.216.34', family: 4 });
+});
+
+test('ssrfSafeLookup: عنوان حرفي داخلي → blocked-url بلا DNS', async () => {
+  await assert.rejects(() => lookupSingle('127.0.0.1'), (e) => e.code === 'blocked-url');
+});
+
+// ===== طرف-لطرف: إعادة ربط DNS عبر fetchArticleContent تفشل مغلقةً =====
+// عام وقت فحص validatePublicUrl، داخلي وقت بحث الاتصال المثبَّت → لا يُفتح أي مقبس.
+test('fetchArticleContent: إعادة ربط DNS إلى عنوان داخلي وقت الاتصال → تفشل مغلقةً', async () => {
+  const fetchContent = require('../server/fetchContent');
+  const orig = dns.promises.lookup;
+  let calls = 0;
+  dns.promises.lookup = async () => {
+    calls++;
+    // النداء الأول = فحص validatePublicUrl (يمرّ)؛ ما بعده = بحث الاتصال المثبَّت (داخلي)
+    return calls === 1
+      ? [{ address: '93.184.216.34', family: 4 }]
+      : [{ address: '169.254.169.254', family: 4 }];
+  };
+  try {
+    await assert.rejects(
+      () => fetchContent.fetchArticleContent('http://rebind.example/'),
+      (e) => e.code === 'fetch-failed' || e.code === 'blocked-url',
+      'إعادة الربط لعنوان داخلي وقت الاتصال يجب أن تفشل مغلقةً',
+    );
+  } finally {
+    dns.promises.lookup = orig;
+  }
 });

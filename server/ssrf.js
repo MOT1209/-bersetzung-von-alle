@@ -101,6 +101,52 @@ function isPublicAddress(addr) {
   return false;
 }
 
+function blockedError() {
+  const err = new Error('blocked-url');
+  err.code = 'blocked-url';
+  return err;
+}
+function invalidError() {
+  const err = new Error('invalid-url');
+  err.code = 'invalid-url';
+  return err;
+}
+
+// حلّ اسم المضيف وتحقق من كل عنوان يعيده — يعيد قائمة العناوين العامة المُتحقَّقة
+// (أو يرمي blocked-url/invalid-url). لا «إنقاذ»: عنوان داخلي واحد يرفض المجموعة.
+async function resolveValidatedAll(host) {
+  if (net.isIP(host)) {
+    if (!isPublicAddress(host)) throw blockedError();
+    return [{ address: host, family: net.isIP(host) }];
+  }
+  let addresses;
+  try {
+    addresses = await dns.promises.lookup(host, { all: true, verbatim: true });
+  } catch (e) {
+    throw invalidError();
+  }
+  if (!Array.isArray(addresses) || addresses.length === 0) throw invalidError();
+  for (const rec of addresses) {
+    if (!isPublicAddress(rec.address)) throw blockedError();
+  }
+  return addresses.map((a) => ({ address: a.address, family: a.family }));
+}
+
+// ===== بحث DNS آمن ضد SSRF للاستخدام كـ connect.lookup في undici Agent =====
+// يغلق ثغرة إعادة ربط DNS: بدل أن يحلّ fetch الاسمَ مرة ثانية مستقلًّا بعد فحص
+// validatePublicUrl (نافذة TOCTOU يستغلها مهاجم بـ TTL منخفض ليعيد عنوانًا عامًا
+// وقت الفحص وداخليًا وقت الاتصال)، يسلّم هذا البحثُ الاتصالَ العنوانَ نفسَه الذي
+// تحقّق منه للتوّ. يبقى اسم المضيف كما هو فيصحّ Host وSNI وتحقّق الشهادة.
+// عقد undici: يُستدعى عادةً بـ options.all=true فيتوقّع مصفوفة؛ ندعم الحالتين.
+function ssrfSafeLookup(hostname, options, callback) {
+  resolveValidatedAll(hostname)
+    .then((list) => {
+      if (options && options.all) return callback(null, list);
+      callback(null, list[0].address, list[0].family);
+    })
+    .catch((err) => callback(err));
+}
+
 // تحقق من أن الرابط عام وآمن للجلب — ترمي خطأ code='invalid-url' أو code='blocked-url'
 async function validatePublicUrl(url) {
   let parsed;
@@ -162,4 +208,4 @@ async function validatePublicUrl(url) {
   return { addresses };
 }
 
-module.exports = { validatePublicUrl };
+module.exports = { validatePublicUrl, ssrfSafeLookup };

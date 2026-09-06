@@ -30,6 +30,7 @@
     "msedge-tts": "^2.0.7",
     "sherpa-onnx": "^1.13.4",
     "tesseract.js": "^7.0.0",
+    "undici": "^7.29.0",
     "youtube-transcript": "^1.2.1"
   },
   "optionalDependencies": {
