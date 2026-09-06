@@ -18,6 +18,7 @@ process.env.STATS_LOG = path.join(os.tmpdir(), 'aralink-test-sse-stats-' + Date.
 
 const translate = require('../server/translate');
 const fetchContent = require('../server/fetchContent');
+const youtube = require('../server/youtube');
 const app = require('../server/server');
 
 const origDetect = translate.detectLanguage;
@@ -143,4 +144,58 @@ test('نص أطول من الحد → input-too-large كحدث', async () => {
   const { events } = await readStream({ text: 'a'.repeat(200001), targetLang: 'ar' });
   assert.equal(events[0].type, 'error');
   assert.equal(events[0].data.error, 'input-too-large');
+});
+
+// ===== محاذاة يوتيوب 1:1 في البثّ =====
+// بلا مفتاح Gemini في هذه البيئة يبقى المسار على ترجمات يوتيوب النصية
+// (geminiVideo.isAvailable() = false)، فنزيّف getTranscript فقط.
+// الحارس: streamYouTube أصبح يعيد استخدام translateBatch الصارمة بدل تكرار
+// parts[0] بصمت عند عدم تطابق عدد الأجزاء مع عدد الأسطر.
+
+const YT_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+
+test('يوتيوب/بثّ: عدم تطابق المحاذاة → حدث error (alignment-failed) لا نصّ مكرَّر', async () => {
+  const savedTranscript = youtube.getTranscript;
+  const savedMeta = translate.translateTextWithMeta;
+  // سطر واحد فقط، لكن الترجمة تعيد فقرتين (\n\n) → 2 أجزاء لسطر واحد = عدم تطابق
+  // لا يمكن إنقاذه بالتقسيم (سطر واحد)، فيجب أن يرفع alignment-failed.
+  youtube.getTranscript = async () => [{ text: 'Only one line.', offset: 0, duration: 1000 }];
+  translate.translateTextWithMeta = async () => ({
+    translated: 'جزء أول\n\nجزء ثانٍ',
+    chunksFromCache: 0,
+    chunksTotal: 1,
+  });
+  try {
+    const { events } = await readStream({ url: YT_URL, targetLang: 'ar' });
+    const err = events.find((e) => e.type === 'error');
+    assert.ok(err, 'توقعنا حدث error عند عدم تطابق المحاذاة');
+    assert.equal(err.data.error, 'alignment-failed');
+    // لا يجوز بثّ أي chunk غير محاذٍ قبل الفشل (السلوك القديم كان يبثّ «جزء أول»)
+    const chunks = events.filter((e) => e.type === 'chunk');
+    assert.equal(chunks.length, 0, 'بُثّ سطر غير محاذٍ قبل الفشل — تسرّب السلوك القديم');
+  } finally {
+    youtube.getTranscript = savedTranscript;
+    translate.translateTextWithMeta = savedMeta;
+  }
+});
+
+test('يوتيوب/بثّ: محاذاة صحيحة تبثّ chunk لكل سطر ثم done', async () => {
+  const savedTranscript = youtube.getTranscript;
+  youtube.getTranscript = async () => [
+    { text: 'A.', offset: 0, duration: 1000 },
+    { text: 'B.', offset: 1000, duration: 1000 },
+  ];
+  // الستب الافتراضي يعيد 'تر:'+النص المدموج، فينقسم على \n\n إلى سطرين مطابقين
+  try {
+    const { events } = await readStream({ url: 'https://youtu.be/dQw4w9WgXcQ', targetLang: 'ar' });
+    assert.equal(events[0].type, 'init');
+    assert.equal(events[0].data.type, 'youtube');
+    const chunks = events.filter((e) => e.type === 'chunk');
+    assert.equal(chunks.length, 2, `توقعنا chunk لكل سطر، وصل ${chunks.length}`);
+    chunks.forEach((c, i) => assert.equal(c.data.index, i));
+    assert.equal(events[events.length - 1].type, 'done');
+    assert.equal(events[events.length - 1].data.captions.length, 2);
+  } finally {
+    youtube.getTranscript = savedTranscript;
+  }
 });

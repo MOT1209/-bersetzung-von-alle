@@ -33,7 +33,7 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 
 ## ARCHITECTURE (follow unless user says otherwise)
 
-- **Frontend:** `public/index.html` + `public/style.css` + ES modules under `public/js/` (entry: `public/js/app.js`, loaded as `<script type="module">`). Arabic RTL, dark theme (see DESIGN.md). Only `public/` is served over HTTP; never move frontend assets to the project root. NOTE: `public/script.js` is the pre-modular monolith — superseded and slated for removal; do not edit it.
+- **Frontend:** `public/index.html` + `public/style.css` + ES modules under `public/js/` (entry: `public/js/app.js`, loaded as `<script type="module">`). Arabic RTL, dark theme (see DESIGN.md). Only `public/` is served over HTTP; never move frontend assets to the project root. NOTE: the pre-modular `public/script.js` monolith has been removed (commit `dc4d32d`) — the ES modules under `public/js/` are the sole frontend now.
 - **Backend:** Node.js + Express in `server/` — handles fetching (CORS), transcript extraction, translation
 - **YouTube:** `server/youtube.js` — uses `youtube-transcript` npm package
 - **Article/website fetching:** `server/fetchContent.js` — server-side fetch + cheerio/readability to extract main text
@@ -93,7 +93,6 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 │   ├── style.css      ← design system styles
 │   ├── js/            ← ES modules: app.js (entry), ui.js, translate.js, result.js,
 │   │                    media.js, features.js, stream.js, dashboard.js, utils.js, constants.js
-│   └── script.js      ← LEGACY pre-modular monolith (superseded — do not edit)
 ├── server/
 │   ├── server.js      ← Express app (routes, proxy, static serving of public/)
 │   ├── fetchContent.js← article/website extraction

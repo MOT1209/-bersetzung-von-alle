@@ -169,7 +169,7 @@ loadLanguages();
 renderHistory();
 handleShareHash();
 
-/* ===== فتح عبر الرابط外部 ===== */
+/* ===== فتح عبر رابط خارجي ===== */
 (function bootstrapFromQuery() {
   try {
     const params    = new URLSearchParams(location.search);
