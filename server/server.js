@@ -117,6 +117,10 @@ app.use(express.json({ limit: '2mb' }));
 // حد الطلبات مغطّى بخط الأساس على '/api' أعلاه (مطابق لـ /api/translate).
 app.use('/api', require('./routes-sse'));
 
+// ===== متابعة الوظائف — قبل compression عمدًا للسبب نفسه =====
+// '/api/jobs/:id/stream' بثّ SSE، والضاغط يخزّنه فيصل دفعة واحدة في النهاية.
+app.use('/api', require('./routes-jobs'));
+
 // ===== ضغط الاستجابات (يقلل حجم HTML/CSS/JS/JSON 60-80%) =====
 app.use(compression());
 

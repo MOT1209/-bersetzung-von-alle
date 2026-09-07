@@ -68,6 +68,13 @@ module.exports = {
   // أصلًا بـ 40 مقطعًا، فالسقف الأعلى هنا لا يوسّع سطح الإساءة كثيرًا.
   RATE_LIMIT_MAX_DUB: Number(process.env.RATE_LIMIT_MAX_DUB) || 60,
 
+  // ===== محرك الوظائف (server/jobs) =====
+  // سقف التزامن هو الحماية الحقيقية: العمل الثقيل مقيّد بالمعالج، وعشرة طلبات
+  // متزامنة بلا سقف تستهلك الجهاز بالكامل. 2 افتراض محافظ يناسب نسخة واحدة.
+  JOB_CONCURRENCY: Number(process.env.JOB_CONCURRENCY) || 2,
+  JOB_MAX_QUEUED: Number(process.env.JOB_MAX_QUEUED) || 50, // رفض صريح بدل نموّ ذاكرة
+  JOB_TTL_MS: Number(process.env.JOB_TTL_MS) || 3600000, // بقاء نتيجة الوظيفة ساعة
+
   // ===== فيديو محلي: أقصى مدة بالدقائق (الافتراضي 5 — STT بطيء ~5.5x المدة على هذا الجهاز) =====
   LOCAL_VIDEO_MAX_MIN: Number(process.env.LOCAL_VIDEO_MAX_MIN) || 5,
 };
