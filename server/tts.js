@@ -1,33 +1,68 @@
-// server/tts.js — تحويل النص إلى صوت mp3 (gTTS مجاني) ودمج المقاطع الطويلة بـ ffmpeg
-// ملاحظة: لا نستخدم msedge-tts — تم التحقق من أنه معطل في هذه البيئة.
+// server/tts.js — تنسيق تحويل النص إلى صوت: اختيار المزوّد + التقسيم + الدمج
+//
+// المنطق هنا **لا يعرف أي مزوّد بالاسم**. التعريفات في providers/tts/*.js خلف
+// واجهة TTSProvider (انظر providers/README.md)، وهذا الملف يتولّى ما هو مشترك:
+//   1) حدود المدخلات   2) التقسيم على حدود الجمل بحسب سقف المزوّد
+//   3) نداء المزوّد لكل قطعة   4) دمج المقاطع في mp3 واحد عبر ffmpeg
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
+const builtinProviders = require('./providers/tts');
 
 const execFileAsync = promisify(execFile);
 
-// ===== ثوابت =====
-const GTTs_URL = 'https://translate.google.com/translate_tts';
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-const MAX_TEXT_LEN = 5000; // حد أقصى لإجمالي النص
-const MAX_CHUNK_LEN = 180; // كل طلب gTTS لا يتحمل أكثر من ~180 حرفًا
-const REQUEST_TIMEOUT = 20000; // مهلة طلب gTTS (مللي ثانية)
+const MAX_TEXT_LEN = 5000; // حد أقصى لإجمالي النص المطلوب نطقه
+const DEFAULT_CHUNK_LEN = 180; // احتياطي لو لم يعلن المزوّد سقفًا
 const SENTENCE_BOUNDS = ['.', '!', '?', '؟', '…', '\n'];
 
-// ===== تقسيم النص إلى مقاطع ≤180 حرفًا على حدود الجمل =====
-function splitIntoChunks(text) {
+// ===== سجل مزوّدي النطق =====
+const providers = [];
+const providerById = {};
+
+function registerProvider(p) {
+  providers.push(p);
+  providerById[p.id] = p;
+}
+function getProviders() { return providers.slice(); }
+function getProvider(id) { return providerById[id]; }
+function getAvailableProviders() { return providers.filter((p) => p.isAvailable()); }
+
+// المزوّد الفعّال: المفروض في الطلب إن كان متاحًا، وإلا أول متاح بالترتيب
+function resolveProvider(id) {
+  if (id) {
+    const p = getProvider(id);
+    if (p && p.isAvailable()) return p;
+  }
+  const first = getAvailableProviders()[0];
+  if (!first) {
+    const err = new Error('tts-failed');
+    err.code = 'tts-failed';
+    throw err;
+  }
+  return first;
+}
+
+for (const p of builtinProviders) registerProvider(p);
+
+// ===== تقسيم النص إلى مقاطع على حدود الجمل =====
+// السقف الافتراضي من المزوّد الفعّال: سقف الطلب الواحد يخصّ المزوّد لا النظام.
+function splitIntoChunks(text, maxLen) {
+  let limit = maxLen;
+  if (!limit) {
+    const active = getAvailableProviders()[0];
+    limit = (active && active.maxChunkChars) || DEFAULT_CHUNK_LEN;
+  }
   const chunks = [];
   let remaining = text;
   while (remaining.length > 0) {
-    if (remaining.length <= MAX_CHUNK_LEN) {
+    if (remaining.length <= limit) {
       chunks.push(remaining);
       break;
     }
-    const slice = remaining.slice(0, MAX_CHUNK_LEN);
+    const slice = remaining.slice(0, limit);
     let cut = -1;
     for (let i = slice.length - 1; i >= 0; i--) {
       if (SENTENCE_BOUNDS.includes(slice[i])) {
@@ -35,24 +70,11 @@ function splitIntoChunks(text) {
         break;
       }
     }
-    if (cut <= 0) cut = MAX_CHUNK_LEN; // لا توجد حدود جمل → قص إجباري
+    if (cut <= 0) cut = limit; // لا توجد حدود جمل → قص إجباري
     chunks.push(remaining.slice(0, cut));
     remaining = remaining.slice(cut);
   }
   return chunks;
-}
-
-// ===== جلب mp3 لقطعة نصية واحدة من gTTS =====
-async function fetchChunk(text, lang) {
-  const url = `${GTTs_URL}?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(text)}`;
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-  });
-  if (!res.ok) throw new Error(`gTTS HTTP ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length === 0) throw new Error('gTTS returned empty audio');
-  return buf;
 }
 
 // ===== دمج مقاطع mp3 في ملف واحد عبر ffmpeg concat =====
@@ -60,7 +82,7 @@ async function concatMp3s(chunkBuffers) {
   if (chunkBuffers.length === 1) return chunkBuffers[0];
 
   const tmpDir = path.join(os.tmpdir(), 'aralink');
-  const stamp = randomUUID().slice(0,8);
+  const stamp = randomUUID().slice(0, 8);
   const listPath = path.join(tmpDir, `list-${stamp}.txt`);
   const outPath = path.join(tmpDir, `out-${stamp}.mp3`);
   const chunkFiles = [];
@@ -96,7 +118,8 @@ async function concatMp3s(chunkBuffers) {
 }
 
 // ===== الواجهة الرئيسية: نص → Buffer mp3 واحد =====
-async function textToMp3Buffer(text, lang = 'ar') {
+// opts اختياري: { provider?: string } — فرض مزوّد بعينه
+async function textToMp3Buffer(text, lang = 'ar', opts) {
   if (typeof text !== 'string' || text.trim().length === 0) {
     const err = new Error('invalid-text');
     err.code = 'invalid-text';
@@ -109,11 +132,12 @@ async function textToMp3Buffer(text, lang = 'ar') {
     throw err;
   }
 
-  const chunks = splitIntoChunks(clean);
+  const provider = resolveProvider(opts && opts.provider);
+  const chunks = splitIntoChunks(clean, provider.maxChunkChars);
   const buffers = [];
   try {
     for (const chunk of chunks) {
-      buffers.push(await fetchChunk(chunk, lang));
+      buffers.push(await provider.synthesize(chunk, lang));
     }
   } catch (err) {
     const wrapped = new Error(`tts-failed: ${err.message}`);
@@ -123,4 +147,13 @@ async function textToMp3Buffer(text, lang = 'ar') {
   return concatMp3s(buffers);
 }
 
-module.exports = { textToMp3Buffer, splitIntoChunks };
+module.exports = {
+  textToMp3Buffer,
+  splitIntoChunks,
+  // ===== سجل المزوّدين =====
+  registerProvider,
+  getProviders,
+  getProvider,
+  getAvailableProviders,
+  resolveProvider,
+};
