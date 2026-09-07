@@ -36,6 +36,7 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 - **Frontend:** `public/index.html` + `public/style.css` + ES modules under `public/js/` (entry: `public/js/app.js`, loaded as `<script type="module">`). Arabic RTL, dark theme (see DESIGN.md). Only `public/` is served over HTTP; never move frontend assets to the project root. NOTE: the pre-modular `public/script.js` monolith has been removed (commit `dc4d32d`) — the ES modules under `public/js/` are the sole frontend now.
 - **Backend:** Node.js + Express in `server/` — handles fetching (CORS), transcript extraction, translation
 - **YouTube:** `server/youtube.js` — uses `youtube-transcript` npm package
+- **YouTube (official/compliant):** `server/youtubeApi.js` + `routes-youtube.js` — YouTube Data API v3 `videos.list` for metadata (API key only, 1 quota unit). It CANNOT fetch caption text: `captions.download` requires OAuth as the video owner and returns 403 for any third party by design. Content for translation must come from a user upload (`/api/video-local`). Never add a caption-download path here.
 - **Article/website fetching:** `server/fetchContent.js` — server-side fetch + cheerio/readability to extract main text
 - **Translation:** `server/translate.js` — unified provider registry (Google → MyMemory → Libre → Gemini → DeepL → zen), auto-fallback + per-engine cooldown; language detection via the free Google endpoint
 - **Config:** `.env` for API keys (NEVER commit real keys)

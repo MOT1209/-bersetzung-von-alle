@@ -18,6 +18,14 @@ module.exports = {
   // حد المدة: ~300 رمز لكل ثانية فيديو، والحصة المجانية 8 ساعات يوميًا
   MAX_VIDEO_MINUTES: Number(process.env.MAX_VIDEO_MINUTES) || 20,
 
+  // ===== YouTube Data API v3 الرسمي (المسار المتوافق) =====
+  // مفتاح API وحده يكفي لبيانات الفيديوهات العامة (videos.list = وحدة واحدة من
+  // حصة 10,000/يوم). لا يمنح نص الترجمات: captions.download يتطلب OAuth بحساب
+  // مالك الفيديو ويعيد 403 لأي طرف ثالث — انظر server/youtubeApi.js.
+  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || '',
+  // قابل للتغيير كي توجّهه الاختبارات إلى خادم محلي (لا شبكة في الاختبارات)
+  YOUTUBE_API_BASE: process.env.YOUTUBE_API_BASE || 'https://www.googleapis.com/youtube/v3',
+
   // محركات الترجمة الاحتياطية المجانية (تُستخدم عند حجب Google أو استنفاد حصته)
   LIBRE_URL: process.env.LIBRE_URL || 'https://libretranslate.com', // خادم LibreTranslate (اختياري)
   MYMEMORY_EMAIL: process.env.MYMEMORY_EMAIL || '', // بريد اختياري يرفع حصة MyMemory اليومية

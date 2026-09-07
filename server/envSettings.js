@@ -22,6 +22,7 @@ const SETTING_KEYS = [
   'ZEN_BASE_URL',
   'ZEN_MODEL',
   'PROVIDER_ORDER',
+  'YOUTUBE_API_KEY',
 ];
 
 // ===== قراءة ملف .env: يعيد المحتوى الخام + خريطة المفاتيح =====
@@ -66,6 +67,8 @@ async function getSettings() {
     hasZenKey: Boolean(zenKey),
     zenBaseUrl: map.ZEN_BASE_URL || '',
     zenModel: map.ZEN_MODEL || '',
+    hasYoutubeKey: Boolean(map.YOUTUBE_API_KEY),
+    youtubeKey: map.YOUTUBE_API_KEY ? maskKey(map.YOUTUBE_API_KEY) : '',
     providerOrder: map.PROVIDER_ORDER || '',
   };
 }
@@ -151,6 +154,7 @@ async function saveSettings(body) {
     if (key === 'ZEN_BASE_URL') config.ZEN_BASE_URL = value;
     if (key === 'ZEN_MODEL') config.ZEN_MODEL = value;
     if (key === 'PROVIDER_ORDER') config.PROVIDER_ORDER = value;
+    if (key === 'YOUTUBE_API_KEY') config.YOUTUBE_API_KEY = value;
   }
 
   return { ok: true };
