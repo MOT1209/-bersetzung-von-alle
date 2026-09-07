@@ -68,6 +68,14 @@ module.exports = {
   // أصلًا بـ 40 مقطعًا، فالسقف الأعلى هنا لا يوسّع سطح الإساءة كثيرًا.
   RATE_LIMIT_MAX_DUB: Number(process.env.RATE_LIMIT_MAX_DUB) || 60,
 
+  // ===== التخزين والمشاريع (P3) =====
+  // مفاتيح لا مسارات: تغيير السائق إلى S3/R2 لاحقًا لا يمسّ أي مستدعٍ.
+  STORAGE_DRIVER: process.env.STORAGE_DRIVER || 'local',
+  STORAGE_DIR: process.env.STORAGE_DIR || path.join(__dirname, '..', 'cache', 'storage'),
+  // قاعدة بيانات SQLite عبر node:sqlite المدمج (بلا تبعية ولا بناء أصلي —
+  // وهو ما يهمّ هنا تحديدًا: الوحدات الأصلية سبق أن كسرت إقلاع صورة Docker).
+  DB_FILE: process.env.DB_FILE || path.join(__dirname, '..', 'cache', 'aralink.db'),
+
   // ===== محرك الوظائف (server/jobs) =====
   // سقف التزامن هو الحماية الحقيقية: العمل الثقيل مقيّد بالمعالج، وعشرة طلبات
   // متزامنة بلا سقف تستهلك الجهاز بالكامل. 2 افتراض محافظ يناسب نسخة واحدة.

@@ -63,7 +63,12 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 
 ## DATABASE
 
-- No database needed for MVP — this is a stateless tool. Do not add Postgres/ORM unless the user explicitly asks for history/saving features.
+- SQLite via Node's built-in `node:sqlite` (P3), file at `DB_FILE` (default `cache/aralink.db`). No ORM, no database server, no native build — that last point matters because a missing native dependency has previously stopped the server booting inside Docker.
+- ALL SQL lives in `server/db/`. Routes and core never write a query, so moving to Postgres later touches two files.
+- `PRAGMA foreign_keys = ON` is required: SQLite disables it by default, and without it `ON DELETE CASCADE` silently does nothing and orphan rows survive.
+- `node:sqlite` is experimental in Node 22 and prints an ExperimentalWarning at boot. Accepted deliberately; the repository layer contains the risk.
+- Schema changes go in `server/db/migrations.js` as a NEW entry appended to the list. Never edit an applied migration.
+- **Storage:** files go through `server/providers/storage/` by KEY, never by path. User-supplied filenames must never form part of a storage key; generate the key and keep the original name in `meta`.
 
 ## TESTING
 

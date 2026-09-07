@@ -171,6 +171,10 @@ app.use('/api', ttsRouter);
 app.use('/api/dub', createRateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, max: config.RATE_LIMIT_MAX_DUB }));
 app.use('/api', require('./routes-dub'));
 
+// ===== المشاريع (البند 30) — تحت الحد الأثقل: الرفع يكتب على القرص =====
+app.use('/api/projects', heavyLimiter);
+app.use('/api', require('./routes-projects'));
+
 // ===== بيانات يوتيوب الوصفية (الواجهة الرسمية — المسار المتوافق) =====
 // طلب خفيف (وحدة واحدة من حصة يوتيوب) لكنه يستهلك حصة خارجية، فيبقى تحت الحد الأثقل.
 app.use('/api/youtube', heavyLimiter);
