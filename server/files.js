@@ -8,7 +8,7 @@ const translate = require('./translate');
 const mammoth = require('mammoth'); // قراءة DOCX
 const ExcelJS = require('exceljs'); // قراءة XLSX
 const { XMLParser, XMLBuilder } = require('fast-xml-parser'); // قراءة/بناء XML
-const JSZip = require('jszip'); // قراءة PPTX (وEPUB احتياطيًا)
+const JSZip = require('jszip'); // قراءة PPTX وEPUB (كلاهما أرشيف ZIP)
 
 // الصيغ المدعومة للاستيراد (11) — تُكتشف من امتداد الملف
 const SUPPORTED_IMPORT = ['txt', 'md', 'docx', 'xlsx', 'csv', 'srt', 'vtt', 'json', 'xml', 'epub', 'pptx'];
@@ -31,6 +31,77 @@ function codeError(code) {
   const e = new Error(code);
   e.code = code;
   return e;
+}
+
+// ===== أدوات أرشيف ZIP (PPTX وEPUB) =====
+
+// حدّ فكّ الضغط — الحماية من «قنبلة ZIP».
+// السبب: كانت قراءة EPUB تمرّ عبر epub2 → adm-zip، وفيها ثغرة تجعل ملفًا مُصاغًا
+// يستهلك 4GB من الذاكرة. الثغرة كانت **قابلة للوصول من مدخلات المستخدم** لأن
+// /api/translate-file يقبل رفع EPUB. أُزيلت التبعية وحلّ محلها JSZip بميزانية
+// صريحة: نرفض بناءً على الحجم المُعلَن في فهرس ZIP قبل تخصيص أي ذاكرة، ثم
+// نحاسب الإجمالي فعليًا بعد الفكّ — فلا يتمدّد ملف صغير بلا حدّ.
+const MAX_ZIP_DECOMPRESSED = 64 * 1024 * 1024; // 64MB لكل ملف مرفوع
+
+// يعيد دالة قراءة تتقاسم ميزانية واحدة عبر كل مدخلات الأرشيف
+function makeZipReader(max = MAX_ZIP_DECOMPRESSED) {
+  let used = 0;
+  return async function readEntry(zip, name) {
+    if (!name) return '';
+    const entry = zip.file(name);
+    if (!entry) return '';
+    // الحجم المُعلَن في الفهرس — رفض مبكر قبل الفكّ (JSZip داخلي، لذا فحص دفاعي)
+    const declared = entry._data && entry._data.uncompressedSize;
+    if (typeof declared === 'number' && used + declared > max) {
+      throw codeError('input-too-large');
+    }
+    const text = await entry.async('string');
+    used += Buffer.byteLength(text, 'utf8');
+    if (used > max) throw codeError('input-too-large');
+    return text;
+  };
+}
+
+// fast-xml-parser يعيد كائنًا مفردًا حين يوجد عنصر واحد ومصفوفة حين يوجد أكثر
+function asArray(v) {
+  if (v === undefined || v === null) return [];
+  return Array.isArray(v) ? v : [v];
+}
+
+// تطبيع مسار داخل الأرشيف: href نسبي إلى مجلد ملف OPF، مع إسقاط '#fragment'
+// ومعالجة '..' و'.' حتى لا يشير المسار خارج الأرشيف
+function resolveZipPath(baseDir, href) {
+  const clean = String(href || '').split('#')[0].split('?')[0];
+  if (!clean) return '';
+  if (clean.startsWith('/')) return clean.replace(/^\/+/, '');
+  const out = [];
+  for (const seg of (baseDir + clean).split('/')) {
+    if (!seg || seg === '.') continue;
+    if (seg === '..') { out.pop(); continue; }
+    out.push(seg);
+  }
+  return out.join('/');
+}
+
+// HTML → نص عادي (فصول EPUB). يُسقط script/style أولًا حتى لا يتسرّب الكود
+// إلى الترجمة، ثم يحوّل حدود الفقرات إلى أسطر ويفكّ الكيانات الشائعة.
+function htmlToPlainText(html) {
+  return String(html || '')
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    // وسم الفتح (<p>) يصير مسافة، فتبدأ كل فقرة بمسافة دخيلة — تُقصّ هنا
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n\s*\n+/g, '\n')
+    .trim();
 }
 
 // هل القيمة النصية قابلة للترجمة؟ (مرآة isUntranslatable في translate.js لكن للقيم النصية)
@@ -185,13 +256,14 @@ async function extractPptxText(buffer) {
   } catch {
     throw codeError('invalid-file');
   }
+  const read = makeZipReader(); // نفس ميزانية فكّ الضغط المطبَّقة على EPUB
   const slideFiles = Object.keys(zip.files)
     .filter((name) => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
     .sort((a, b) => Number(a.match(/slide(\d+)\.xml/i)[1]) - Number(b.match(/slide(\d+)\.xml/i)[1]));
   if (!slideFiles.length) throw codeError('invalid-file');
   const parts = [];
   for (const name of slideFiles) {
-    const xml = await zip.file(name).async('string');
+    const xml = await read(zip, name);
     const texts = [];
     // \b بعد t يمنع مطابقة <a:tbl> أو <a:title> بالخطأ
     const re = /<a:t\b[^>]*>([\s\S]*?)<\/a:t>/g;
@@ -206,34 +278,58 @@ async function extractPptxText(buffer) {
   return parts.join('\n\n');
 }
 
-// EPUB: قراءة الفصول عبر epub2 (يستقبل Buffer عبر adm-zip) وتنظيف HTML
+// EPUB: أرشيف ZIP يحوي فصول XHTML — يُقرأ عبر JSZip مباشرةً بلا epub2/adm-zip.
+// المسار القياسي: META-INF/container.xml → ملف OPF → ترتيب <spine> → الفصول.
+// نتبع spine لا ترتيب manifest، لأن spine هو ترتيب القراءة الفعلي.
 async function extractEpubText(buffer) {
-  const { EPub } = require('epub2'); // تحميل كسول — لا يُحمَّل إلا عند الحاجة
-  let epub;
+  let zip;
   try {
-    epub = await EPub.createAsync(buffer);
+    zip = await JSZip.loadAsync(buffer);
   } catch {
     throw codeError('invalid-file');
   }
-  if (!epub.flow || !epub.flow.length) throw codeError('invalid-file');
+  const read = makeZipReader();
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+
+  const parseXml = (xml) => {
+    try {
+      return parser.parse(xml);
+    } catch {
+      throw codeError('invalid-file');
+    }
+  };
+
+  // 1) container.xml → مسار ملف OPF
+  const containerXml = await read(zip, 'META-INF/container.xml');
+  if (!containerXml) throw codeError('invalid-file');
+  const container = parseXml(containerXml);
+  const opfPath = asArray(container && container.container && container.container.rootfiles
+    && container.container.rootfiles.rootfile)
+    .map((r) => r && r['@_full-path'])
+    .find(Boolean);
+  if (!opfPath) throw codeError('invalid-file');
+
+  // 2) OPF → manifest (id → href) وspine (ترتيب القراءة)
+  const opfXml = await read(zip, resolveZipPath('', opfPath));
+  if (!opfXml) throw codeError('invalid-file');
+  const pkg = parseXml(opfXml);
+  const root = (pkg && pkg.package) || {};
+  const manifest = {};
+  for (const item of asArray(root.manifest && root.manifest.item)) {
+    if (item && item['@_id'] && item['@_href']) manifest[item['@_id']] = item['@_href'];
+  }
+  const spine = asArray(root.spine && root.spine.itemref)
+    .map((r) => r && r['@_idref'])
+    .filter(Boolean);
+  if (!spine.length) throw codeError('invalid-file');
+
+  // 3) الفصول بترتيب spine — href نسبي إلى مجلد ملف OPF
+  const baseDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
   const parts = [];
-  for (const chapter of epub.flow) {
-    const html = await new Promise((resolve) => {
-      epub.getChapter(chapter.id, (err, text) => resolve(err ? '' : text));
-    });
-    const plain = String(html || '')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/(p|div|h[1-6]|li)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&lt;/gi, '<')
-      .replace(/&gt;/gi, '>')
-      .replace(/&quot;/gi, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n\s*\n+/g, '\n')
-      .trim();
+  for (const idref of spine) {
+    const href = manifest[idref];
+    if (!href) continue;
+    const plain = htmlToPlainText(await read(zip, resolveZipPath(baseDir, href)));
     if (plain) parts.push(plain);
   }
   if (!parts.length) throw codeError('invalid-file');
@@ -594,6 +690,12 @@ module.exports = {
   SUPPORTED_EXPORT,
   MAX_FILE_CHARS,
   MAX_CELLS,
+  // ===== أدوات ZIP/EPUB — مُصدَّرة للاختبار المباشر =====
+  MAX_ZIP_DECOMPRESSED,
+  makeZipReader,
+  resolveZipPath,
+  htmlToPlainText,
+  extractEpubText,
   parseSubtitle,
   buildSubtitle,
   formatClock,

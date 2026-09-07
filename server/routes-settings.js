@@ -1,5 +1,5 @@
 // server/routes-settings.js — مسارات API للإعدادات (قراءة/حفظ مفاتيح .env)
-// يُركّب على /api/settings في server.js بدون حد طلبات (يقرأ/يكتب ملفًا محليًا فقط)
+// يُركّب على /api/settings في server.js خلف requireAdmin + heavyLimiter
 const express = require('express');
 const { getSettings, saveSettings } = require('./envSettings');
 const { getRules, addRule, removeRule } = require('./extractionRules');
