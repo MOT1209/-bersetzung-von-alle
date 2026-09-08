@@ -12,6 +12,8 @@
 const express = require('express');
 const { randomUUID } = require('crypto');
 const repo = require('./db/projects');
+const jobs = require('./jobs');
+const pipeline = require('./projectPipeline'); // يسجّل معالج الوظيفة عند تحميله
 const { storage } = require('./providers/storage');
 
 const router = express.Router();
@@ -24,6 +26,7 @@ const ERROR_STATUS = {
   'invalid-storage-key': 400,
   'project-not-found': 404,
   'asset-not-found': 404,
+  'queue-full': 503,
   'server-error': 500,
 };
 
@@ -156,6 +159,40 @@ router.delete('/projects/:id/assets/:assetId', async (req, res) => {
     }
     await repo.deleteAsset(asset.id);
     res.json({ deleted: true, id: asset.id });
+  } catch (e) {
+    return sendError(res, e);
+  }
+});
+
+// ===== تشغيل خط المعالجة على أصل وسائط =====
+// POST /api/projects/:id/process  body: { assetId, targetLang? }
+// يعيد 202 ومعرّف وظيفة: العمل أثقل من عمر طلب HTTP، فيُتابع عبر /api/jobs/:id
+router.post('/projects/:id/process', (req, res) => {
+  try {
+    const project = repo.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: 'project-not-found' });
+
+    const { assetId, targetLang = 'ar' } = req.body || {};
+    const asset = repo.getAsset(assetId);
+    // الأصل يجب أن ينتمي للمشروع: بدونه يصير معرّف الأصل مفتاحًا لمعالجة أي ملف
+    if (!asset || asset.projectId !== project.id) {
+      return res.status(404).json({ error: 'asset-not-found' });
+    }
+    if (asset.kind !== 'media') {
+      return res.status(400).json({ error: 'invalid-asset' });
+    }
+
+    const job = jobs.enqueue(pipeline.JOB_TYPE, {
+      projectId: project.id,
+      assetId: asset.id,
+      targetLang,
+    });
+    res.status(202).json({
+      jobId: job.id,
+      status: job.status,
+      statusUrl: `/api/jobs/${job.id}`,
+      streamUrl: `/api/jobs/${job.id}/stream`,
+    });
   } catch (e) {
     return sendError(res, e);
   }
