@@ -12,6 +12,7 @@ import {
   startCaptionSync,
 } from './media.js';
 import { stopDubbing } from './dub.js';
+import { isRtlText } from './localEngine.mjs';
 
 /* ---------- عرض النتيجة حسب النوع ---------- */
 export function renderResult(data) {
@@ -170,6 +171,7 @@ function renderParagraphs(text) {
   String(text || '').split(/\n{2,}/).forEach((p) => {
     const el = document.createElement('p');
     el.className = 'blk';
+    el.dir = isRtlText(p) ? 'rtl' : 'ltr'; // اتجاه كل فقرة حسب أول حرف قوي
     el.textContent = p;
     resultBody.appendChild(el);
   });
@@ -200,12 +202,14 @@ function renderCompareView(data) {
     if (ob) {
       const el = document.createElement('p');
       el.className = 'blk' + (ob.type === 'heading' ? ' blk-heading' : '');
+      el.dir = isRtlText(ob.content) ? 'rtl' : 'ltr';
       el.textContent = ob.content;
       colA.appendChild(el);
     }
     if (tb) {
       const el = document.createElement('p');
       el.className = 'blk' + (tb.type === 'heading' ? ' blk-heading' : '');
+      el.dir = isRtlText(tb.content) ? 'rtl' : 'ltr';
       el.textContent = tb.content;
       colB.appendChild(el);
     }

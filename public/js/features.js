@@ -3,11 +3,16 @@ import { state, safeGet, safeSet, postJson, detectArabic } from './utils.js';
 import {
   tashkeelBtn,
   glossaryFrom, glossaryTo, glossaryAddBtn, glossaryListEl,
+  glossaryImportBtn, glossaryImportInput, glossaryImportStatus,
+  glossaryLoadEn, glossaryLoadAr,
   ruleDomain, ruleSelector, ruleAddBtn, ruleListEl,
   settingsBtn, settingsModal, settingsForm, settingsCancelBtn, settingsCloseBtn,
   historyListEl,
   showToast, showError, hideProgress, showProgress,
 } from './ui.js';
+import {
+  normalizeDictionary, translateWithDictionary, isRtlText, setDebug,
+} from './localEngine.mjs';
 
 /* ========== سجل الترجمات ========== */
 function loadHistory() {
@@ -77,13 +82,28 @@ export function handleShareHash() {
   } catch {}
 }
 
-/* ========== المسرد ========== */
+/* ========== المسرد ==========
+ * مخزنان في localStorage:
+ *  - 'aralink-glossary': أزواج يدوية يضيفها المستخدم زوجًا زوجًا (حد 100)
+ *  - 'aralink-glossary-imported': قاموس كامل مُستورد من ملف JSON (حد 20000 —
+ *    نفس maxEntries في localEngine.mjs). تخزين منفصل لأن حد الأزواج اليدوية
+ *    كان سيقتطع القاموس المستورد بصمت.
+ * getGlossary() يجمعهما — الأزواج اليدوية أولاً — فيُرسلان مع كل ترجمة.
+ */
 function loadGlossary() {
   try { return JSON.parse(safeGet('aralink-glossary') || '[]'); } catch { return []; }
 }
 function saveGlossary(list) { safeSet('aralink-glossary', JSON.stringify(list.slice(0, 100))); }
 
-export function getGlossary() { return loadGlossary(); }
+function loadImportedDict() {
+  try { return JSON.parse(safeGet('aralink-glossary-imported') || '{}'); } catch { return {}; }
+}
+function saveImportedDict(dict) { safeSet('aralink-glossary-imported', JSON.stringify(dict)); }
+
+export function getGlossary() {
+  const imported = Object.entries(loadImportedDict()).map(([from, to]) => ({ from, to }));
+  return loadGlossary().concat(imported);
+}
 
 function renderGlossaryList() {
   const list = loadGlossary();
@@ -138,6 +158,124 @@ export function initGlossary() {
   glossaryAddBtn.addEventListener('click', addGlossaryPair);
   glossaryFrom.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); glossaryTo.focus(); } });
   glossaryTo.addEventListener('keydown',   (e) => { if (e.key === 'Enter') { e.preventDefault(); addGlossaryPair(); } });
+  setupGlossaryImport();
+}
+
+/* ========== استيراد قاموس JSON مخصص ==========
+ * يُرفع ملف JSON، يُتحقق من سلامته (نوع، مفاتيح نصية، حجم معقول)، ثم يُدمج
+ * في الذاكرة — كأزواج مسرد في localStorage تُرسل مع كل ترجمة، وبوصف محلي
+ * يترجم النص في المتصفح فورًا دون إعادة تحميل الصفحة.
+ */
+const GLOSSARY_IMPORT_MAX_BYTES = 2 * 1024 * 1024; // 2MB — قاموس كامل بلا مشقة
+
+// أزواج المسرد تُخزّن كقائمة؛ نجمعها هنا لدمج القاموس المرفوع فوقها
+function glossaryPairsToDict(list) {
+  const dict = {};
+  for (const p of list) {
+    if (p && typeof p.from === 'string' && typeof p.to === 'string') dict[p.from] = p.to;
+  }
+  return dict;
+}
+
+function dictToGlossaryPairs(dict) {
+  return Object.entries(dict).map(([from, to]) => ({ from, to }));
+}
+
+function setImportStatus(text, isError) {
+  glossaryImportStatus.textContent = text;
+  glossaryImportStatus.classList.toggle('import-err', !!isError);
+  glossaryImportStatus.hidden = !text;
+}
+
+// ترجمة محلية فورية للنتيجة المعروضة (إن وُجدت) — يرى المستخدم أثر القاموس حالًا
+function applyLocalDictToCurrentResult(dict) {
+  const data = state.current;
+  if (!data) return;
+  const src = data.type === 'youtube'
+    ? (data.captions || []).map((c) => c.original || '').join('\n')
+    : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n') || data.translated || '';
+  if (!src) return;
+  const out = translateWithDictionary(src, dict);
+  if (data.type === 'youtube') {
+    (data.captions || []).forEach((c) => { c.translated = c.original || ''; });
+  }
+  const body = document.getElementById('result-body');
+  if (body) {
+    body.innerHTML = '';
+    String(out).split(/\n{2,}/).forEach((p) => {
+      const el = document.createElement('p');
+      el.className = 'blk';
+      el.dir = isRtlText(p) ? 'rtl' : 'ltr';
+      el.textContent = p;
+      body.appendChild(el);
+    });
+  }
+}
+
+async function loadSampleDictionary(which) {
+  const file = which === 'ar' ? 'ar.json' : 'en.json';
+  setImportStatus('جاري تحميل القاموس النموذجي…', false);
+  glossaryImportBtn.disabled = true;
+  try {
+    const res = await fetch('/locales/' + file, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    mergeImportedDictionary(json, file);
+  } catch (e) {
+    console.error('[glossary-import] فشل تحميل القاموس النموذجي:', e);
+    setImportStatus('تعذر تحميل القاموس النموذجي — تحقق من اتصال الخادم', true);
+  } finally {
+    glossaryImportBtn.disabled = false;
+  }
+}
+
+// الدمج: القاموس المرفوع يُطبَّع (lowercase) ثم يُحفظ في مخزن المستوردات،
+// ويُدمج فوق الأزواج اليدوية عند الإرسال (الأزواج اليدوية لها الأولوية)
+function mergeImportedDictionary(raw, name) {
+  let dict;
+  try {
+    dict = normalizeDictionary(raw); // يرمي invalid-dictionary إن لم يصلح
+  } catch {
+    setImportStatus('ملف غير صالح: يجب أن يكون JSON كائنًا بمفاتيح نصية وقيم نصية غير فارغة', true);
+    return;
+  }
+  const entries = Object.keys(dict).length;
+  saveImportedDict(dict);
+  setImportStatus('تم استيراد ' + entries + ' مدخلة من ' + name + ' ✓', false);
+  showToast('تم استيراد القاموس (' + entries + ' مدخلة) ✓');
+  applyLocalDictToCurrentResult({ ...dict, ...glossaryPairsToDict(loadGlossary()) });
+}
+
+function setupGlossaryImport() {
+  glossaryImportBtn.addEventListener('click', () => glossaryImportInput.click());
+
+  glossaryImportInput.addEventListener('change', () => {
+    const file = glossaryImportInput.files && glossaryImportInput.files[0];
+    glossaryImportInput.value = ''; // نفس الملف قابل لإعادة الرفع
+    if (!file) return;
+    if (file.size > GLOSSARY_IMPORT_MAX_BYTES) {
+      setImportStatus('الملف أكبر من الحد المسموح (2 ميغابايت)', true);
+      return;
+    }
+    setImportStatus('جاري التحقق من الملف…', false);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        mergeImportedDictionary(JSON.parse(String(reader.result)), file.name);
+      } catch (e) {
+        console.error('[glossary-import] JSON غير صالح في ' + file.name + ':', e);
+        setImportStatus('تعذر قراءة الملف — ليس ملف JSON صالحًا', true);
+      }
+    };
+    reader.onerror = () => {
+      console.error('[glossary-import] فشل قراءة الملف', reader.error);
+      setImportStatus('تعذر قراءة الملف', true);
+    };
+    reader.readAsText(file);
+  });
+
+  glossaryLoadEn.addEventListener('click', (e) => { e.preventDefault(); loadSampleDictionary('en'); });
+  glossaryLoadAr.addEventListener('click', (e) => { e.preventDefault(); loadSampleDictionary('ar'); });
 }
 
 /* ========== قواعد الاستخراج ========== */
@@ -246,6 +384,7 @@ function renderParagraphsLocal(text) {
   String(text || '').split(/\n{2,}/).forEach((p) => {
     const el = document.createElement('p');
     el.className = 'blk';
+    el.dir = isRtlText(p) ? 'rtl' : 'ltr';
     el.textContent = p;
     body.appendChild(el);
   });

@@ -342,6 +342,12 @@
           <button type="button" id="glossary-add-btn" class="btn-secondary">إضافة</button>
         </div>
         <div id="glossary-list" class="glossary-list" aria-label="قائمة المسرد"></div>
+        <div class="glossary-form">
+          <button type="button" id="glossary-import-btn" class="btn-secondary" title="رفع ملف JSON يحتوي قاموسًا (المفاتيح إنجليزية والقيم ترجماتها)">📥 استيراد قاموس JSON</button>
+          <input type="file" id="glossary-import-input" accept=".json,application/json" hidden>
+          <span id="glossary-import-status" class="glossary-import-status" role="status" aria-live="polite" hidden></span>
+        </div>
+        <small class="field-hint">القاموس JSON يكون على الشكل {"hello": "مرحبا", "world": "عالم"} — المفاتيح تُطبّع ل lowercase تلقائيًا. جرّب قاموسًا نموذجيًا: <a href="#" id="glossary-load-en">English</a> · <a href="#" id="glossary-load-ar">عربي⇄إنجليزي</a></small>
         <hr class="modal-sep">
         <h3 class="modal-subtitle">🔍 قواعد الاستخراج (المواقع الصعبة)</h3>
         <p class="modal-note">للمواقع التي لا تُستخرج تلقائيًا (مثل جوجل نيوز): حدد نطاقًا ومحدد CSS للمحتوى.</p>

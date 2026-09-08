@@ -5,6 +5,7 @@ import {
   ttsPlayer, listenBtn, localBtn, targetLang,
   showError, showToast,
 } from './ui.js';
+import { isRtlText } from './localEngine.mjs';
 
 /* ---------- WebVTT + VTT clock ---------- */
 export function vttClock(sec) {
@@ -191,6 +192,7 @@ export function buildCaptionPanel() {
     t.textContent = formatTime(c.start || 0);
     const s = document.createElement('span');
     s.className = 'cap-text';
+    s.dir = isRtlText(c.translated || c.original || '') ? 'rtl' : 'ltr';
     s.textContent = c.translated || c.original || '';
     row.appendChild(t);
     row.appendChild(s);

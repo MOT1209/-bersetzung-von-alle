@@ -737,6 +737,21 @@ body {
   word-break: break-word;
 }
 
+/* ===== اتجاه الفقرة (RTL/LTR) =====
+ * الواجهة كلها عربية RTL، لكن الترجمة قد تكون بأي لغة. كل فقرة نتيجة تُبنى
+ * بـ dir حسب أول حرف قوي في نصها (isRtlText في localEngine.mjs)، وهنا نُلزم
+ * المحاذاة والتعطيل ثنائي الاتجاه باتباع ذلك الاتجاه. unicode-bidi: embed
+ * يعزل الفقرة الـ LTR داخل صفحة RTL دون كسر ترتيب الفقرات نفسها. */
+.blk[dir='rtl'] {
+  text-align: right;
+  unicode-bidi: embed;
+}
+
+.blk[dir='ltr'] {
+  text-align: left;
+  unicode-bidi: embed;
+}
+
 .blk:last-child { margin-bottom: 0; }
 
 .blk-heading {
@@ -787,6 +802,9 @@ body {
   overflow-wrap: break-word;
   word-break: break-word;
 }
+
+.cap-text[dir='rtl'] { text-align: right; unicode-bidi: embed; }
+.cap-text[dir='ltr'] { text-align: left; unicode-bidi: embed; }
 
 /* صفوف قابلة للنقر (نقل الفيديو للحظة) */
 .cap-clickable { cursor: pointer; transition: background .15s ease; border-radius: var(--radius-sm); padding-right: 8px; padding-left: 8px; }
@@ -1160,6 +1178,16 @@ body {
   grid-template-columns: 1fr 1fr auto;
   gap: 8px;
   margin: 10px 0;
+}
+
+/* حالة استيراد القاموس: نجاح بلون النص الهادئ، خطأ بلون الخطر */
+.glossary-import-status {
+  grid-column: 1 / -1;
+  font-size: .85rem;
+  color: var(--text-muted);
+}
+.glossary-import-status.import-err {
+  color: var(--danger);
 }
 .glossary-list {
   display: flex;
