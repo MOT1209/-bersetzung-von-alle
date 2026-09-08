@@ -27,12 +27,15 @@ const posCompression = () => at(/app\.use\(compression\(\)\)/);
 const posStatic = () => at(/app\.use\(express\.static\(publicDir\)\)/);
 const posSse = () => at(/require\('\.\/routes-sse'\)/);
 const posJobs = () => at(/require\('\.\/routes-jobs'\)/);
+const posYoutubeDub = () => at(/require\('\.\/routes-youtube-dub'\)/);
 const posFile = () => at(/require\('\.\/routes-file'\)/);
 const posLocalVideo = () => at(/require\('\.\/routes-local-video'\)/);
 
 test('بثّ SSE (الترجمة والوظائف) مركَّب قبل compression', () => {
   assert.ok(posSse() < posCompression(), 'routes-sse بعد compression — سيُخزَّن البثّ ويصل دفعة واحدة');
   assert.ok(posJobs() < posCompression(), 'routes-jobs بعد compression — بثّ تقدّم الوظائف سيتعطّل صامتًا');
+  // دبلجة يوتيوب (أُضيفت على main بالتوازي) تبثّ التقدّم بـSSE أيضًا — نفس الشرط
+  assert.ok(posYoutubeDub() < posCompression(), 'routes-youtube-dub بعد compression — بثّ تقدّم الدبلجة سيتعطّل صامتًا');
 });
 
 test('بثّ SSE مركَّب بعد express.json (يحتاج req.body)', () => {
