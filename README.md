@@ -115,6 +115,18 @@ npm run bench:translate -- --provider google --lang ar,fr
   + `cdn.jsdelivr.net` للسكربتات؛ إضافةً إلى `X-Frame-Options` و`X-Content-Type-Options: nosniff`
   و`Referrer-Policy` و`HSTS`. و`trust proxy` عند `NODE_ENV=production` لضبط `req.ip` خلف Render.
 
+## ⚠️ قيود معروفة
+
+- **لا استئناف للمهام بعد إعادة تشغيل الخادم**: مهام الدبلجة/التفريغ الطويلة (`server/jobs/job-manager.js`)
+  تُدار في ذاكرة العملية فقط بلا حفظ دائم. إعادة تشغيل الخادم أثناء مهمة جارية تُفقدها كليًا
+  (لا استئناف تلقائي ولا إشعار للمستخدم بأن المهمة ضاعت). مقبول لنشر أحادي النسخة، لكن **لا تُعِد
+  تشغيل الخادم أثناء دبلجة أو تفريغ صوتي طويل قيد التنفيذ**.
+- **`youtube-dl-exec` تبعية اختيارية قد تفشل تثبيتها صامتًا**: يعتمد `postinstall` الخاص بها على
+  تنزيل ثنائي `yt-dlp` من الإنترنت أثناء `npm install`؛ في بيئة بلا وصول شبكي كافٍ (بروكسي مقيَّد،
+  جدار حماية) يفشل هذا التنزيل ويتخطاه npm بصمت لأنها `optionalDependency` — النتيجة: تنزيل يوتيوب
+  المباشر يرجع `youtube-blocked`/`ytdlp-missing` رغم أن الكود سليم. تحقق دائمًا من
+  `require.resolve('youtube-dl-exec')` بعد `npm install` في أي بيئة نشر جديدة.
+
 ## 🚀 طريقة الاستخدام
 
 ### 1) مع أي وكيل برمجة (pi، Codex، Cursor، Claude Code)

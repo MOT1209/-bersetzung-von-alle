@@ -23,13 +23,13 @@
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "express": "^4.21.2",
-    "fast-xml-parser": "^5.10.1",
+    "fast-xml-parser": "^5.11.1",
     "helmet": "^8.3.0",
     "jszip": "^3.10.1",
-    "mammoth": "^1.12.1",
-    "sherpa-onnx": "^1.13.4",
+    "mammoth": "^1.12.2",
+    "sherpa-onnx": "^1.13.7",
     "tesseract.js": "^7.0.0",
-    "undici": "^7.29.0",
+    "undici": "^7.29.1",
     "youtube-transcript": "^1.2.1"
   },
   "optionalDependencies": {
@@ -38,9 +38,12 @@
     "youtube-dl-exec": "^3.1.9"
   },
   "devDependencies": {
-    "eslint": "^10.9.1"
+    "eslint": "^10.10.0"
   },
   "engines": {
     "node": ">=22"
+  },
+  "overrides": {
+    "qs": "6.16.0"
   }
 }

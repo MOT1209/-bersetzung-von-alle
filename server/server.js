@@ -1,4 +1,10 @@
 ﻿// server/server.js — الخادم الرئيسي لأداة الترجمة AraLink
+//
+// ⚠️ تحذير لأي إضافة جديدة: ترتيب app.use أدناه حسّاس فعليًا لا تجميليًا — مسارات SSE/الدبلجة
+// يجب أن تُركَّب قبل compression() (وإلا يُخزَّن البثّ ولا يصل)، وحدود حجم الجسم الخاصة يجب أن
+// تُركَّب قبل express.json() العام. هذا سبق أن سبّب حادثة إنتاج حقيقية موثَّقة في CHANGELOG.md
+// (routes-sse.js غير مُركَّب أصلًا فأرجع 404 صامتًا بينما 248 اختبار وحدة كانت تمرّ). قبل نقل أي
+// app.use هنا: اقرأ tests/middlewareOrder.test.js أولًا — هو ما يحرس هذا الترتيب فعليًا.
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');

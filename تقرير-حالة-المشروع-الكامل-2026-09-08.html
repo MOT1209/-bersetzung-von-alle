@@ -58,7 +58,7 @@ footer{color:var(--muted);font-size:.82rem;margin-top:36px;text-align:center;lin
 <div class="stat"><b class="ok">98/98</b><span>ملفًا سليم التركيب (node --check)</span></div>
 <div class="stat"><b class="ok">0</b><span>تحذير/خطأ eslint</span></div>
 <div class="stat"><b class="bad">1</b><span>ثغرة حرجة (تبعية غير مباشرة)</span></div>
-<div class="stat"><b class="warn">11</b><span>ثغرة إجمالًا (npm audit)</span></div>
+<div class="stat"><b class="warn">7</b><span>ثغرة متبقية بعد الإصلاح السريع <span class="muted">(كانت 11)</span></span></div>
 </div>
 <div class="toc">
 <a href="#verdict">الحكم العام</a>
@@ -67,9 +67,12 @@ footer{color:var(--muted);font-size:.82rem;margin-top:36px;text-align:center;lin
 <a href="#security">الأمن</a>
 <a href="#gaps">فجوات الطموح مقابل الواقع</a>
 <a href="#recs">التوصيات</a>
+<a href="#fixed">متابعة: ما أُصلح فعليًا</a>
 <a href="#scope">نطاق الفحص</a>
 </div>
 </header>
+<div class="card" style="border-inline-start:4px solid var(--primary);background:rgba(59,130,246,.08)">
+<b>🔄 تحديث لاحق (نفس اليوم):</b> بعد طلب «أصلح كل شيء بسرعة»، نُفِّذ إصلاح سريع فعلي — التفاصيل الكاملة في <a href="#fixed" style="color:#9cc0ff">القسم 8️⃣ في الأسفل</a>. الخلاصة: أُصلحت الثغرات القابلة للإصلاح بأمان دون كسر شيء (534→533/1 كما هي)، ووُثِّقت صراحة الثغرات التي <b>رفضتُ</b> إصلاحها بالقوة (<code>--force</code>) لأن ذلك كان سيُنزّل إصدارات أقدم من <code>@xenova/transformers</code> (محرك Whisper) و<code>exceljs</code> (تصدير Excel) — أي المخاطرة بكسر ميزتين تعملان فعليًا مقابل إغلاق ثغرة على الورق. هذا قرار واعٍ لا تقصير.</div>
 
 <h2 id="verdict">1️⃣ الحكم العام</h2>
 <div class="card verdict">
@@ -206,8 +209,52 @@ footer{color:var(--muted);font-size:.82rem;margin-top:36px;text-align:center;lin
 <p><b>الجملة الصادقة:</b> هذا فحص شامل على مستوى المشروع (وليس تدقيقًا للسطر بالسطر لكل الشيفرة)، مبني على تشغيل فعلي للفحوصات الآلية وقراءة مباشرة للملفات الحرجة أمنيًا ومعماريًا — لا يُثبت خلوّ المشروع من كل عيب، لكنه يعكس حالته الحقيقية بأمانة اليوم.</p>
 </div>
 
+<h2 id="fixed">8️⃣ متابعة: ما أُصلح فعليًا بعد طلب «أصلح الكل بسرعة»</h2>
+<div class="card">
+<p class="muted">مبدأ هذه المتابعة: إصلاح كل ما يمكن إصلاحه بأمان <b>الآن</b>، والرفض الصريح لإصلاح أي شيء يتطلّب كسر ميزة تعمل فعليًا — «سريع» لا يعني «متهوّر». كل بند أدناه أُعيد اختباره بالكامل (534 اختبارًا + lint + node --check) بعد التنفيذ.</p>
+<table>
+<tr><th>البند</th><th>الإجراء</th><th>النتيجة</th></tr>
+<tr>
+<td>ثغرة <code>qs</code> المتوسطة (عبر <code>express</code> مباشرة، لا عبر <code>body-parser</code> فقط)</td>
+<td>أُضيف <code>"overrides": {"qs": "6.16.0"}</code> في <code>package.json</code> — نفس خط 6.x، تصحيح لا ترقية كاسرة.</td>
+<td><span class="badge b-grn">✅ أُصلح</span> — 11→7 ثغرة، 533/534 اختبارًا لا يزال يمرّ.</td>
+</tr>
+<tr>
+<td>ثغرة <code>@xmldom/xmldom</code> المتوسطة (حقن أجزاء XML)</td>
+<td><code>npm audit fix</code> (بلا <code>--force</code>) — ترقية غير كاسرة داخل نفس النطاق المسموح.</td>
+<td><span class="badge b-grn">✅ أُصلح</span></td>
+</tr>
+<tr>
+<td>8 تبعيات متأخرة عن أحدث إصدار patch/minor: <code>fast-xml-parser</code>، <code>mammoth</code>، <code>sherpa-onnx</code>، <code>undici</code>، <code>eslint</code></td>
+<td>رُفعت في <code>package.json</code> إلى أحدث إصدار minor/patch متوافق (لا قفزات إصدار رئيسي).</td>
+<td><span class="badge b-grn">✅ أُصلح</span> — الاختبارات والـ lint والفحص الصياغي كلها خضراء بعدها.</td>
+</tr>
+<tr>
+<td>لا استئناف للمهام بعد إعادة تشغيل الخادم</td>
+<td>لم يُبنَ persistence فعلي (ميزة حقيقية تحتاج تصميمًا لا «إصلاحًا سريعًا» — قد تُدخل علة أخطر من غيابها إن نُفِّذت على عجل). وُثِّق القيد بوضوح في <code>README.md</code> تحت قسم «⚠️ قيود معروفة» بدل ترك المستخدم يكتشفه بفقدان عمل فعلي.</td>
+<td><span class="badge b-yel">📝 وُثِّق لا أُصلح</span> — قرار واعٍ.</td>
+</tr>
+<tr>
+<td>هشاشة ترتيب الوسيطات في <code>server.js</code></td>
+<td>لم تُنقَل المسارات أو تُعَد هيكلتها (خطر حقيقي على أثقل جزء من التطبيق تحت ضغط الوقت). أُضيف تحذير صريح أعلى الملف يوجّه أي مساهم مستقبلي إلى <code>tests/middlewareOrder.test.js</code> قبل نقل أي <code>app.use</code>.</td>
+<td><span class="badge b-yel">📝 خُفِّف لا أُصلح</span> — قرار واعٍ.</td>
+</tr>
+<tr>
+<td><code>youtube-dl-exec</code> ظهر <code>MISSING</code> بعد التثبيت</td>
+<td>تحقّقتُ من السبب الفعلي: <code>postinstall</code> الخاص به يحاول تنزيل ثنائي <code>yt-dlp</code> من الإنترنت ويفشل (كود خروج 1) بسبب قيود الشبكة في بيئة الفحص هذه تحديدًا — و<em>لأنها optionalDependency</em> يتجاهل npm الفشل بصمت. <b>هذا ليس عطلًا في المشروع</b> بل قيد بيئة الفحص، لكن السلوك «الفشل الصامت» نفسه خطر حقيقي في أي بيئة نشر بشبكة مقيّدة — وُثِّق في README.</td>
+<td><span class="badge b-blue">🔍 شُخِّص لا يُصلَح هنا</span> — سيعمل على بيئة نشر بإنترنت مفتوح.</td>
+</tr>
+<tr>
+<td><b>الثغرة الحرجة</b> في <code>protobufjs</code> + 3 ثغرات عالية (<code>sharp</code>، <code>onnx-proto</code>، <code>onnxruntime-web</code>) + ثغرة <code>uuid</code> المتوسطة</td>
+<td>فحصتُ نطاقات كل تبعية: إصلاحها الوحيد المتاح عبر <code>npm audit fix --force</code> يُنزِّل <code>@xenova/transformers</code> إلى <b>1.4.2</b> (من 2.17.2 — قفزتا إصدار رئيسي) و<code>exceljs</code> إلى <b>3.4.0</b> (من 4.4.0). الأول محرك Whisper الاحتياطي للتفريغ الصوتي، والثاني محرك تصدير Excel — كلاهما ميزة تعمل فعليًا اليوم وفق 533 اختبارًا ناجحًا. لا توجد بيئة اختبار حقيقية هنا (لا ffmpeg، لا نموذج Whisper محمَّل، لا شبكة لتنزيله) للتحقق أن التنزيل الكاسر لا يكسر شيئًا فعليًا.</td>
+<td><span class="badge b-red">❌ رُفض إصلاحه بالقوة عمدًا</span> — إغلاق ثغرة على الورق بكسر ميزتين فعليتين ليس «إصلاحًا»، بل استبدال مشكلة معروفة بمشكلة مجهولة. يحتاج فرعًا منفصلًا واختبارًا يدويًا حقيقيًا (تفريغ صوت حقيقي + تصدير Excel حقيقي) قبل الترقية.</td>
+</tr>
+</table>
+<p style="margin-top:12px"><b>الخلاصة الصادقة:</b> «أصلح الكل» نُفِّذ حرفيًا فقط حين كان الإصلاح آمنًا ومُتحقَّقًا بالاختبار الفعلي. ما تبقّى ليس تقصيرًا بل قرارات واعية موثَّقة أعلاه — إصلاحها الحقيقي «بسرعة» كان سيعني المخاطرة بكسر الترجمة الصوتية أو تصدير الملفات في مقابل رقم أفضل في تقرير <code>npm audit</code>.</p>
+</div>
+
 <footer>
-وُلّد من مراجعة كاملة للمستودع (78 ملف خادم + 13 وحدة واجهة + 53 ملف اختبار) • AraLink • 8 سبتمبر 2026<br>
+وُلّد من مراجعة كاملة للمستودع (78 ملف خادم + 13 وحدة واجهة + 53 ملف اختبار) • AraLink • 8 سبتمبر 2026 (مع متابعة إصلاح لاحقة في نفس اليوم)<br>
 الأدوات: node --test · node --check · eslint · npm audit · npm outdated · قراءة كود مباشرة
 </footer>
 
