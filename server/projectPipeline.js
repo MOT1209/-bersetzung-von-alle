@@ -81,7 +81,7 @@ async function runProjectVideo(payload, ctx) {
       duration: c.duration || 2,
       original: c.text || '',
     }));
-    const { sourceLang, captions } = await translateLines(lines, targetLang, {});
+    const { sourceLang, captions, cached } = await translateLines(lines, targetLang, {});
 
     // 4) بناء ملفات الترجمة وحفظها كأصول في المشروع
     ctx.progress('saving', 85);
@@ -111,11 +111,21 @@ async function runProjectVideo(payload, ctx) {
     repo.updateProject(projectId, { status: 'ready', targetLangs: langs });
 
     return {
+      // type/videoId/meta بالشكل الذي يتوقّعه public/js/result.js (renderResult →
+      // renderYouTubeResult/renderLocalVideo) — إعادة استخدام واجهة النتيجة
+      // الموحّدة نفسها بدل بناء عرض مخصّص (قرار مُعلَن: انظر CURRENT_STATE.md §18).
+      type: 'local-video',
+      videoId: null, // لا مضمَّن يوتيوب — لا رابط فيديو مصدر
       projectId,
       sourceLang,
       targetLang,
       captions,
       subtitles: { srt: srtAsset.id, vtt: vttAsset.id },
+      meta: {
+        title: (asset.meta && asset.meta.originalName) || 'ملف مرفوع',
+        source: 'upload',
+        cached: Boolean(cached),
+      },
     };
   } catch (e) {
     // الفشل يظهر على المشروع نفسه لا في السجلّ وحده — المستخدم يرى الحالة

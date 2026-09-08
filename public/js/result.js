@@ -23,12 +23,22 @@ export function renderResult(data) {
   if (dubBtn) dubBtn.hidden = true;
 
   const origTab = document.querySelector('.tab[data-tab="original"]');
-  if (origTab) origTab.hidden = (data.type === 'localvideo');
+  if (origTab) origTab.hidden = (data.type === 'local-video');
 
-  if (data.type === 'youtube')   return renderYouTubeResult(data);
-  if (data.type === 'article')   return renderArticleResult(data);
-  if (data.type === 'localvideo') return renderLocalVideo(data);
+  if (data.type === 'youtube')     return renderYouTubeResult(data);
+  if (data.type === 'article')     return renderArticleResult(data);
+  if (data.type === 'local-video') return renderLocalVideo(data);
   renderTextResult(data);
+}
+
+// ملف محلي مرفوع (تبويب «ترجمة ملف» → فيديو/صوت، عبر server/projectPipeline.js):
+// شكل البيانات مطابق تمامًا لنتيجة يوتيوب (captions بنفس الحقول)، فنعيد استخدام
+// renderYouTubeResult كاملة — نفس لوحة الترجمات، وزر SRT، وصفّ التصدير، والاستماع
+// — بدل بناء عرض مخصّص. الفارق الوحيد: لا رابط يوتيوب لتضمينه فنُخفي مربّع المشغّل.
+function renderLocalVideo(data) {
+  renderYouTubeResult(data);
+  resultEmbed.hidden = true;
+  resultEmbed.innerHTML = '';
 }
 
 function renderYouTubeResult(data) {

@@ -11,6 +11,7 @@ import { renderResult, renderTab, renderContextBadge } from './result.js';
 import { teardownPlayers } from './media.js';
 import { saveToHistory, getGlossary } from './features.js';
 import { streamTranslate, supportsStreaming } from './stream.js';
+import { uploadAndTranslateMedia } from './projectUpload.js';
 
 function safeGetLocal(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
@@ -53,8 +54,29 @@ export async function runTranslate() {
     result.hidden = true;
     showProgress('جاري الترجمة…');
 
-    // File mode — no streaming. الخادم يتوقّع JSON base64 (routes-file.js)
+    // File mode: مستند → المسار الفوري القديم (translate-file). فيديو/صوت →
+    // خط أنابيب المشاريع (رفع → تفريغ → ترجمة، بتقدّم حيّ). كلاهما تحت التبويب
+    // نفسه «ترجمة ملف» — لا صفحة منفصلة (قرار §18 في CURRENT_STATE.md).
+    if (state.mode === 'file' && state.file.kind === 'media') {
+      try {
+        const d = await uploadAndTranslateMedia(state.file, target, {
+          onProgress: (text) => showProgress(text),
+        });
+        hideProgress();
+        state.current = d;
+        state.activeTab = 'translated';
+        teardownPlayers();
+        saveToHistory(d, target);
+        renderResult(d);
+      } catch (e) {
+        hideProgress();
+        showError(e.code || 'server-error', e.status || 500);
+      }
+      return;
+    }
+
     if (state.mode === 'file') {
+      // مستند — لا يزال بلا بثّ. الخادم يتوقّع JSON base64 (routes-file.js)
       const { status, data: d } = await postJson('/api/translate-file', {
         format: state.file.ext,
         content: state.file.base64,

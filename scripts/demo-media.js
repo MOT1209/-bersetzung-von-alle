@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/demo-studio.js — تشغيل الاستوديو للعرض بلا ffmpeg وبلا شبكة
+// scripts/demo-media.js — تشغيل ترجمة الفيديو/الصوت للعرض بلا ffmpeg وبلا شبكة
 //
 // لماذا: المسار الحقيقي يحتاج ffmpeg (لاستخراج الصوت) ونماذج تفريغ ثم شبكة
 // للترجمة. على جهاز بلا ffmpeg أو بلا إنترنت لا يمكن رؤية الواجهة تعمل إطلاقًا،
@@ -11,7 +11,8 @@
 // وكل ما عداهما حقيقي تمامًا: الرفع، والتخزين على القرص، وقاعدة البيانات،
 // وطابور الوظائف، وبثّ التقدّم، وبناء ملفي SRT وVTT، والتنزيل، وحذف المشروع.
 //
-// الاستخدام:  npm run demo:studio   ثم افتح العنوان المطبوع.
+// الاستخدام:  npm run demo:media   ثم افتح الرابط المطبوع → تبويب «ترجمة ملف»
+// → ارفع أي ملف فيديو/صوت (مثلًا mp4 أو mp3، المحتوى الفعلي لا يهم في العرض).
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
@@ -59,11 +60,12 @@ const app = require('../server/server');
 const server = app.listen(Number(process.env.PORT), () => {
   const { port } = server.address();
   console.log('');
-  console.log('  🎬 عرض الاستوديو جاهز:  http://localhost:' + port + '/studio.html');
+  console.log('  🎬 عرض جاهز:  http://localhost:' + port + '/');
   console.log('');
-  console.log('  ارفع أي ملف (أي ملف يعمل — التفريغ مزيّف في هذا العرض)');
-  console.log('  التفريغ والترجمة مزيّفان؛ الرفع والتخزين والقاعدة والطابور');
-  console.log('  والتقدّم وملفا SRT/VTT والتنزيل كلها حقيقية.');
+  console.log('  افتح تبويب «ترجمة ملف» وارفع أي ملف فيديو/صوت (mp4, mp3…) —');
+  console.log('  أي محتوى يعمل، التفريغ مزيّف في هذا العرض. التفريغ والترجمة');
+  console.log('  مزيّفان؛ الرفع والتخزين والقاعدة والطابور والتقدّم الحيّ');
+  console.log('  وملفا SRT/VTT والتنزيل كلها حقيقية.');
   console.log('');
   console.log('  بيانات العرض المؤقتة: ' + demoDir);
   console.log('');

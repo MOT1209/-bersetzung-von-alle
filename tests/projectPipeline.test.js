@@ -110,6 +110,14 @@ test('المسار الكامل: رفع → معالجة → أصول ترجمة
   assert.equal(done.status, 'completed', `فشلت: ${JSON.stringify(done.error)}`);
 
   const result = done.result;
+  // الشكل الذي يتوقّعه public/js/result.js (renderResult → renderYouTubeResult/
+  // renderLocalVideo) — إعادة استخدام واجهة النتيجة الموحّدة بعد دمج الاستوديو
+  // داخل تبويب «ترجمة ملف» (CURRENT_STATE.md §18). videoId فارغ عمدًا: لا رابط
+  // يوتيوب لتضمينه.
+  assert.equal(result.type, 'local-video');
+  assert.equal(result.videoId, null);
+  assert.equal(result.meta.title, 'lecture.mp4');
+  assert.equal(result.meta.source, 'upload');
   assert.equal(result.sourceLang, 'en');
   assert.equal(result.targetLang, 'ar');
   assert.equal(result.captions.length, 2);
@@ -198,13 +206,17 @@ test('حذف المشروع بعد المعالجة يزيل ملفات التر
   assert.equal(await storage().exists(srtKey), false, 'بقي ملف ترجمة بعد حذف المشروع');
 });
 
-// ===== 4) الصفحة تُقدَّم فعلاً =====
+// ===== 4) لا صفحة منفصلة — كل شيء تحت الصفحة الرئيسية (CURRENT_STATE.md §18) =====
 
-test('GET /studio.html: الصفحة مخدومة وتحمّل سكربتها', async () => {
+test('GET /studio.html: غير موجودة — دُمج المسار في تبويب «ترجمة ملف»', async () => {
   const res = await fetch(`${baseUrl}/studio.html`);
+  assert.equal(res.status, 404, 'صفحة الاستوديو المنفصلة يجب ألّا تكون موجودة بعد الدمج');
+});
+
+test('GET /: الصفحة الرئيسية تحمّل سكربت رفع الوسائط (project upload)', async () => {
+  const res = await fetch(`${baseUrl}/`);
   assert.equal(res.status, 200);
   const html = await res.text();
-  assert.match(html, /js\/studio\.js/);
-  assert.match(html, /استوديو أرا لينك/);
-  assert.equal((await fetch(`${baseUrl}/js/studio.js`)).status, 200);
+  assert.match(html, /js\/app\.js/);
+  assert.equal((await fetch(`${baseUrl}/js/projectUpload.js`)).status, 200);
 });
