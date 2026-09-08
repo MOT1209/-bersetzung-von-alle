@@ -108,8 +108,11 @@ module.exports = {
   TTS_ENGINE: process.env.TTS_ENGINE || 'edge',
 
   // ===== مشاريع الدبلجة: مدة الاحتفاظ بالأيام (الافتراضي 7) وحجم أقصى للقرص =====
+  // 3GB لا 5GB (§20): قرص Render في render.yaml خمسة غيغابايت **يتقاسمه**
+  // projects/ مع cache/ (قاعدة SQLite وملفات التخزين). سقفٌ مساوٍ لحجم القرص
+  // كله يعني أن التنظيف لا يبدأ إلا والقرص ممتلئ فعلًا — أي بعد فوات الأوان.
   PROJECTS_RETENTION_DAYS: Number(process.env.PROJECTS_RETENTION_DAYS) || 7,
-  PROJECTS_MAX_BYTES: Number(process.env.PROJECTS_MAX_BYTES) || 5368709120,
+  PROJECTS_MAX_BYTES: Number(process.env.PROJECTS_MAX_BYTES) || 3221225472,
 
   // ===== سجل التكاليف: عدد مقاطع TTS، حروف الترجمة، ثوانٍ ffmpeg =====
   COST_FILE: process.env.COST_FILE || path.join(__dirname, '..', 'cache', 'cost.json'),

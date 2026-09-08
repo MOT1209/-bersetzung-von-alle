@@ -54,8 +54,15 @@ after(async () => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* تنظيف */ }
 });
 
-const api = (p, opts) => fetch(baseUrl + p, { headers: { 'Content-Type': 'application/json' }, ...opts });
-const post = (p, body) => api(p, { method: 'POST', body: JSON.stringify(body) });
+const api = (p, opts = {}) => fetch(baseUrl + p, {
+  ...opts,
+  headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+});
+const post = (p, body, token) => api(p, {
+  method: 'POST',
+  body: JSON.stringify(body),
+  headers: token ? { 'X-Project-Token': token } : {},
+});
 
 async function until(fn, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
@@ -66,16 +73,18 @@ async function until(fn, timeoutMs = 5000) {
   return false;
 }
 
-// ينشئ مشروعًا وأصل وسائط جاهزًا للمعالجة
+// ينشئ مشروعًا وأصل وسائط جاهزًا للمعالجة.
+// كل عملية على المشروع تحتاج توكن المالك (X-Project-Token) بعد §19.
 async function seedProject(name = 'pipeline') {
   const project = await (await post('/api/projects', { name })).json();
+  const token = project.ownerToken;
   const asset = await (await post(`/api/projects/${project.id}/assets`, {
     kind: 'media',
     content: Buffer.from('fake media bytes').toString('base64'),
     filename: 'lecture.mp4',
     mime: 'video/mp4',
-  })).json();
-  return { project, asset };
+  }, token)).json();
+  return { project, asset, token };
 }
 
 // ===== 1) تحويل المقاطع =====
@@ -94,9 +103,9 @@ test('toVttSegments: يحوّل duration إلى end ويأخذ الترجمة', 
 // ===== 2) الخط كاملاً =====
 
 test('المسار الكامل: رفع → معالجة → أصول ترجمة محفوظة فعليًا', async () => {
-  const { project, asset } = await seedProject('محاضرة');
+  const { project, asset, token } = await seedProject('محاضرة');
 
-  const started = await post(`/api/projects/${project.id}/process`, { assetId: asset.id, targetLang: 'ar' });
+  const started = await post(`/api/projects/${project.id}/process`, { assetId: asset.id, targetLang: 'ar' }, token);
   assert.equal(started.status, 202);
   const job = await started.json();
   assert.ok(job.jobId);
@@ -135,12 +144,12 @@ test('المسار الكامل: رفع → معالجة → أصول ترجمة
 });
 
 test('محتوى SRT صالح: ترقيم وتوقيت وترجمة', async () => {
-  const { project, asset } = await seedProject('srt');
-  const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id, targetLang: 'ar' })).json();
+  const { project, asset, token } = await seedProject('srt');
+  const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id, targetLang: 'ar' }, token)).json();
   await until(async () => (await (await api(job.statusUrl)).json()).status === 'completed');
   const result = (await (await api(job.statusUrl)).json()).result;
 
-  const res = await api(`/api/projects/${project.id}/assets/${result.subtitles.srt}/content`);
+  const res = await api(`/api/projects/${project.id}/assets/${result.subtitles.srt}/content`, { headers: { 'X-Project-Token': token } });
   assert.equal(res.status, 200);
   const srt = await res.text();
   assert.match(srt, /^1\n00:00:00,000 --> 00:00:02,500\nتر: Hello world/m);
@@ -148,12 +157,12 @@ test('محتوى SRT صالح: ترقيم وتوقيت وترجمة', async () =
 });
 
 test('محتوى VTT يبدأ بترويسة WEBVTT', async () => {
-  const { project, asset } = await seedProject('vtt');
-  const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id, targetLang: 'ar' })).json();
+  const { project, asset, token } = await seedProject('vtt');
+  const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id, targetLang: 'ar' }, token)).json();
   await until(async () => (await (await api(job.statusUrl)).json()).status === 'completed');
   const result = (await (await api(job.statusUrl)).json()).result;
 
-  const vtt = await (await api(`/api/projects/${project.id}/assets/${result.subtitles.vtt}/content`)).text();
+  const vtt = await (await api(`/api/projects/${project.id}/assets/${result.subtitles.vtt}/content`, { headers: { 'X-Project-Token': token } })).text();
   assert.match(vtt, /^WEBVTT/);
   assert.match(vtt, /تر: Second line/);
 });
@@ -161,11 +170,11 @@ test('محتوى VTT يبدأ بترويسة WEBVTT', async () => {
 // ===== 3) الأخطاء =====
 
 test('صوت بلا كلام → الوظيفة تفشل بـ audio-empty والمشروع يصير failed', async () => {
-  const { project, asset } = await seedProject('صامت');
+  const { project, asset, token } = await seedProject('صامت');
   const saved = audioMod.transcribeMediaFile;
   audioMod.transcribeMediaFile = async () => ({ chunks: [] });
   try {
-    const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id })).json();
+    const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id }, token)).json();
     assert.ok(await until(async () => (await (await api(job.statusUrl)).json()).status === 'failed'));
     const done = await (await api(job.statusUrl)).json();
     assert.equal(done.error.code, 'audio-empty');
@@ -179,30 +188,30 @@ test('صوت بلا كلام → الوظيفة تفشل بـ audio-empty وال
 test('process: مشروع مجهول 404، وأصل من مشروع آخر 404', async () => {
   const a = await seedProject('أ');
   const b = await seedProject('ب');
-  assert.equal((await post('/api/projects/ghost/process', { assetId: a.asset.id })).status, 404);
-  // أصل المشروع (أ) لا يُعالَج عبر المشروع (ب)
-  assert.equal((await post(`/api/projects/${b.project.id}/process`, { assetId: a.asset.id })).status, 404);
+  assert.equal((await post('/api/projects/ghost/process', { assetId: a.asset.id }, a.token)).status, 404);
+  // أصل المشروع (أ) لا يُعالَج عبر المشروع (ب) حتى بتوكن (ب) الصحيح
+  assert.equal((await post(`/api/projects/${b.project.id}/process`, { assetId: a.asset.id }, b.token)).status, 404);
 });
 
 test('process: أصل ليس وسائط (ترجمة مثلاً) → 400', async () => {
-  const { project } = await seedProject('نوع خاطئ');
+  const { project, token } = await seedProject('نوع خاطئ');
   const sub = await (await post(`/api/projects/${project.id}/assets`, {
     kind: 'subtitle', content: Buffer.from('x').toString('base64'),
-  })).json();
-  const res = await post(`/api/projects/${project.id}/process`, { assetId: sub.id });
+  }, token)).json();
+  const res = await post(`/api/projects/${project.id}/process`, { assetId: sub.id }, token);
   assert.equal(res.status, 400);
   assert.equal((await res.json()).error, 'invalid-asset');
 });
 
 test('حذف المشروع بعد المعالجة يزيل ملفات الترجمة أيضًا (البند 59)', async () => {
-  const { project, asset } = await seedProject('حذف');
-  const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id })).json();
+  const { project, asset, token } = await seedProject('حذف');
+  const job = await (await post(`/api/projects/${project.id}/process`, { assetId: asset.id }, token)).json();
   await until(async () => (await (await api(job.statusUrl)).json()).status === 'completed');
   const result = (await (await api(job.statusUrl)).json()).result;
   const srtKey = repo.getAsset(result.subtitles.srt).storageKey;
 
   assert.ok(await storage().exists(srtKey));
-  await api(`/api/projects/${project.id}`, { method: 'DELETE' });
+  await api(`/api/projects/${project.id}`, { method: 'DELETE', headers: { 'X-Project-Token': token } });
   assert.equal(await storage().exists(srtKey), false, 'بقي ملف ترجمة بعد حذف المشروع');
 });
 

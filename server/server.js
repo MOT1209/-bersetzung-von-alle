@@ -4,7 +4,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const path = require('path');
-const crypto = require('crypto');
 const config = require('./config');
 const { createStore, closeAll: closeStore } = require('./store');
 const translateRouter = require('./routes-translate');
@@ -12,6 +11,7 @@ const ttsRouter = require('./routes-tts');
 const videoRouter = require('./routes-video');
 const settingsRouter = require('./routes-settings'); // إعدادات المفاتيح (.env) — محمي بـ ADMIN_TOKEN
 const statsRouter = require('./routes-stats'); // إحصائيات لوحة التحكم — محمية بـ ADMIN_TOKEN
+const { requireAdmin, tokenMatches, adminCookieHeader } = require('./adminAuth');
 const { getAllLanguages } = require('./languages');
 
 const app = express();
@@ -123,6 +123,13 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api', require('./routes-sse'));
 
 // ===== دبلجة يوتيوب إلى MP4 (jobs + SSE progress) — قبل compression عمدًا (نفس سبب routes-sse) =====
+// الحدّان أدناه **يجب** أن يسبقا هذا الموجّه: كان تركيبهما بعده (مع routes-dub
+// وroutes-youtube) يعني أنهما لا يُنفَّذان إطلاقًا لهذه المسارات، لأن الموجّه
+// هنا ينهي الطلب قبل بلوغهما — فكانت الدبلجة (أثقل عملية في المشروع) تحت الحد
+// العام وحده. tests/middlewareOrder.test.js يحرس هذا الترتيب الآن.
+const dubLimiter = createRateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, max: config.RATE_LIMIT_MAX_DUB });
+app.use('/api/dub', dubLimiter);
+app.use('/api/youtube', heavyLimiter);
 app.use('/api', require('./routes-youtube-dub'));
 
 // ===== متابعة الوظائف — قبل compression عمدًا للسبب نفسه =====
@@ -146,23 +153,29 @@ app.get('/api/languages', (req, res) => {
   res.json({ languages: getAllLanguages() });
 });
 
+// ===== دخول الأدمن — كوكي httpOnly بدل localStorage =====
+// كانت اللوحة تحفظ التوكن في localStorage، فأي XSS يقرأه ويسرّبه (دين §8.6).
+// الآن يُبادَل التوكن مرة واحدة بكوكي httpOnly لا يراه جافاسكربت إطلاقًا.
+// المنطق نفسه في adminAuth.js يخدم الرأس والكوكي معًا.
+app.post('/api/admin/login', heavyLimiter, (req, res) => {
+  const expected = process.env.ADMIN_TOKEN;
+  if (!expected) return res.status(503).json({ error: 'settings-disabled' });
+  const given = (req.body && req.body.token) || req.get('x-admin-token') || '';
+  if (!tokenMatches(given, expected)) return res.status(401).json({ error: 'unauthorized' });
+  res.setHeader('Set-Cookie', adminCookieHeader(given));
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  res.setHeader('Set-Cookie', adminCookieHeader('', { clear: true }));
+  res.json({ ok: true });
+});
+
 // ===== إعدادات المفاتيح (قراءة/حفظ .env) — محمية بـ ADMIN_TOKEN =====
 // الافتراضي الآمن: بلا ADMIN_TOKEN ⇒ المسار معطّل بالكامل (503).
 // يشمل GET أيضًا لأنه يكشف hasGeminiKey — استطلاع مفيد للمهاجم.
 // ملاحظة: ARALINK_API_KEY مفتاح حصص للطلاب ولا يصلح هنا — لا يجوز أن يمنح
 // مفتاحُ حصةٍ صلاحيةَ الكتابة في .env.
-function requireAdmin(req, res, next) {
-  const expected = process.env.ADMIN_TOKEN;
-  if (!expected) return res.status(503).json({ error: 'settings-disabled' });
-  const given = req.get('x-admin-token') || '';
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  // مقارنة ثابتة الزمن — timingSafeEqual يرمي عند اختلاف الطول، لذا نفحصه أولًا
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  next();
-}
 app.use('/api/settings', heavyLimiter, requireAdmin, settingsRouter);
 
 // ===== إحصائيات لوحة التحكم (محمية بـ ADMIN_TOKEN + حد أثقل) =====
@@ -176,7 +189,8 @@ app.use('/api/tts', heavyLimiter);
 app.use('/api', ttsRouter);
 
 // ===== الدبلجة (حدّ خاص أوسع — دفعات متتابعة طوال الفيديو لا طلب واحد) =====
-app.use('/api/dub', createRateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, max: config.RATE_LIMIT_MAX_DUB }));
+// الحدّ نفسه مركَّب أعلاه قبل routes-youtube-dub ويغطّي هذا الموجّه أيضًا
+// (app.use على بادئة يسري على كل ما بعده)، فلا يُكرَّر هنا حتى لا يُحتسب مرتين.
 app.use('/api', require('./routes-dub'));
 
 // ===== المشاريع (البند 30) — تحت الحد الأثقل: الرفع يكتب على القرص =====
@@ -184,8 +198,8 @@ app.use('/api/projects', heavyLimiter);
 app.use('/api', require('./routes-projects'));
 
 // ===== بيانات يوتيوب الوصفية (الواجهة الرسمية — المسار المتوافق) =====
-// طلب خفيف (وحدة واحدة من حصة يوتيوب) لكنه يستهلك حصة خارجية، فيبقى تحت الحد الأثقل.
-app.use('/api/youtube', heavyLimiter);
+// طلب خفيف (وحدة واحدة من حصة يوتيوب) لكنه يستهلك حصة خارجية، فيبقى تحت الحد
+// الأثقل — المركَّب أعلاه قبل routes-youtube-dub ويغطّي هذا الموجّه أيضًا.
 app.use('/api', require('./routes-youtube'));
 
 // ===== مسارات بثّ الفيديو (الترجمات المدمجة) =====

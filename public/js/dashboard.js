@@ -1,13 +1,22 @@
 // public/js/dashboard.js — Admin dashboard logic
-const TOKEN_KEY = 'aralink-admin-token';
-
+//
+// التوكن **لا يُحفظ في localStorage** (دين §8.6): يُرسَل مرة واحدة إلى
+// /api/admin/login فيعيد كوكي httpOnly لا يقرأه جافاسكربت — فلا تسرّبه ثغرة XSS.
+// كل طلب لاحق يحمل الكوكي تلقائيًا، ولا يبقى للصفحة نسخة من السرّ.
 async function fetchStats(endpoint) {
-  const token = localStorage.getItem(TOKEN_KEY);
-  const res = await fetch(`/api/stats/${endpoint}`, {
-    headers: { 'x-admin-token': token },
-  });
+  const res = await fetch(`/api/stats/${endpoint}`, { credentials: 'same-origin' });
   if (!res.ok) throw new Error(`Stats failed: ${res.status}`);
   return res.json();
+}
+
+async function login(token) {
+  const res = await fetch('/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ token }),
+  });
+  return res.ok;
 }
 
 function showAuthGate() {
@@ -114,16 +123,12 @@ function renderQuality(data) {
 }
 
 async function init() {
-  const token = localStorage.getItem(TOKEN_KEY);
-
-  document.getElementById('auth-btn').addEventListener('click', () => {
+  document.getElementById('auth-btn').addEventListener('click', async () => {
     const val = document.getElementById('admin-token').value.trim();
     if (!val) return;
-    localStorage.setItem(TOKEN_KEY, val);
-    location.reload();
+    if (await login(val)) location.reload();
+    else showError('المفتاح غير صحيح');
   });
-
-  if (!token) { showAuthGate(); return; }
 
   try {
     const [summary, timeseries, languages, hourly] = await Promise.all([
@@ -150,9 +155,9 @@ async function init() {
     document.getElementById('auth-gate').hidden = true;
     document.getElementById('dashboard').hidden = false;
   } catch {
-    localStorage.removeItem(TOKEN_KEY);
+    // لا كوكي صالح (أو انتهى) — أظهر البوابة بلا رسالة خطأ عند أول زيارة.
+    // لا localStorage.removeItem هنا: التوكن لم يعد يُحفظ محليًا أصلًا (§19).
     showAuthGate();
-    showError('المفتاح غير صحيح أو الخادم غير متاح');
   }
 }
 

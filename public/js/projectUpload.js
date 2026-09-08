@@ -6,7 +6,34 @@
    قرار مُعلَن: هذا يستبدل صفحة /studio.html المنفصلة (أُزيلت) — ليست هوية
    بصرية موازية، بل نفس مسار «ترجمة ملف» الموجود يتفرّع حسب نوع الملف.
    انظر CURRENT_STATE.md §18. */
-import { postJson } from './utils.js';
+import { postJson, safeGet, safeSet } from './utils.js';
+
+/* توكن ملكية المشروع: يُعاد مرة واحدة عند الإنشاء ولا يُعاد أبدًا بعدها، فيُحفظ
+   هنا محليًا. بدونه لا يستطيع أحد — ولا نحن — الوصول إلى المشروع لاحقًا.
+   localStorage مقبول هنا: التوكن يخصّ ملفات هذا المتصفح وحده، لا صلاحية إدارية. */
+const TOKENS_KEY = 'aralink-project-tokens';
+
+function loadTokens() {
+  try { return JSON.parse(safeGet(TOKENS_KEY) || '{}'); } catch { return {}; }
+}
+
+function rememberToken(projectId, token) {
+  const all = loadTokens();
+  all[projectId] = token;
+  // سقف 50 مشروعًا: التوكنات لا تُستهلك ولا تنتهي، فبلا سقف ينمو التخزين بلا حد
+  const ids = Object.keys(all);
+  if (ids.length > 50) delete all[ids[0]];
+  safeSet(TOKENS_KEY, JSON.stringify(all));
+}
+
+export function projectToken(projectId) {
+  return loadTokens()[projectId] || '';
+}
+
+function ownerHeader(projectId) {
+  const t = projectToken(projectId);
+  return t ? { 'X-Project-Token': t } : {};
+}
 
 const STAGE_LABELS = {
   queued: 'في الطابور…',
@@ -39,11 +66,13 @@ export async function uploadAndTranslateMedia(file, targetLang, { onProgress } =
   if (s1 >= 400 || !project || !project.id) {
     throw apiError(project, s1, 'invalid-project');
   }
+  // التوكن يصل في هذا الرد وحده — احفظه قبل أي طلب لاحق وإلا ضاع المشروع
+  if (project.ownerToken) rememberToken(project.id, project.ownerToken);
 
   // 2) رفع الأصل
   const { status: s2, data: asset } = await postJson(`/api/projects/${project.id}/assets`, {
     kind: 'media', content: file.base64, filename: file.name, mime: file.mime || null,
-  });
+  }, ownerHeader(project.id));
   if (s2 >= 400 || !asset || !asset.id) {
     throw apiError(asset, s2, 'invalid-asset');
   }
@@ -51,7 +80,7 @@ export async function uploadAndTranslateMedia(file, targetLang, { onProgress } =
   // 3) بدء المعالجة — 202 + معرّف وظيفة
   const { status: s3, data: job } = await postJson(`/api/projects/${project.id}/process`, {
     assetId: asset.id, targetLang,
-  });
+  }, ownerHeader(project.id));
   if (s3 >= 400 || !job || !job.jobId) {
     throw apiError(job, s3, 'server-error');
   }

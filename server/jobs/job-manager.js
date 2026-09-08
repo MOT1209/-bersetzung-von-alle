@@ -44,7 +44,9 @@ function needsPersist(job, prevStatus) {
 }
 
 function createJob({ type, projectId, params }) {
-  const id = randomUUID().slice(0, 8);
+  // معرّف كامل لا مقطوع (§20): 8 أحرف hex = 32 بت، ضعيفة كحارس وحيد على قراءة
+  // حالة مهمة غيرك. UUID كامل (36 حرفًا) يمرّ من تطبيع jobFilePath بلا قصّ.
+  const id = randomUUID();
   const job = {
     id, type, projectId,
     params: params || {},

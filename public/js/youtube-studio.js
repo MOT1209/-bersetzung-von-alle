@@ -1,5 +1,40 @@
 // public/js/youtube-studio.js — استوديو دبلجة يوتيوب: URL → job → progress حي → فيديو نهائي
-import { $ } from './utils.js';
+import { $, safeGet, safeSet } from './utils.js';
+
+/* ===== توكن ملكية المشروع (CURRENT_STATE.md §20) =====
+   يُعاد مرة واحدة من POST /api/youtube/dub ولا يُعاد أبدًا بعدها. بدونه لا وصول
+   إلى حالة المهمة ولا إلى ملفات المشروع — لا لنا ولا لغيرنا. */
+const TOKENS_KEY = 'aralink-dub-tokens';
+
+function loadTokens() {
+  try { return JSON.parse(safeGet(TOKENS_KEY) || '{}'); } catch { return {}; }
+}
+
+function rememberToken(projectId, token) {
+  const all = loadTokens();
+  all[projectId] = token;
+  const ids = Object.keys(all);
+  if (ids.length > 50) delete all[ids[0]]; // سقف: التوكنات لا تنتهي فلا تنمو بلا حد
+  safeSet(TOKENS_KEY, JSON.stringify(all));
+}
+
+function tokenFor(projectId) {
+  return loadTokens()[projectId] || '';
+}
+
+const tokenHeader = (projectId) => {
+  const t = tokenFor(projectId);
+  return t ? { 'X-Project-Token': t } : {};
+};
+
+/* يضيف التوكن كمعامل استعلام. لازم لثلاث حالات لا تستطيع إرسال رؤوس مخصّصة:
+   EventSource، و<video src>، و<a download>. التوكن يظهر في الرابط عندئذٍ —
+   مقبول لرابط قدرة على نفس الأصل، ولا يُستخدم حيث يكفي الرأس. */
+function withToken(url, projectId) {
+  const t = tokenFor(projectId);
+  if (!t) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+}
 
 const STAGES_AR = {
   queued: 'في الانتظار…', analyzing: 'تحليل الفيديو…', transcribing: 'تفريغ الصوت…',
@@ -33,7 +68,7 @@ function setSteps(current) {
   }
 }
 
-async function pollJob(jobId, onUpdate) {
+async function pollJob(jobId, onUpdate, projectId) {
   // SSE أولًا، مع fallback للـ polling كل 2 ثانية عند انقطاعه.
   // لا يبقى أي مؤقت حي بعد اكتمال المهمة أو فشلها (settled يحرس كل المسارات).
   let settled = false;
@@ -43,7 +78,7 @@ async function pollJob(jobId, onUpdate) {
     const p = setInterval(async () => {
       if (settled) { clearInterval(p); return; }
       try {
-        const r = await fetch(`/api/dub/jobs/${jobId}`);
+        const r = await fetch(`/api/dub/jobs/${jobId}`, { headers: tokenHeader(projectId) });
         const job = await r.json();
         onUpdate(job);
         if (job.status === 'completed' || job.status === 'failed') { finish(); clearInterval(p); }
@@ -51,7 +86,8 @@ async function pollJob(jobId, onUpdate) {
     }, 2000);
   }
   try {
-    const es = new EventSource(`/api/dub/jobs/${jobId}/stream`);
+    // EventSource لا يرسل رؤوسًا — التوكن في الاستعلام
+    const es = new EventSource(withToken(`/api/dub/jobs/${jobId}/stream`, projectId));
     es.addEventListener('progress', (ev) => {
       try {
         const job = JSON.parse(ev.data);
@@ -98,6 +134,8 @@ export function initYoutubeStudio() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.errorAr || data.error || 'server-error');
       const jobId = data.jobId;
+      // التوكن يصل في هذا الرد وحده — احفظه قبل أي طلب لاحق وإلا ضاع المشروع
+      if (data.ownerToken && data.projectId) rememberToken(data.projectId, data.ownerToken);
       E.plabel.textContent = 'بدأت الدبلجة — تتبع التقدم لحظيًا…';
       await pollJob(jobId, (job) => {
         E.plabel.textContent = `${job.stage || STAGES_AR[job.status]} (${job.progress || 0}٪)`;
@@ -109,7 +147,7 @@ export function initYoutubeStudio() {
           showErrorAr(job.errorAr || 'تعذر إكمال الدبلجة — أعد المحاولة.');
           start.disabled = false;
         }
-      });
+      }, data.projectId);
     } catch (e) {
       showErrorAr(e.message || 'تعذر بدء الدبلجة.');
     } finally {
@@ -145,7 +183,7 @@ async function renderTimeline(r) {
   box.innerHTML = '<p class="muted">جاري تحميل المقاطع…</p>';
   let segments = [];
   try {
-    const res = await fetch(`/api/dub/projects/${r.projectId}/translation-${r.targetLang}.json`);
+    const res = await fetch(`/api/dub/projects/${r.projectId}/translation-${r.targetLang}.json`, { headers: tokenHeader(r.projectId) });
     if (res.ok) segments = await res.json();
   } catch {}
   box.innerHTML = '';
@@ -175,7 +213,7 @@ function renderResult(r) {
   if (!box) return;
   box.hidden = false;
   const player = $('yt-player');
-  if (player) { player.src = r.videoUrl; player.poster = ''; }
+  if (player) { player.src = withToken(r.videoUrl, r.projectId); player.poster = ''; }
   const meta = $('yt-meta');
   if (meta) meta.textContent = `الأصل: ${r.sourceLang || '?'} → الهدف: ${r.targetLang} • ${r.segments} مقطعًا • وضع ${r.mode}`;
   const set = (id, href, dl) => {
@@ -183,9 +221,9 @@ function renderResult(r) {
     if (!a) return;
     a.href = href; if (dl) a.setAttribute('download', dl);
   };
-  set('yt-dl-video', r.videoUrl, 'dubbed.mp4');
-  set('yt-dl-audio', r.audioUrl, 'dubbed.mp3');
-  set('yt-dl-srt', r.srtUrl, 'subtitles.srt');
+  set('yt-dl-video', withToken(r.videoUrl, r.projectId), 'dubbed.mp4');
+  set('yt-dl-audio', withToken(r.audioUrl, r.projectId), 'dubbed.mp3');
+  set('yt-dl-srt', withToken(r.srtUrl, r.projectId), 'subtitles.srt');
   wireDeleteButton(r);
   renderTimeline(r);
   box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -203,7 +241,7 @@ function wireDeleteButton(r) {
     if (!pid) return;
     if (!window.confirm('حذف المشروع وملفاته نهائيًا؟')) return;
     try {
-      const res = await fetch(`/api/dub/projects/${pid}`, { method: 'DELETE' });
+      const res = await fetch(`/api/dub/projects/${pid}`, { method: 'DELETE', headers: tokenHeader(pid) });
       if (!res.ok) throw new Error('delete-failed');
       $('yt-result').hidden = true;
       $('yt-progress-label').textContent = 'حُذف المشروع.';

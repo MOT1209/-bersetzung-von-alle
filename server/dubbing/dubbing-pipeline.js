@@ -35,6 +35,8 @@ function errAr(code) {
     'tts-failed': 'تعذر توليد الصوت — خدمة النطق مزدحمة، أعد المحاولة.',
     'download-failed': 'تعذر تنزيل الفيديو — قد يكون محجوبًا على الخادم.',
     'youtube-blocked': 'يوتيوب رفض الطلب من هذا الخادم — جرب لاحقًا.',
+    'video-too-long': `الفيديو أطول من الحد المسموح (${config.MAX_VIDEO_MINUTES} دقيقة).`,
+    'ytdlp-missing': 'أداة تنزيل الفيديو غير مثبَّتة على الخادم.',
   };
   return map[code] || 'تعذر إكمال الدبلجة — أعد المحاولة.';
 }
@@ -98,6 +100,18 @@ async function runDubbingJob(job, jobs) {
     if (!meta || meta.videoId !== videoId) {
       meta = { videoId, ...(await getVideoMetadata(videoId)) };
       fs.writeFileSync(metaPath, JSON.stringify(meta));
+    }
+
+    // سقف المدة (CURRENT_STATE.md §20): كانت `duration` تُقرأ ولا تُقارَن بشيء،
+    // فكان فيديو ثلاث ساعات يمرّ كفيديو دقيقتين — مئات المقاطع، كلٌّ منها نداء
+    // ترجمة + نطق + عملية ffmpeg، بلا سقف زمني على المهمة كلها.
+    // duration = 0 يعني تعذّرت قراءة البيانات الوصفية؛ لا نمنع عندها (المتاح
+    // بعدها حدُّ الحجم MAX_VIDEO_BYTES في التنزيل).
+    const maxSec = Math.max(1, Number(config.MAX_VIDEO_MINUTES) || 20) * 60;
+    if (meta.duration > maxSec) {
+      const e = new Error(`الفيديو أطول من الحد (${config.MAX_VIDEO_MINUTES} دقيقة)`);
+      e.code = 'video-too-long';
+      throw e;
     }
 
     // تنزيل الفيديو الأصلي (يُعاد استخدامه بين اللغات)

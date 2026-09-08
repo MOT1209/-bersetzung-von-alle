@@ -5,6 +5,7 @@
 const { randomUUID } = require('crypto');
 const { getDb } = require('./index');
 const { storage } = require('../providers/storage');
+const { newToken, hashToken, verifyToken } = require('../ownerToken');
 
 const VALID_STATUS = ['draft', 'processing', 'ready', 'failed'];
 const VALID_KINDS = ['media', 'audio', 'subtitle', 'transcript', 'export'];
@@ -51,6 +52,9 @@ function rowToAsset(r) {
 
 // ===== المشاريع =====
 
+// توكن الملكية: يُعاد **مرة واحدة** عند الإنشاء ولا يُخزَّن أبدًا كنصّ — القاعدة
+// تحفظ sha256 فقط. المنطق في server/ownerToken.js لأن مشاريع الدبلجة (على نظام
+// الملفات) تحتاجه أيضًا، فلا يُنسخ في موضعين.
 function createProject({ name, sourceType = null, sourceRef = null, targetLangs = [], status = 'draft' } = {}) {
   const clean = String(name || '').trim();
   if (!clean) throw codeError('invalid-project', 'الاسم مطلوب');
@@ -60,11 +64,22 @@ function createProject({ name, sourceType = null, sourceRef = null, targetLangs 
 
   const now = Date.now();
   const id = randomUUID();
+  const ownerToken = newToken();
   getDb().prepare(`INSERT INTO projects
-      (id, name, source_type, source_ref, target_langs, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, clean, sourceType, sourceRef, JSON.stringify(targetLangs), status, now, now);
-  return getProject(id);
+      (id, name, source_type, source_ref, target_langs, status, created_at, updated_at, owner_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, clean, sourceType, sourceRef, JSON.stringify(targetLangs), status, now, now, hashToken(ownerToken));
+  // التوكن خارج rowToProject عمدًا: لا يظهر في أي قراءة لاحقة، هذه فرصته الوحيدة
+  return { ...getProject(id), ownerToken };
+}
+
+/**
+ * هل يملك حاملُ هذا التوكن المشروعَ؟ مقارنة ثابتة الزمن على التجزئتين.
+ * صفّ قديم بلا owner_hash ⇒ false دائمًا (fail-closed، لا انفتاح ضمني).
+ */
+function verifyProjectOwner(projectId, token) {
+  const row = getDb().prepare('SELECT owner_hash FROM projects WHERE id = ?').get(String(projectId || ''));
+  return verifyToken(row && row.owner_hash, token);
 }
 
 function getProject(id) {
@@ -161,6 +176,7 @@ async function deleteAsset(id) {
 
 module.exports = {
   createProject, getProject, listProjects, countProjects, updateProject, deleteProject,
+  verifyProjectOwner,
   addAsset, getAsset, listAssets, deleteAsset,
   projectPrefix,
   VALID_STATUS, VALID_KINDS,

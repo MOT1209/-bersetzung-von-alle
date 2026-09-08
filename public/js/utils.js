@@ -13,10 +13,10 @@ export function mapError(c, s) {
   return MESSAGES['server-error'];
 }
 
-export async function postJson(url, body) {
+export async function postJson(url, body, headers) {
   const r = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(headers || {}) },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(300000),
   });
