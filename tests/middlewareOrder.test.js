@@ -56,3 +56,20 @@ test('حدّ الطلبات الأساسي على /api مركَّب قبل كل 
   assert.ok(limiter < posFile(), 'موجّه ملفات قبل حدّ الطلبات — يفلت من الحد');
   assert.ok(limiter < posSse(), 'موجّه SSE قبل حدّ الطلبات — يفلت من الحد');
 });
+
+// كان حدّا /api/dub و/api/youtube مركَّبَين **بعد** routes-youtube-dub، فلا
+// يُنفَّذان إطلاقًا لمساراته: الموجّه ينهي الطلب قبل بلوغهما. أثقل عملية في
+// المشروع (دبلجة فيديو كامل) كانت تحت الحد العام وحده، ولم يكشف ذلك أي اختبار.
+test('حدّا /api/dub و/api/youtube قبل موجّه الدبلجة (وإلا لم يُنفَّذا أصلًا)', () => {
+  const dubLimiter = at(/app\.use\('\/api\/dub', dubLimiter\)/);
+  const ytLimiter = at(/app\.use\('\/api\/youtube', heavyLimiter\)/);
+  assert.ok(dubLimiter < posYoutubeDub(), 'حدّ /api/dub بعد الموجّه — لن يُنفَّذ لمسارات /api/dub/*');
+  assert.ok(ytLimiter < posYoutubeDub(), 'حدّ /api/youtube بعد الموجّه — لن يُنفَّذ لـPOST /api/youtube/dub');
+});
+
+// الحدّان لا يُكرَّران بعد موجّهاتهما الأصلية: تركيب app.use على البادئة نفسها
+// مرتين يحتسب الطلب مرتين ويخفض الحد الفعلي إلى النصف بلا قصد.
+test('حدّا /api/dub و/api/youtube مركَّبان مرة واحدة لا مرتين', () => {
+  assert.equal((SERVER.match(/app\.use\('\/api\/dub',/g) || []).length, 1);
+  assert.equal((SERVER.match(/app\.use\('\/api\/youtube',/g) || []).length, 1);
+});

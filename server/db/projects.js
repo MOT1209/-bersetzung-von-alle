@@ -2,9 +2,10 @@
 //
 // كل وصول إلى SQL يمرّ من هنا: النواة والمسارات لا تكتب استعلامًا واحدًا،
 // فالانتقال إلى Postgres لاحقًا يمسّ هذا الملف وحده (البند 43 مطبَّقًا على البيانات).
-const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
+const { randomUUID } = require('crypto');
 const { getDb } = require('./index');
 const { storage } = require('../providers/storage');
+const { newToken, hashToken, verifyToken } = require('../ownerToken');
 
 const VALID_STATUS = ['draft', 'processing', 'ready', 'failed'];
 const VALID_KINDS = ['media', 'audio', 'subtitle', 'transcript', 'export'];
@@ -51,12 +52,9 @@ function rowToAsset(r) {
 
 // ===== المشاريع =====
 
-// توكن الملكية: 32 بايت عشوائية تُعاد **مرة واحدة** عند الإنشاء ولا تُخزَّن أبدًا
-// كنصّ. القاعدة تحفظ sha256 فقط، فمن يقرأ القاعدة لا يستطيع انتحال المالك.
-function hashToken(token) {
-  return createHash('sha256').update(String(token)).digest('hex');
-}
-
+// توكن الملكية: يُعاد **مرة واحدة** عند الإنشاء ولا يُخزَّن أبدًا كنصّ — القاعدة
+// تحفظ sha256 فقط. المنطق في server/ownerToken.js لأن مشاريع الدبلجة (على نظام
+// الملفات) تحتاجه أيضًا، فلا يُنسخ في موضعين.
 function createProject({ name, sourceType = null, sourceRef = null, targetLangs = [], status = 'draft' } = {}) {
   const clean = String(name || '').trim();
   if (!clean) throw codeError('invalid-project', 'الاسم مطلوب');
@@ -66,7 +64,7 @@ function createProject({ name, sourceType = null, sourceRef = null, targetLangs 
 
   const now = Date.now();
   const id = randomUUID();
-  const ownerToken = randomBytes(32).toString('hex');
+  const ownerToken = newToken();
   getDb().prepare(`INSERT INTO projects
       (id, name, source_type, source_ref, target_langs, status, created_at, updated_at, owner_hash)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -80,12 +78,8 @@ function createProject({ name, sourceType = null, sourceRef = null, targetLangs 
  * صفّ قديم بلا owner_hash ⇒ false دائمًا (fail-closed، لا انفتاح ضمني).
  */
 function verifyProjectOwner(projectId, token) {
-  if (!token) return false;
   const row = getDb().prepare('SELECT owner_hash FROM projects WHERE id = ?').get(String(projectId || ''));
-  if (!row || !row.owner_hash) return false;
-  const a = Buffer.from(hashToken(token), 'hex');
-  const b = Buffer.from(row.owner_hash, 'hex');
-  return a.length === b.length && timingSafeEqual(a, b);
+  return verifyToken(row && row.owner_hash, token);
 }
 
 function getProject(id) {

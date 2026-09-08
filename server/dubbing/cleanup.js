@@ -1,11 +1,39 @@
 // server/dubbing/cleanup.js — تنظيف تلقائي لمشاريع الدبلجة القديمة
 // كل دبلجة ≈ فيديو + صوت + مقاطع TTS؛ بلا تنظيف يمتلئ القرص.
 // القواعد: حذف المشاريع الأقدم من RETENTION، وإن تجاوز الإجمالي السقفَ يُحذف
-// الأقدم أولًا. المشاريع الأصغر من ساعة تُحمى دائمًا (مهام جارية).
+// الأقدم أولًا. المشاريع التي لها مهمة جارية تُحمى دائمًا (انظر isProtected).
 const fs = require('fs');
 const path = require('path');
 
-const MIN_AGE_PROTECT_MS = 60 * 60 * 1000; // ساعة — مهام جارية لا تُمس
+// حماية المشاريع الجارية (CURRENT_STATE.md §20).
+//
+// كانت الحماية «كل ما عمره أقل من ساعة» — وهو معيار خاطئ في الاتجاهين: يحمي
+// مشروعًا اكتمل قبل دقيقتين (فلا تُسترَدّ مساحته)، ويكشف مشروعًا جاريًا تجاوز
+// عمره الساعة. والأثر عملي: قرص Render خمسة غيغابايت، وطلب واحد قد ينتج مثلها،
+// فإن مُنع الاسترداد ساعةً كاملة امتلأ القرص قبل أن يعمل التنظيف أصلًا.
+//
+// المعيار الصحيح: هل للمشروع مهمة قيد التشغيل فعلًا؟ الجواب على القرص أصلًا في
+// job-*.json الذي يكتبه job-manager.
+const MIN_AGE_PROTECT_MS = 2 * 60 * 1000; // دقيقتان: مهلة إنشاء قبل كتابة أول job-*.json
+
+// هل للمشروع مهمة لم تنتهِ بعد؟ (queued/processing)
+function hasActiveJob(projectPath) {
+  let files = [];
+  try { files = fs.readdirSync(projectPath).filter((f) => f.startsWith('job-') && f.endsWith('.json')); }
+  catch { return false; }
+  for (const f of files) {
+    try {
+      const s = JSON.parse(fs.readFileSync(path.join(projectPath, f), 'utf8')).status;
+      if (s === 'queued' || s === 'processing') return true;
+    } catch { /* ملف تالف — لا يُعتبر حماية */ }
+  }
+  return false;
+}
+
+// المشروع محميّ إن كان جاريًا، أو أحدث من مهلة الإنشاء القصيرة
+function isProtected(it, now) {
+  return (now - it.mtime) <= MIN_AGE_PROTECT_MS || hasActiveJob(it.path);
+}
 
 function dirSize(dir) {
   let total = 0;
@@ -46,24 +74,25 @@ function cleanupProjects({ dir, maxAgeDays = 7, maxBytes = 5368709120 } = {}) {
     } catch { /* تجاهل */ }
   };
 
-  // 1) الأقدم من مدة الاحتفاظ (ما عدا المحمي بالساعة)
+  // 1) الأقدم من مدة الاحتفاظ (ما عدا المشاريع الجارية)
   for (const it of info) {
-    if (it.mtime < cutoff && (now - it.mtime) > MIN_AGE_PROTECT_MS) remove(it);
+    if (it.mtime < cutoff && !isProtected(it, now)) remove(it);
   }
-  // 2) سقف الحجم: الأقدم أولًا (المحمي يُستثنى دائمًا)
+  // 2) سقف الحجم: الأقدم أولًا (الجاري يُستثنى دائمًا)
   const remaining = info.filter((it) => !removed.includes(it.name));
   let total = remaining.reduce((a, b) => a + b.size, 0);
   remaining.sort((a, b) => a.mtime - b.mtime);
   for (const it of remaining) {
     if (total <= maxBytes) break;
-    if ((now - it.mtime) <= MIN_AGE_PROTECT_MS) continue;
+    if (isProtected(it, now)) continue;
     remove(it);
     total -= it.size;
   }
   return { removed, freedBytes, totalBytes: total };
 }
 
-// جدولة دورية: أول تشغيل بعد دقيقة (لا يؤخر الإقلاع)، ثم كل 6 ساعات.
+// جدولة دورية: أول تشغيل بعد دقيقة (لا يؤخر الإقلاع)، ثم كل ساعة.
+// كانت كل 6 ساعات: على قرص 5GB يمكن أن يمتلئ القرص كاملًا بين تشغيلين.
 // المؤقت unref حتى لا يُبقي العملية حية في الاختبارات.
 function scheduleCleanup({ maxAgeDays, maxBytes } = {}) {
   const run = () => {
@@ -73,7 +102,7 @@ function scheduleCleanup({ maxAgeDays, maxBytes } = {}) {
     } catch (e) { console.error('[cleanup]', e.message); }
   };
   const t1 = setTimeout(run, 60 * 1000);
-  const t2 = setInterval(run, 6 * 60 * 60 * 1000);
+  const t2 = setInterval(run, 60 * 60 * 1000);
   if (t1.unref) t1.unref();
   if (t2.unref) t2.unref();
   return { stop: () => { clearTimeout(t1); clearInterval(t2); } };

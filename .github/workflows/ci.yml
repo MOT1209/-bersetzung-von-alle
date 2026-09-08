@@ -27,6 +27,12 @@ jobs:
             npm install
           fi
 
+      # ffmpeg مطلوب لاختبار E2E في tests/youtube-dub.test.js (mix + mux).
+      # Dockerfile يثبّته أصلًا، فهذا يجعل CI يطابق بيئة الإنتاج بدل أن يخالفها.
+      # بدونه يتخطّى الاختبارُ نفسَه فيمرّ CI أخضر وهو لا يفحص شيئًا.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Run checks
         run: npm run check
 

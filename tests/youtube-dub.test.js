@@ -79,7 +79,22 @@ test('GET /api/dub/jobs/nope → 404', async () => {
 });
 
 // ===== E2E مصغر حقيقي: tone + فيديو لوني → mix → mux → MP4 قابل للتشغيل =====
-test('E2E: mix + mux ينتج MP4 قابلًا للتشغيل', async () => {
+// يحتاج ffmpeg/ffprobe فعليًا. CI يثبّتهما (راجع .github/workflows/ci.yml) فيعمل
+// الاختبار هناك حقيقةً؛ وعلى جهاز تطوير بلا ffmpeg يتخطّى نفسه **معلنًا السبب**
+// بدل أن يفشل ويبدو المشروع مكسورًا وهو سليم.
+let ffmpegAvailable = null;
+async function hasFfmpeg() {
+  if (ffmpegAvailable === null) {
+    try {
+      await execFileAsync('ffmpeg', ['-version'], { timeout: 10000 });
+      ffmpegAvailable = true;
+    } catch { ffmpegAvailable = false; }
+  }
+  return ffmpegAvailable;
+}
+
+test('E2E: mix + mux ينتج MP4 قابلًا للتشغيل', async (t) => {
+  if (!(await hasFfmpeg())) return t.skip('ffmpeg غير مثبَّت في هذه البيئة');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dub-e2e-'));
   const tone = path.join(dir, 'tone.mp3');
   const video = path.join(dir, 'src.mp4');
@@ -130,15 +145,16 @@ test('jobs: مهمة جارية وقت الإقلاع تُعلَّم interrupted
   jobs._testClear();
   jobs.reloadFromDisk();
 });
-test('GET /api/dub/projects/:id/jobs: يعيد مهام المشروع', async () => {
+// كان هذا الاختبار يؤكّد أن الزائر المجهول يحصل على 200 — وهو السلوك الذي أُغلق
+// في §20: مهام المشروع لا تُقرأ إلا بتوكن المالك. التغطية الكاملة للعزل في
+// tests/dubOwnership.test.js؛ هنا نثبّت أن المسار لم يعد مفتوحًا.
+test('GET /api/dub/projects/:id/jobs: بلا توكن مالك → 404 لا 200', async () => {
   const app = require('../server/server');
   const srv = app.listen(0);
   try {
     const port = srv.address().port;
     const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/somepid/jobs`);
-    assert.equal(r.status, 200);
-    const data = await r.json();
-    assert.ok(Array.isArray(data.jobs));
+    assert.equal(r.status, 404, 'مهام مشروع غيرك يجب ألّا تُقرأ بلا توكن');
   } finally { srv.close(); }
 });
 
