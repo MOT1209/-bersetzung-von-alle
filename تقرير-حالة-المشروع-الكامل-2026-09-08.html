@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقرير حالة المشروع الكامل — AraLink | 8 سبتمبر 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b1220;--card:#111b2e;--card2:#0e1728;--border:#24334d;--text:#e8eef7;--muted:#93a3bb;--primary:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Cairo,system-ui,sans-serif;line-height:1.85}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+header.hero{background:linear-gradient(160deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:20px}
+h1{margin:0 0 6px;font-size:1.65rem}
+h2{font-size:1.25rem;margin:32px 0 12px;border-bottom:1px solid var(--border);padding-bottom:8px;display:flex;align-items:center;gap:8px}
+h3{font-size:1.02rem;margin:18px 0 8px;color:#cfe0fb}
+.sub{color:var(--muted);margin:4px 0 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+.stat b{display:block;font-size:1.6rem}
+.stat span{color:var(--muted);font-size:.82rem}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin:12px 0}
+.verdict{border-inline-start:4px solid var(--ok);background:rgba(34,197,94,.08)}
+table{width:100%;border-collapse:collapse;font-size:.9rem;margin:8px 0}
+th,td{border:1px solid var(--border);padding:9px 11px;text-align:right;vertical-align:top}
+th{background:var(--card2);white-space:nowrap}
+tr:hover td{background:rgba(255,255,255,.02)}
+code{direction:ltr;display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:0 6px;font-size:.82rem;unicode-bidi:plaintext}
+pre{direction:ltr;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;font-size:.82rem}
+.badge{display:inline-block;border-radius:999px;padding:2px 11px;font-size:.78rem;font-weight:700;white-space:nowrap}
+.b-red{background:rgba(239,68,68,.15);color:var(--bad)}
+.b-yel{background:rgba(245,158,11,.15);color:var(--warn)}
+.b-grn{background:rgba(34,197,94,.15);color:var(--ok)}
+.b-blue{background:rgba(59,130,246,.15);color:#7fb0ff}
+ul{margin:8px 0;padding-inline-start:22px}
+li{margin:5px 0}
+.muted{color:var(--muted);font-size:.88rem}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.two-col{grid-template-columns:1fr}table{font-size:.8rem}}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.toc a{color:#9cc0ff;text-decoration:none;background:rgba(59,130,246,.1);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-size:.82rem}
+.toc a:hover{background:rgba(59,130,246,.2)}
+footer{color:var(--muted);font-size:.82rem;margin-top:36px;text-align:center;line-height:1.7}
+.scorebar{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin-top:6px}
+.scorebar i{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#22c55e)}
+</style>
+</head>
+<body><div class="wrap">
+
+<header class="hero">
+<h1>🔍 تقرير حالة المشروع الكامل — AraLink</h1>
+<p class="sub">التاريخ: 8 سبتمبر 2026 · الفرع: <code>claude/project-review-html-ughy4t</code> · الالتزام المفحوص: <code>7ee3372</code></p>
+<p class="sub">النطاق: كامل المستودع (خادم + واجهة + إضافة المتصفح + بنية تحتية) — لا فقط ميزة واحدة. المنهجية: قراءة الكود + تشغيل فعلي لكل الفحوصات (لا افتراضات).</p>
+<div class="grid">
+<div class="stat"><b class="ok">533/534</b><span>اختبار ناجح (1 مُتجاوَز بيئيًا)</span></div>
+<div class="stat"><b class="ok">98/98</b><span>ملفًا سليم التركيب (node --check)</span></div>
+<div class="stat"><b class="ok">0</b><span>تحذير/خطأ eslint</span></div>
+<div class="stat"><b class="bad">1</b><span>ثغرة حرجة (تبعية غير مباشرة)</span></div>
+<div class="stat"><b class="warn">11</b><span>ثغرة إجمالًا (npm audit)</span></div>
+</div>
+<div class="toc">
+<a href="#verdict">الحكم العام</a>
+<a href="#good">ما تم بشكل جيد</a>
+<a href="#findings">النتائج</a>
+<a href="#security">الأمن</a>
+<a href="#gaps">فجوات الطموح مقابل الواقع</a>
+<a href="#recs">التوصيات</a>
+<a href="#scope">نطاق الفحص</a>
+</div>
+</header>
+
+<h2 id="verdict">1️⃣ الحكم العام</h2>
+<div class="card verdict">
+<b>💬 مشروع MVP ناضج فنيًا وأكثر أمانًا من المتوسط — قابل للنشر، مع دَين تقني وفجوة طموح واضحين وموثَّقين ذاتيًا.</b>
+<p style="margin:10px 0 0">الكود يعمل فعليًا (لا محاكاة): 6 مزوّدي ترجمة بسلسلة احتياط، خط أنابيب دبلجة حقيقي (ffmpeg mux/mix)، محرك مهام (jobs) بحدود تزامن، قاعدة SQLite، وحماية SSRF من أعمق ما رأيته في مشروع بهذا الحجم (IPv4/IPv6 + صيغ التفافية + DNS rebinding). في المقابل: ثغرة أمنية <b>حرجة</b> في تبعية غير مباشرة بلا إصلاح جاهز، و<code>server.js</code> أصبح هشًّا (ترتيب وسيطات حسّاس يعتمد على تعليقات لا فرض بنيوي)، والمشروع بعيد كثيرًا عن رؤية «استوديو دبلجة كامل» (لا صوت مستنسخ، لا مزامنة توقيت صوتي، لا تحرير ترجمات، لا مصادقة مستخدمين) — وهذا موثَّق بصدق داخل <code>CURRENT_STATE.md</code> نفسه، وهي ميزة نادرة: المشروع لا يخفي نقصه.</p>
+</div>
+
+<h2 id="good">2️⃣ ما تم بشكل جيد 🎉</h2>
+<div class="card"><ul>
+<li><b>ثقافة اختبار مبنية على حوادث حقيقية:</b> <code>CHANGELOG.md</code> يوثّق أن مسار الترجمة الأساسي (<code>/api/translate-stream</code>) كان معطّلًا كليًا في المتصفح بينما 248 اختبار وحدة كانت تمرّ — والإصلاح لم يكتفِ بترقيع العلّة بل أضاف <code>tests/smoke.test.js</code> الذي يستخرج كل مسار <code>/api</code> من كود الواجهة فعليًا ويتأكد أنه مسجَّل في Express، فيفشل تلقائيًا إن تكرر النمط. هذا مستوى نضج هندسي أعلى من المعتاد في مشاريع MVP.</li>
+<li><b>حماية SSRF شاملة نادرًا ما تُرى بهذا العمق:</b> <code>server/ssrf.js</code> يغطي نطاقات IPv4/IPv6 الخاصة، عناوين البيانات الوصفية للسحابة، الصيغ الالتفافية (عشري/سداسي/ثماني للعنوان)، IPv4-mapped/6to4/Teredo داخل IPv6، والأهم: يغلق ثغرة <b>DNS rebinding</b> عبر تمرير العنوان المُتحقَّق منه مباشرة إلى دالة اتصال undici بدل إعادة حل الاسم (نافذة TOCTOU كلاسيكية في أدوات الجلب من روابط المستخدم).</li>
+<li><b>مصادقة الأدمن مصمَّمة بعقلية مهاجم:</b> كوكي <code>httpOnly</code> + <code>SameSite=Strict</code> + <code>Secure</code> في الإنتاج بدل <code>localStorage</code> (يمنع تسريب XSS)، مقارنة توكن ثابتة الزمن (<code>timingSafeEqual</code>)، وإغلاق افتراضي آمن: بلا <code>ADMIN_TOKEN</code> ⇒ 503 لا مسار مفتوح.</li>
+<li><b>ترتيب وسيطات Express موثَّق بدقة جراحية</b> ومحروس باختبار (<code>tests/middlewareOrder.test.js</code>): مسارات SSE قبل <code>compression()</code> (وإلا يُخزَّن البثّ ولا يصل)، حدود حجم الجسم قبل <code>express.json()</code> العام، حدود الطلبات الثقيلة قبل موجّهات الدبلجة كي لا تُنفَّذ عمليات ثقيلة تحت حد عام متساهل.</li>
+<li><b>معمارية مزوّدين قابلة للتوسّع فعليًا لا نظريًا:</b> الترجمة (Google→MyMemory→Libre→Gemini→DeepL→zen) والـ STT (Gemini→captions→Whisper) بسلسلة احتياط + تبريد (cooldown) بعد فشل متكرر يمنع ضرب حصة ميتة داخل نفس الطلب.</li>
+<li><b>أمان تشغيلي إضافي:</b> كل استدعاء ffmpeg عبر <code>execFile</code> بمصفوفة وسائط (لا shell)، مسارات مشاريع/ملفات مُطهَّرة بـ regex + فحص <code>startsWith</code> على المجلد الجذر، تخزين الملفات بمفتاح مولَّد لا باسم المستخدم مباشرة.</li>
+<li><b>فشل آمن (fail-open/fail-closed) مدروس مكانًا بمكان:</b> عطل متجر حد الطلبات (Redis) يسقط للذاكرة ويسمح بالطلب بدل انهيار الخادم؛ غياب <code>msedge-tts</code> يعطّل الصوت العصبي دائمًا بتحذير واحد بدل قاطع يعيد المحاولة بلا أمل (مذكور في التزام <code>7ee3372</code> الأخير).</li>
+</ul></div>
+
+<h2 id="findings">3️⃣ النتائج (مرتبة حسب الخطورة)</h2>
+<table>
+<tr><th>الخطورة</th><th>ما</th><th>أين (دليل)</th><th>الأثر + الإصلاح المقترح</th></tr>
+<tr>
+<td><span class="badge b-red">🔴 حرجة</span></td>
+<td>ثغرة تنفيذ كود عشوائي في <code>protobufjs</code> (عبر <code>@xenova/transformers</code> ← <code>onnxruntime-web</code> ← <code>onnx-proto</code>)</td>
+<td><code>npm audit --omit=dev</code> — CVE مصنّف Critical</td>
+<td>@xenova/transformers يُستخدم لخط STT الاحتياطي (Whisper). لا إصلاح غير مُكسِّر متاح حاليًا (<code>npm audit fix --force</code> يخفض <code>@xenova/transformers</code> إلى 1.4.2 وهو تغيير كاسر، ويخفض <code>exceljs</code> بسبب سلسلة أخرى). <b>القرار المطلوب من الفريق:</b> إمّا اختبار الترقية الكاسرة في فرع منفصل، أو تقييم ما إذا كان مسار الاستغلال قابلًا للوصول فعليًا (المدخل صوت/فيديو من مستخدم — يستحق تقييم استغلال حقيقي قبل الشحن للإنتاج).</td>
+</tr>
+<tr>
+<td><span class="badge b-yel">🟡 مهم</span></td>
+<td>3 ثغرات <b>عالية</b> إضافية: <code>onnxruntime-web</code>، <code>onnx-proto</code> (نفس سلسلة protobufjs)، و<code>sharp</code> (ثغرات libvips CVE-2026-33327/33328/35590/35591)</td>
+<td><code>npm audit</code></td>
+<td><code>sharp</code> تابع لـ <code>@xenova/transformers</code> أيضًا. نفس القرار أعلاه يعالجها معًا — لا تستحق إصلاحًا منفصلًا.</td>
+</tr>
+<tr>
+<td><span class="badge b-yel">🟡 مهم</span></td>
+<td>6 ثغرات <b>متوسطة</b>: <code>qs</code> (عبر <code>express</code>/<code>body-parser</code>)، <code>uuid</code> (عبر <code>exceljs</code>)، <code>xmldom</code> (حقن أجزاء XML)</td>
+<td><code>npm audit</code></td>
+<td><code>express@5</code> يحل سلسلة <code>qs</code> لكنه ترقية إصدار رئيسي (تغييرات في التوجيه والمعالجات) — تستحق مسارًا منفصلًا لا ضمن هذه المراجعة. الحد الأدنى: تتبّع في backlog، ليست طارئة (DoS/تجاوز حد لا تنفيذ كود).</td>
+</tr>
+<tr>
+<td><span class="badge b-yel">🟡 مهم</span></td>
+<td><code>server.js</code> أصبح «ملفًا موزَّع المسؤوليات» هشًّا: تركيب المسارات + حدود الطلبات + مصادقة الأدمن + CORS + معالجة الأخطاء في 259 سطرًا، وترتيب الوسيطات <b>يجب</b> أن يبقى دقيقًا (SSE/الدبلجة قبل <code>compression</code>، حدود حجم قبل <code>express.json</code>)</td>
+<td><code>server/server.js:99-213</code> — التعليقات نفسها تصف الهشاشة صراحة</td>
+<td>مُخفَّف حاليًا باختبار <code>middlewareOrder.test.js</code>، لكن أي مساهم جديد يضيف موجّهًا دون قراءة التعليقات كاملة قد يكرر خطأ <code>routes-sse.js</code> التاريخي (404 صامت). <b>مقترح:</b> استخراج تركيب المسارات إلى دالة/وحدة منفصلة مع تعليق تحذيري أعلى الملف يشير صراحة إلى الاختبار الحارس.</td>
+</tr>
+<tr>
+<td><span class="badge b-yel">🟡 مهم</span></td>
+<td>لا استئناف للمهام (jobs) بعد إعادة تشغيل الخادم — مهام دبلجة/تفريغ جارية تُفقَد</td>
+<td><code>server/jobs/job-manager.js</code> (Map داخل العملية فقط)</td>
+<td>مقبول لنشر أحادي النسخة بلا حالة، لكنه بند مفتوح موثَّق في <code>specs/enhancement-suite</code> و<code>CURRENT_STATE.md</code> منذ أكثر من أسبوع دون حل. <b>مقترح:</b> إمّا توثيق القيد بوضوح في README كسلوك متوقَّع للمستخدم النهائي («لا تُعِد تشغيل الخادم أثناء دبلجة طويلة»)، أو استعادة حالة بسيطة من مجلد <code>projects/</code> عند الإقلاع.</td>
+</tr>
+<tr>
+<td><span class="badge b-yel">🟡 مهم</span></td>
+<td>كود الواجهة (<code>public/js/**</code>) خارج تغطية eslint فعليًا رغم إدراجه في سكربت <code>lint</code></td>
+<td><code>package.json</code> سكربت <code>lint</code> يمرّ صفر تحذير — لكن هذا لا يثبت تغطية منطقية، فقط نظافة صياغية</td>
+<td>خلل واجهة سابق (تسرّب <code>setInterval</code> في <code>youtube-studio.js</code>) وُجد بمراجعة يدوية لا بأداة آلية — <b>وهو مُصلَح الآن فعليًا</b> (تحقّقتُ: <code>clearInterval</code> عند <code>completed/failed</code> موجود في <code>public/js/youtube-studio.js:79-84</code>)، لكن غياب فحص منطقي آلي للواجهة يعني اعتمادًا مستمرًا على المراجعة اليدوية لأي علّة مشابهة مستقبلًا.</td>
+</tr>
+<tr>
+<td><span class="badge b-grn">🟢 صغيرة</span></td>
+<td>8 تبعيات إنتاجية متأخرة عن أحدث إصدار (غير حرجة أمنيًا لوحدها): <code>dotenv</code>، <code>eslint</code>، <code>express</code> (v5 متاح)، <code>fast-xml-parser</code>، <code>mammoth</code>، <code>redis</code>، <code>sherpa-onnx</code>، <code>undici</code></td>
+<td><code>npm outdated</code></td>
+<td>لا إجراء عاجل — تحديثات صيانة روتينية. <code>youtube-dl-exec</code> ظهر <code>MISSING</code> بعد <code>npm install</code> الحالي رغم وجوده في <code>package-lock.json</code> كتبعية اختيارية؛ يستحق تحققًا سريعًا أن التنزيل المباشر ليس صامت الفشل في بيئة النشر الفعلية.</td>
+</tr>
+<tr>
+<td><span class="badge b-grn">🟢 صغيرة</span></td>
+<td>ازدواج منطق خط الأنابيب بين <code>routes-translate.js</code> و<code>routes-sse.js</code> (كلاهما ينفّذ تدفق يوتيوب/مقال/نص بشكل شبه مكرَّر)</td>
+<td>موثَّق ذاتيًا في <code>CURRENT_STATE.md</code> §4.4</td>
+<td>المحاذاة 1:1 بين المسارين مضمونة حاليًا عبر إعادة استخدام <code>translateBatch</code> المشتركة، لكن بقية التدفق مكرَّر — خطر انحراف مستقبلي إن عُدِّل أحدهما دون الآخر. لا يستحق إعادة هيكلة فورية، لكن يستحق تتبّعًا.</td>
+</tr>
+</table>
+
+<h2 id="security">4️⃣ مراجعة أمنية (OWASP-محور)</h2>
+<div class="two-col">
+<div class="card">
+<h3>✅ محصَّن وتحقَّقتُ منه بالقراءة الفعلية</h3>
+<ul>
+<li><b>SSRF:</b> تغطية استثنائية (انظر القسم 2) + قفل DNS rebinding.</li>
+<li><b>Injection:</b> كل استدعاء عمليات خارجية (ffmpeg/yt-dlp) عبر <code>execFile</code> بمصفوفة، لا سلسلة shell أبدًا.</li>
+<li><b>Path traversal:</b> فحص صريح لبادئة المسار + regex على أسماء المشاريع/الملفات.</li>
+<li><b>Auth timing attack:</b> <code>crypto.timingSafeEqual</code> لتوكن الأدمن، وطول متساوٍ يُفحص أولًا لتفادي رمي الاستثناء المكشوف للتوقيت.</li>
+<li><b>Secrets في الاستعلام:</b> <code>?api_key=</code> يُرفض عمدًا كمصادقة (يظهر في السجلات/Referrer) — رأس <code>x-api-key</code> فقط.</li>
+<li><b>CSP:</b> فعّالة بتوجيهات صريحة (لا <code>unsafe-inline</code> للسكربت، السكربت المضمَّن السابق نُقل إلى <code>theme-init.js</code>).</li>
+<li><b>CORS:</b> قائمة سماح صريحة (<code>CORS_ORIGIN</code>) بدل <code>cors()</code> المفتوح.</li>
+<li><b>Rate limiting:</b> على كل <code>/api</code> كخط أساس + حدود أثقل للعمليات المكلفة (دبلجة/OCR/TTS)، مع مضاعِف لحاملي مفتاح API صالح.</li>
+</ul>
+</div>
+<div class="card">
+<h3>⚠️ لم يُفحص أو مقبول كقيد MVP صراحة</h3>
+<ul>
+<li><b>لا صلاحيات وصول للمشاريع:</b> أي شخص يعرف معرّف مشروع يقرؤه — لا مصادقة مستخدمين إطلاقًا (موثَّق كقرار مقصود لغياب حسابات في الـ MVP).</li>
+<li><b>حمولات TTS/OCR ضخمة لكل مقطع:</b> لم أُجرِ اختبار إجهاد فعليًا في هذه الجلسة.</li>
+<li><b>سباق تنزيلين متزامنين لنفس المشروع:</b> لم يُفحص تجريبيًا.</li>
+<li><b>الثغرة الحرجة في protobufjs (القسم 3):</b> لم أُقيّم قابلية الاستغلال الفعلية (هل مسار الوصول من مدخلات مستخدم غير موثوقة يصل فعليًا إلى فكّ Protobuf؟) — يحتاج فحصًا مخصصًا قبل اعتباره مغلقًا أو مقبولًا.</li>
+<li><b>حد طول 16 حرفًا لـ ADMIN_TOKEN:</b> تحذير فقط لا فرض — توكن قصير عمدًا من مشغّل النشر يبقى ممكنًا.</li>
+</ul>
+</div>
+</div>
+
+<h2 id="gaps">5️⃣ فجوة الطموح: ما تطلبه رؤية «استوديو دبلجة كامل» مقابل الموجود فعليًا</h2>
+<div class="card">
+<p class="muted">هذا الجدول مبني على مقارنة موثَّقة ذاتيًا داخل <code>CURRENT_STATE.md</code> (تحديث 7 سبتمبر) — تحقّقتُ من عيّنة منها بالبحث في الكود ولم أجد ما يناقضها.</p>
+<table>
+<tr><th>الميزة المتوقَّعة لمنصة دبلجة كاملة</th><th>الحالة الفعلية</th></tr>
+<tr><td>مصادقة مستخدمين / حسابات</td><td><span class="badge b-red">غير موجود</span> — لا جلسات، لا صلاحيات، لا عزل بيانات بين المستخدمين</td></tr>
+<tr><td>Speaker Diarization (فصل المتحدثين)</td><td><span class="badge b-red">غير موجود</span></td></tr>
+<tr><td>مزامنة توقيت الصوت المدبلج (<code>atempo</code>)</td><td><span class="badge b-red">غير موجود</span> — تحقّقتُ: لا ذكر لـ<code>atempo</code> في المستودع</td></tr>
+<tr><td>استنساخ صوت / تعيين أصوات متعددة</td><td><span class="badge b-red">غير موجود</span> — صوت واحد لكل لغة عبر gTTS</td></tr>
+<tr><td>محرر ترجمات (Subtitle Editor) يدوي</td><td><span class="badge b-red">غير موجود</span></td></tr>
+<tr><td>حرق الترجمات / تصيير فيديو نهائي</td><td><span class="badge b-red">غير موجود</span> — بثّ فقط، لا تصيير</td></tr>
+<tr><td>معالجة دفعية (Batch processing)</td><td><span class="badge b-red">غير موجود</span></td></tr>
+<tr><td>مسرد مصطلحات (Glossary) يُحترم أثناء الترجمة</td><td><span class="badge b-yel">جزئي</span> — يُطبَّق بعد الترجمة لا أثناءها</td></tr>
+<tr><td>ذاكرة ترجمة (Translation Memory)</td><td><span class="badge b-yel">جزئي</span> — كاش عام بلا سياق لغة/مشروع/ثقة</td></tr>
+<tr><td>مراقبة/سجلّات بنيوية (Observability)</td><td><span class="badge b-yel">بدائي</span> — <code>console.error</code> + ملف نصي متدوّر</td></tr>
+<tr><td>محرك مهام + نظام مشاريع + SQLite</td><td><span class="badge b-grn">موجود</span></td></tr>
+<tr><td>تخزين قابل للتبديل (محلي/S3/R2)</td><td><span class="badge b-grn">موجود</span> (محلي افتراضيًا)</td></tr>
+</table>
+<p style="margin-top:10px"><b>الخلاصة:</b> المشروع الحالي أداة ترجمة + دبلجة أساسية صلبة وآمنة — وليس بعد منصة إنتاج دبلجة احترافية. الفجوة معروفة ومكتوبة صراحة من الفريق نفسه، وهذه شفافية جيدة نادرة، لكنها تعني أن أي توقّع تسويقي بـ«استوديو دبلجة كامل» غير دقيق اليوم.</p>
+</div>
+
+<h2 id="recs">6️⃣ التوصيات (بالأولوية)</h2>
+<div class="card"><ol>
+<li><b>قيّموا استغلالية ثغرة protobufjs الحرجة</b> قبل أي نشر إنتاجي جديد — إمّا مسار ترقية مُختبَر لـ <code>@xenova/transformers</code>، أو تبرير مكتوب لقبول المخاطرة مؤقتًا (المدخل صوت/فيديو غير موثوق يستحق جدّية أعلى من ثغرات <code>qs</code> المتوسطة).</li>
+<li><b>وثّقوا قيد فقدان المهام عند إعادة التشغيل</b> في README كسلوك متوقَّع للمستخدم النهائي، أو نفّذوا استعادة بسيطة من <code>projects/</code> — البند مفتوح منذ أكثر من أسبوع بلا حسم.</li>
+<li><b>افصلوا تركيب المسارات في <code>server.js</code></b> إلى وحدة/دالة مستقلة مع تحذير بارز أعلى الملف يشير للاختبار الحارس — تقليل احتمال تكرار حادثة <code>routes-sse.js</code> 404 التاريخية مع أي مساهم جديد.</li>
+<li><b>خطة ترقية <code>express@5</code></b> (تحل سلسلة ثغرات <code>qs</code> المتوسطة) كمهمة منفصلة مع اختبار انحدار كامل — لا ضمن إصلاح سريع.</li>
+<li><b>تحققوا من <code>youtube-dl-exec</code></b> فعليًا في بيئة النشر (ظهر <code>MISSING</code> بعد التثبيت النظيف هنا رغم كونه في package-lock) لضمان أن مسار التنزيل ليس صامت الفشل.</li>
+<li><b>إن كان الهدف التسويقي لاحقًا هو «استوديو دبلجة كامل»</b>: رتّبوا فجوة القسم 5 في خارطة طريق صريحة (Speaker diarization → atempo sync → استنساخ صوت → محرر ترجمات) بدل تركها ضمنية في وثيقة تدقيق داخلية فقط.</li>
+</ol></div>
+
+<h2 id="scope">7️⃣ ما فُحص وما لم يُفحص (صدقًا)</h2>
+<div class="card">
+<p><b>فُحص فعليًا بالتشغيل في هذه الجلسة:</b> <code>npm install</code> نظيف كامل، <code>npm test</code> (534 اختبارًا)، <code>node scripts/check.js</code> (98 ملفًا)، <code>npm run lint</code>، <code>npm audit --omit=dev</code>، <code>npm outdated</code>، <code>git status/log</code> لنظافة الشجرة، وقراءة مباشرة لـ <code>server.js</code>، <code>ssrf.js</code>، <code>adminAuth.js</code>، <code>youtube-studio.js</code> (للتحقق من إصلاح تسرّب المؤقّت المذكور في مراجعة سابقة)، ومستندات <code>CURRENT_STATE.md</code>/<code>CHANGELOG.md</code>/<code>plan.md</code>/كل ملفات <code>specs/*/action-required.md</code>.</p>
+<p><b>لم يُفحص في هذه الجلسة:</b> تجربة متصفح حية (لا واجهة رسومية متاحة في هذه البيئة)، دبلجة فيديو حقيقي (ffmpeg غير مثبَّت هنا — اختبار E2E الوحيد المتجاوَز بيّن ذلك بوضوح)، اختبار إجهاد/تزامن حقيقي، تقييم استغلالية ثغرة protobufjs عمليًا، مراجعة سطر-بسطر لكل ملفات <code>server/providers/</code> (78 ملف خادم إجمالًا — رُوجعت عيّنة الملفات الأكثر حساسية أمنيًا وحركيًا لا كل الأسطر).</p>
+<p><b>الجملة الصادقة:</b> هذا فحص شامل على مستوى المشروع (وليس تدقيقًا للسطر بالسطر لكل الشيفرة)، مبني على تشغيل فعلي للفحوصات الآلية وقراءة مباشرة للملفات الحرجة أمنيًا ومعماريًا — لا يُثبت خلوّ المشروع من كل عيب، لكنه يعكس حالته الحقيقية بأمانة اليوم.</p>
+</div>
+
+<footer>
+وُلّد من مراجعة كاملة للمستودع (78 ملف خادم + 13 وحدة واجهة + 53 ملف اختبار) • AraLink • 8 سبتمبر 2026<br>
+الأدوات: node --test · node --check · eslint · npm audit · npm outdated · قراءة كود مباشرة
+</footer>
+
+</div></body></html>
