@@ -1,8 +1,7 @@
 // server/fetchContent.js — جلب المقالات والمواقع واستخراج النص الأساسي
-const http = require('node:http');
-const https = require('node:https');
 const cheerio = require('cheerio');
-const { validatePublicUrl } = require('./ssrf'); // حماية SSRF قبل أي جلب
+const { Agent } = require('undici'); // مُرسِل fetch مخصّص لتثبيت الاتصال على العنوان المُتحقَّق
+const { validatePublicUrl, ssrfSafeLookup } = require('./ssrf'); // حماية SSRF قبل أي جلب
 const { extractPdfText, extractPdfTitle } = require('./pdf'); // مستخرج نصوص PDF (بدون مكتبات)
 const { getRuleForUrl } = require('./extractionRules'); // قواعد استخراج مخصصة للمواقع الصعبة
 
@@ -22,133 +21,117 @@ const FETCH_HEADERS = {
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const MAX_HTML_BYTES = 10 * 1024 * 1024; // 10 MB — hard cap for HTML/text responses
 
-const fetchFailed = () => {
-  const err = new Error('fetch-failed');
-  err.code = 'fetch-failed';
-  return err;
-};
-const tooLarge = () => {
-  const err = new Error('input-too-large');
-  err.code = 'input-too-large';
-  return err;
-};
-
-// ===== جلب مثبّت على عنوان مُتحقَّق منه (يُغلق ثغرة TOCTOU/DNS-rebinding) =====
-// لا ندع Node يحلّ DNS إطلاقًا وقت الاتصال: نمرّر القائمة التي أعادها validatePublicUrl
-// (حلّ + فحص في خطوة واحدة) ونفتح المقبس على عنوان منها تحديدًا. القرار الوحيد لـ DNS
-// وقع قبل الفتح، فلا وجود لقرار ثانٍ يقلبه المهاجم بين الفحص والاتصال، والمقبس لا يمكن
-// أن يلامس عنوانًا داخليًا حتى لو انقلب سجل النطاق بعد الفحص.
-// `u` كائن URL مارّ بالفحص، وaddresses عناوينه العامة. يعيد IncomingMessage للاستجابة.
-function requestPinned(u, addresses, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const isHttps = u.protocol === 'https:';
-    const mod = isHttps ? https : http;
-    const base = {
-      method: 'GET',
-      port: Number(u.port) || (isHttps ? 443 : 80),
-      path: u.pathname + u.search,
-      // Host الأصلي (الاسم لا الـ IP) — تُخدم المواقع الافتراضية المشتركة على نفس العنوان
-      headers: { ...FETCH_HEADERS, Host: u.host },
-      signal: AbortSignal.timeout(timeoutMs),
-    };
-    // SNI الأصلي للـ https — الشهادة تُتحقَّق مقابل اسم المضيف الحقيقي لا مقابل الـ IP
-    if (isHttps) base.servername = u.hostname;
-
-    let lastErr = null;
-    const tryAddress = (i) => {
-      if (i >= addresses.length) {
-        const err = fetchFailed();
-        err.cause = lastErr;
-        return reject(err);
-      }
-      const req = mod.request({ ...base, hostname: addresses[i].address }, (res) => {
-        // نال المقبس استجابة من هذا العنوان — لا نعيد المحاولة بعد وصول الرأس
-        resolve(res);
-      });
-      req.on('error', (e) => {
-        lastErr = e;
-        tryAddress(i + 1); // نجرب عنوانًا آخر من قائمة من فُحصت سلفًا (غير ممنوع أصلًا)
-      });
-      req.end();
-    };
-    tryAddress(0);
-  });
-}
-
 /**
- * Read an HTTP response body as text with a streaming byte cap.
+ * Read a fetch Response body as text with a streaming byte cap.
  * Uses Content-Length for early rejection when present, then streams chunks
  * via the async iterator and aborts immediately if the accumulated size
  * exceeds `maxBytes`. Throws an error with `code = 'input-too-large'`
  * (→ HTTP 413) on overflow so callers can map it uniformly.
  */
 async function readBodyLimited(res, maxBytes) {
-  const lenHeader = res.headers['content-length'];
-  if (lenHeader && Number(lenHeader) > maxBytes) throw tooLarge();
+  const lenHeader = res.headers.get('content-length');
+  if (lenHeader && Number(lenHeader) > maxBytes) {
+    const err = new Error('input-too-large');
+    err.code = 'input-too-large';
+    throw err;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
   const chunks = [];
   let totalBytes = 0;
   try {
-    for await (const chunk of res) {
-      totalBytes += chunk.length;
-      if (totalBytes > maxBytes) throw tooLarge();
-      chunks.push(chunk);
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        const err = new Error('input-too-large');
+        err.code = 'input-too-large';
+        throw err;
+      }
+      chunks.push(value);
     }
   } finally {
-    // حرّر المقبس دائمًا — حتى عند التجاوز/الانقطاع لا يظل التنزيل مستمرًا في الخلفية
-    res.destroy();
+    // Ensure the reader is released even on error / abort
+    reader.releaseLock();
   }
-  return Buffer.concat(chunks).toString('utf-8');
+  return decoder.decode(Buffer.concat(chunks));
 }
 
 async function readPdfBufferLimited(res) {
-  const lenHeader = res.headers['content-length'];
-  if (lenHeader && Number(lenHeader) > MAX_PDF_BYTES) throw tooLarge();
-  const chunks = [];
-  let totalBytes = 0;
-  try {
-    for await (const chunk of res) {
-      totalBytes += chunk.length;
-      if (totalBytes > MAX_PDF_BYTES) throw tooLarge();
-      chunks.push(chunk);
-    }
-  } finally {
-    res.destroy();
+  const lenHeader = res.headers.get('content-length');
+  if (lenHeader && Number(lenHeader) > MAX_PDF_BYTES) {
+    const err = new Error('input-too-large');
+    err.code = 'input-too-large';
+    throw err;
   }
-  return Buffer.concat(chunks);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_PDF_BYTES) {
+    const err = new Error('input-too-large');
+    err.code = 'input-too-large';
+    throw err;
+  }
+  return buf;
 }
 
-// ===== fetch آمن ضد القفزات: كل قفزة (بما فيها الأولى) تُفحص وتُحلّ قبل فتح المقبس =====
-async function fetchWithSafeRedirects(startUrl, timeoutMs = 15000) {
+// undici Agent whose connect.lookup pins the socket to the SSRF-validated IP.
+// Passed to fetch() as its dispatcher so fetch does NOT re-resolve DNS on its
+// own — closing the rebinding (TOCTOU) window between validatePublicUrl and the
+// actual connect. One per request; closed by the caller after the body is read.
+function createSafeDispatcher() {
+  return new Agent({ connect: { lookup: ssrfSafeLookup } });
+}
+
+async function fetchWithSafeRedirects(startUrl, dispatcher, timeoutMs = 15000) {
   let currentUrl = startUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    // تحليل + فحص + حلّ DNS في خطوة واحدة (يرمي invalid-url / blocked-url قبل أي اتصال)
-    const validated = await validatePublicUrl(currentUrl);
-    const addresses = validated.addresses || [{ address: validated.address, family: 0 }];
+    let res;
+    try {
+      res = await fetch(currentUrl, {
+        headers: FETCH_HEADERS,
+        redirect: 'manual',
+        signal: AbortSignal.timeout(timeoutMs),
+        dispatcher,
+      });
+    } catch (e) {
+      const err = new Error('fetch-failed');
+      err.code = 'fetch-failed';
+      throw err;
+    }
 
-    const u = new URL(currentUrl);
-    const res = await requestPinned(u, addresses, timeoutMs);
+    if (!REDIRECT_STATUSES.includes(res.status)) return res;
 
-    if (!REDIRECT_STATUSES.includes(res.statusCode)) return res;
+    // Free the redirect response's socket for the next hop (we never read its body).
+    await res.body?.cancel?.().catch(() => {});
 
-    const location = res.headers.location;
+    const location = res.headers.get('location');
     if (!location) {
       // Redirect status without a Location header — treat as a failed fetch (matches old behavior)
-      throw fetchFailed();
+      const err = new Error('fetch-failed');
+      err.code = 'fetch-failed';
+      throw err;
     }
 
     let nextUrl;
     try {
       nextUrl = new URL(location, currentUrl).href;
     } catch (e) {
-      throw fetchFailed();
+      const err = new Error('fetch-failed');
+      err.code = 'fetch-failed';
+      throw err;
     }
 
-    // القفزة التالية تُفحص في بداية الدورة الجديدة قبل فتح أي مقبس عليها
+    // Re-validate the redirect target before fetching it (throws invalid-url / blocked-url).
+    // The dispatcher's lookup re-validates again at connect time, so a redirect that
+    // rebinds to an internal address between this check and the connect is still refused.
+    await validatePublicUrl(nextUrl);
     currentUrl = nextUrl;
   }
 
   // Too many redirects — fail closed
-  throw fetchFailed();
+  const err = new Error('fetch-failed');
+  err.code = 'fetch-failed';
+  throw err;
 }
 
 // ===== جلب المقال من رابط =====
@@ -159,63 +142,74 @@ async function fetchArticleContent(url) {
     throw err;
   }
 
-  // SSRF-safe fetch: كل قفزة (بما فيها الأولى) تُفحص وتُحلّ قبل فتح المقبس، والمقبس
-  // يُثبَّت على عنوان مُتحقَّق منه لا DNS ثانٍ — فينغلق مسار rebinding (invalid-url / blocked-url / fetch-failed)
-  const res = await fetchWithSafeRedirects(url);
+  // حماية SSRF: ارفض العناوين الداخلية/المحظورة قبل أي اتصال (blocked-url / invalid-url)
+  await validatePublicUrl(url);
 
-  if (res.statusCode < 200 || res.statusCode >= 300) {
-    const err = new Error('fetch-failed');
-    err.code = 'fetch-failed';
-    throw err;
-  }
+  // مُرسِل مثبَّت على العنوان المُتحقَّق: fetch لا يعيد حلّ DNS بنفسه، فيُغلق باب
+  // إعادة ربط DNS. يُغلق في finally بعد قراءة الجسم كاملًا.
+  const dispatcher = createSafeDispatcher();
+  try {
+    // SSRF-safe fetch: every redirect hop is validated before it is fetched, and the
+    // dispatcher re-validates at connect time (blocked-url / invalid-url / fetch-failed)
+    const res = await fetchWithSafeRedirects(url, dispatcher);
 
-  const contentType = res.headers['content-type'] || '';
-  // الكشف عن ملف PDF: امتداد .pdf في الرابط أو نوع المحتوى application/pdf
-  const isPdfUrl = /\.pdf($|\?)/i.test(url);
-  if (isPdfUrl || contentType.includes('pdf')) {
-    try {
-      const buf = await readPdfBufferLimited(res);
-      const text = await extractPdfText(buf); // يعيد '' إن كان النص قصيرًا جدًا أو غير قابل للقراءة
-      if (!text) {
+    if (!res.ok) {
+      const err = new Error('fetch-failed');
+      err.code = 'fetch-failed';
+      throw err;
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    // الكشف عن ملف PDF: امتداد .pdf في الرابط أو نوع المحتوى application/pdf
+    const isPdfUrl = /\.pdf($|\?)/i.test(url);
+    if (isPdfUrl || contentType.includes('pdf')) {
+      try {
+        const buf = await readPdfBufferLimited(res);
+        const text = extractPdfText(buf); // يعيد '' إن كان النص قصيرًا جدًا أو غير قابل للقراءة
+        if (!text) {
+          const err = new Error('pdf-unsupported');
+          err.code = 'pdf-unsupported';
+          throw err;
+        }
+        const title = extractPdfTitle(buf) || 'PDF';
+        // تقسيم النص إلى فقرات (كتل) بنفس صيغة المقالات حتى تمر عبر خط الترجمة نفسه
+        const blocks = text
+          .split(/\n{2,}/)
+          .map((p) => p.replace(/\s+/g, ' ').trim())
+          .filter((p) => p.length >= 3)
+          .map((p) => ({ type: 'text', content: p.slice(0, 20000) }));
+        if (!blocks.length) blocks.push({ type: 'text', content: text.slice(0, 20000) });
+        return { title, text, blocks, source: 'pdf' };
+      } catch (e) {
+        if (e.code === 'pdf-unsupported') throw e;
+        if (e.code === 'input-too-large') throw e;
         const err = new Error('pdf-unsupported');
         err.code = 'pdf-unsupported';
         throw err;
       }
-      const title = extractPdfTitle(buf) || 'PDF';
-      // تقسيم النص إلى فقرات (كتل) بنفس صيغة المقالات حتى تمر عبر خط الترجمة نفسه
-      const blocks = text
-        .split(/\n{2,}/)
-        .map((p) => p.replace(/\s+/g, ' ').trim())
-        .filter((p) => p.length >= 3)
-        .map((p) => ({ type: 'text', content: p.slice(0, 20000) }));
-      if (!blocks.length) blocks.push({ type: 'text', content: text.slice(0, 20000) });
-      return { title, text, blocks, source: 'pdf' };
-    } catch (e) {
-      if (e.code === 'pdf-unsupported') throw e;
-      if (e.code === 'input-too-large') throw e;
-      const err = new Error('pdf-unsupported');
-      err.code = 'pdf-unsupported';
-      throw err;
     }
-  }
 
-  const html = await readBodyLimited(res, MAX_HTML_BYTES);
+    const html = await readBodyLimited(res, MAX_HTML_BYTES);
 
-  // قاعدة استخراج مخصصة لهذا النطاق؟ (مواقع لا تلتقطها الأداة العامة)
-  const rule = await getRuleForUrl(url);
-  if (rule) {
-    try {
-      return extractWithSelectors(html, rule);
-    } catch (e) {
-      if (e.code === 'content-empty') {
-        // القاعدة لم تطابق شيئًا — نعود للاستخراج العام بدل الفشل
-        return extractMainText(html);
+    // قاعدة استخراج مخصصة لهذا النطاق؟ (مواقع لا تلتقطها الأداة العامة)
+    const rule = await getRuleForUrl(url);
+    if (rule) {
+      try {
+        return extractWithSelectors(html, rule);
+      } catch (e) {
+        if (e.code === 'content-empty') {
+          // القاعدة لم تطابق شيئًا — نعود للاستخراج العام بدل الفشل
+          return extractMainText(html);
+        }
+        throw e;
       }
-      throw e;
     }
-  }
 
-  return extractMainText(html);
+    return extractMainText(html);
+  } finally {
+    // أغلِق المُرسِل وسوكيتاته (الجسم قد قُرئ بالكامل هنا). لا ننتظر الإغلاق.
+    dispatcher.close().catch(() => dispatcher.destroy().catch(() => {}));
+  }
 }
 
 // ===== استخراج النص عبر محددات CSS مخصصة (قواعد المستخدم للمواقع الصعبة) =====
@@ -307,4 +301,4 @@ function extractMainText(html) {
   return { title, blocks };
 }
 
-module.exports = { fetchArticleContent, extractMainText, extractWithSelectors, requestPinned };
+module.exports = { fetchArticleContent, extractMainText, extractWithSelectors };

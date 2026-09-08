@@ -286,6 +286,7 @@ body {
 .hero-card { display: flex; flex-direction: column; gap: var(--space-5); }
 
 .field { display: flex; flex-direction: column; gap: var(--space-2); }
+.field[hidden] { display: none; }
 
 .field-label {
   font-size: .875rem;
@@ -435,6 +436,10 @@ body {
   transition: background .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
 }
 
+.btn-srt[hidden],
+.btn-listen[hidden],
+.btn-action[hidden] { display: none; }
+
 .btn-srt:disabled,
 .btn-listen:disabled,
 .btn-action:disabled { opacity: .5; cursor: not-allowed; }
@@ -470,6 +475,8 @@ body {
   border-radius: var(--radius-lg);
   background: var(--bg-subtle);
 }
+/* display الصريح أعلاه يتغلّب على [hidden] الافتراضي — بدونه يظهر الشريط فارغًا دومًا */
+.progress[hidden] { display: none; }
 
 .dots { display: flex; gap: 5px; }
 
@@ -797,6 +804,8 @@ body {
   background: var(--danger-soft);
   padding: 18px 22px;
 }
+/* نفس مشكلة .progress أعلاه — display الصريح يتغلّب على [hidden] الافتراضي */
+.error-card[hidden] { display: none; }
 
 .error-message {
   margin: 0;

@@ -25,10 +25,20 @@ export function renderResult(data) {
   const origTab = document.querySelector('.tab[data-tab="original"]');
   if (origTab) origTab.hidden = (data.type === 'local-video');
 
-  if (data.type === 'youtube')   return renderYouTubeResult(data);
-  if (data.type === 'article')   return renderArticleResult(data);
-  if (data.type === 'local-video') return renderYouTubeResult(data);
+  if (data.type === 'youtube')     return renderYouTubeResult(data);
+  if (data.type === 'article')     return renderArticleResult(data);
+  if (data.type === 'local-video') return renderLocalVideo(data);
   renderTextResult(data);
+}
+
+// ملف محلي مرفوع (تبويب «ترجمة ملف» → فيديو/صوت، عبر server/projectPipeline.js):
+// شكل البيانات مطابق تمامًا لنتيجة يوتيوب (captions بنفس الحقول)، فنعيد استخدام
+// renderYouTubeResult كاملة — نفس لوحة الترجمات، وزر SRT، وصفّ التصدير، والاستماع
+// — بدل بناء عرض مخصّص. الفارق الوحيد: لا رابط يوتيوب لتضمينه فنُخفي مربّع المشغّل.
+function renderLocalVideo(data) {
+  renderYouTubeResult(data);
+  resultEmbed.hidden = true;
+  resultEmbed.innerHTML = '';
 }
 
 function renderYouTubeResult(data) {
@@ -133,15 +143,26 @@ function revealResult() {
 export function renderTab(tab) {
   const data = state.current;
   if (!data) return;
-  const isOriginal = tab === 'original';
-  const text = data.type === 'youtube'
-    ? (data.captions || [])
-        .map((c) => (isOriginal ? c.original : c.translated || c.original) || '')
-        .join('\n')
-    : (isOriginal ? data.originalBlocks : data.translatedBlocks || [])
-        .map((b) => (b && b.content) || '')
-        .join('\n\n');
-  renderParagraphs(text);
+  if (tab === 'original') {
+    const text = data.type === 'youtube'
+      ? (data.captions || []).map((c) => c.original || '').join('\n')
+      : (data.originalBlocks || []).map((b) => (b && b.content) || '').join('\n\n');
+    renderParagraphs(text);
+  } else {
+    const text = data.type === 'youtube'
+      ? (data.captions || []).map((c) => c.translated || c.original || '').join('\n')
+      : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n');
+    renderParagraphs(text);
+  }
+  resultBody.innerHTML = '';
+  const t = tab === 'original'
+    ? (data.type === 'youtube'
+        ? (data.captions || []).map((c) => c.original || '').join('\n')
+        : (data.originalBlocks || []).map((b) => (b && b.content) || '').join('\n\n'))
+    : (data.type === 'youtube'
+        ? (data.captions || []).map((c) => c.translated || c.original || '').join('\n')
+        : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n'));
+  renderParagraphs(t);
 }
 
 function renderParagraphs(text) {

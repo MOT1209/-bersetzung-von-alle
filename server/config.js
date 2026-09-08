@@ -18,6 +18,14 @@ module.exports = {
   // حد المدة: ~300 رمز لكل ثانية فيديو، والحصة المجانية 8 ساعات يوميًا
   MAX_VIDEO_MINUTES: Number(process.env.MAX_VIDEO_MINUTES) || 20,
 
+  // ===== YouTube Data API v3 الرسمي (المسار المتوافق) =====
+  // مفتاح API وحده يكفي لبيانات الفيديوهات العامة (videos.list = وحدة واحدة من
+  // حصة 10,000/يوم). لا يمنح نص الترجمات: captions.download يتطلب OAuth بحساب
+  // مالك الفيديو ويعيد 403 لأي طرف ثالث — انظر server/youtubeApi.js.
+  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY || '',
+  // قابل للتغيير كي توجّهه الاختبارات إلى خادم محلي (لا شبكة في الاختبارات)
+  YOUTUBE_API_BASE: process.env.YOUTUBE_API_BASE || 'https://www.googleapis.com/youtube/v3',
+
   // محركات الترجمة الاحتياطية المجانية (تُستخدم عند حجب Google أو استنفاد حصته)
   LIBRE_URL: process.env.LIBRE_URL || 'https://libretranslate.com', // خادم LibreTranslate (اختياري)
   MYMEMORY_EMAIL: process.env.MYMEMORY_EMAIL || '', // بريد اختياري يرفع حصة MyMemory اليومية
@@ -59,6 +67,21 @@ module.exports = {
   // يُستنفد خلال دقيقة مشاهدة واحدة فتتوقف الدبلجة بـ 429. الطلب نفسه محدود
   // أصلًا بـ 40 مقطعًا، فالسقف الأعلى هنا لا يوسّع سطح الإساءة كثيرًا.
   RATE_LIMIT_MAX_DUB: Number(process.env.RATE_LIMIT_MAX_DUB) || 60,
+
+  // ===== التخزين والمشاريع (P3) =====
+  // مفاتيح لا مسارات: تغيير السائق إلى S3/R2 لاحقًا لا يمسّ أي مستدعٍ.
+  STORAGE_DRIVER: process.env.STORAGE_DRIVER || 'local',
+  STORAGE_DIR: process.env.STORAGE_DIR || path.join(__dirname, '..', 'cache', 'storage'),
+  // قاعدة بيانات SQLite عبر node:sqlite المدمج (بلا تبعية ولا بناء أصلي —
+  // وهو ما يهمّ هنا تحديدًا: الوحدات الأصلية سبق أن كسرت إقلاع صورة Docker).
+  DB_FILE: process.env.DB_FILE || path.join(__dirname, '..', 'cache', 'aralink.db'),
+
+  // ===== محرك الوظائف (server/jobs) =====
+  // سقف التزامن هو الحماية الحقيقية: العمل الثقيل مقيّد بالمعالج، وعشرة طلبات
+  // متزامنة بلا سقف تستهلك الجهاز بالكامل. 2 افتراض محافظ يناسب نسخة واحدة.
+  JOB_CONCURRENCY: Number(process.env.JOB_CONCURRENCY) || 2,
+  JOB_MAX_QUEUED: Number(process.env.JOB_MAX_QUEUED) || 50, // رفض صريح بدل نموّ ذاكرة
+  JOB_TTL_MS: Number(process.env.JOB_TTL_MS) || 3600000, // بقاء نتيجة الوظيفة ساعة
 
   // ===== فيديو محلي: أقصى مدة بالدقائق (الافتراضي 5 — STT بطيء ~5.5x المدة على هذا الجهاز) =====
   LOCAL_VIDEO_MAX_MIN: Number(process.env.LOCAL_VIDEO_MAX_MIN) || 5,

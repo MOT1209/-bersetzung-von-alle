@@ -125,6 +125,10 @@ app.use('/api', require('./routes-sse'));
 // ===== دبلجة يوتيوب إلى MP4 (jobs + SSE progress) — قبل compression عمدًا (نفس سبب routes-sse) =====
 app.use('/api', require('./routes-youtube-dub'));
 
+// ===== متابعة الوظائف — قبل compression عمدًا للسبب نفسه =====
+// '/api/jobs/:id/stream' بثّ SSE، والضاغط يخزّنه فيصل دفعة واحدة في النهاية.
+app.use('/api', require('./routes-jobs'));
+
 // ===== ضغط الاستجابات (يقلل حجم HTML/CSS/JS/JSON 60-80%) =====
 app.use(compression());
 
@@ -174,6 +178,15 @@ app.use('/api', ttsRouter);
 // ===== الدبلجة (حدّ خاص أوسع — دفعات متتابعة طوال الفيديو لا طلب واحد) =====
 app.use('/api/dub', createRateLimiter({ windowMs: config.RATE_LIMIT_WINDOW_MS, max: config.RATE_LIMIT_MAX_DUB }));
 app.use('/api', require('./routes-dub'));
+
+// ===== المشاريع (البند 30) — تحت الحد الأثقل: الرفع يكتب على القرص =====
+app.use('/api/projects', heavyLimiter);
+app.use('/api', require('./routes-projects'));
+
+// ===== بيانات يوتيوب الوصفية (الواجهة الرسمية — المسار المتوافق) =====
+// طلب خفيف (وحدة واحدة من حصة يوتيوب) لكنه يستهلك حصة خارجية، فيبقى تحت الحد الأثقل.
+app.use('/api/youtube', heavyLimiter);
+app.use('/api', require('./routes-youtube'));
 
 // ===== مسارات بثّ الفيديو (الترجمات المدمجة) =====
 app.use('/api/video', heavyLimiter);

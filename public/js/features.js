@@ -18,7 +18,7 @@ function saveHistory(list) { safeSet('aralink-history', JSON.stringify(list.slic
 export function saveToHistory(data, lang) {
   if (!data) return;
   const list = loadHistory();
-  const snippet = data.type === 'youtube'
+  const snippet = (data.type === 'youtube' || data.type === 'local-video')
     ? (data.captions || []).map((c) => c.translated || c.original || '').join(' ').slice(0, 140)
     : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join(' ').slice(0, 140) || (data.translated || '').slice(0, 140);
   list.unshift({ ts: Date.now(), lang, type: data.type, src: data.sourceUrl || '', title: data.meta?.title || '', snippet });
@@ -335,12 +335,25 @@ export function setupFileMode() {
   });
 }
 
-// صيغ الإدخال التي يدعمها الخادم (routes-file.js → SUPPORTED_IMPORT)
-const FILE_FORMAT_NAMES = {
+// صيغ المستندات (routes-file.js → SUPPORTED_IMPORT) — المسار الفوري /api/translate-file
+const DOC_FORMAT_NAMES = {
   txt: 'نص TXT', md: 'ماركداون MD', docx: 'مستند Word DOCX', xlsx: 'جدول Excel XLSX',
   csv: 'CSV', srt: 'ترجمات SRT', vtt: 'ترجمات VTT', json: 'JSON', xml: 'XML',
   epub: 'كتاب EPUB', pptx: 'عرض PowerPoint PPTX',
 };
+// صيغ الفيديو/الصوت (routes-local-video.js → SUPPORTED_EXT) — مسار المشاريع
+// (رفع → تفريغ صوتي → ترجمة، بتقدّم حيّ عبر server/projectPipeline.js)
+const MEDIA_FORMAT_NAMES = {
+  mp4: 'فيديو MP4', webm: 'فيديو WebM', mov: 'فيديو MOV', mkv: 'فيديو MKV',
+  avi: 'فيديو AVI', m4v: 'فيديو M4V', '3gp': 'فيديو 3GP',
+  mp3: 'صوت MP3', wav: 'صوت WAV', m4a: 'صوت M4A', ogg: 'صوت OGG',
+};
+const FILE_FORMAT_NAMES = { ...DOC_FORMAT_NAMES, ...MEDIA_FORMAT_NAMES };
+
+// حد المستندات يطابق حدّ /api/translate-file (base64 يضخّم ~33%، حدّ الراوتر 15MB)
+const MAX_DOC_BYTES = 10 * 1024 * 1024;
+// حد الفيديو/الصوت يطابق MAX_BASE64 في routes-local-video.js (~40MB بعد الترميز)
+const MAX_MEDIA_BYTES = 30 * 1024 * 1024;
 
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' بايت';
@@ -355,15 +368,16 @@ function handleFile(file) {
     showToast('صيغة الملف غير مدعومة — يُدعم: ' + Object.keys(FILE_FORMAT_NAMES).join('، '));
     return;
   }
-  // base64 يضخّم ~33% وحدّ جسم الراوتر 15MB — نبقى تحت ~10MB للملف الخام
-  if (file.size > 10 * 1024 * 1024) {
-    showToast('حجم الملف يتجاوز الحد الأقصى (10 ميغابايت)');
+  const kind = MEDIA_FORMAT_NAMES[ext] ? 'media' : 'document';
+  const maxBytes = kind === 'media' ? MAX_MEDIA_BYTES : MAX_DOC_BYTES;
+  if (file.size > maxBytes) {
+    showToast('حجم الملف يتجاوز الحد الأقصى (' + formatSize(maxBytes) + ')');
     return;
   }
   // الخادم يتوقّع JSON: { format, content(base64), targetLang } — نقرأ الملف base64
   const reader = new FileReader();
   reader.onload = () => {
-    state.file = { name: file.name, ext, base64: String(reader.result).split(',')[1] || '' };
+    state.file = { name: file.name, ext, kind, mime: file.type || null, base64: String(reader.result).split(',')[1] || '' };
     const fileMeta = document.getElementById('file-meta');
     if (fileMeta) {
       fileMeta.textContent = '📎 ' + file.name + ' (' + formatSize(file.size) + ') — ' + FILE_FORMAT_NAMES[ext];

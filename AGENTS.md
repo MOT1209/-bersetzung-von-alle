@@ -33,14 +33,16 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 
 ## ARCHITECTURE (follow unless user says otherwise)
 
-- **Frontend:** `public/index.html` + `public/style.css` + ES modules under `public/js/` (entry: `public/js/app.js`, loaded as `<script type="module">`). Arabic RTL, dark theme (see DESIGN.md). Only `public/` is served over HTTP; never move frontend assets to the project root. NOTE: `public/script.js` is the pre-modular monolith — superseded and slated for removal; do not edit it.
+- **Frontend:** `public/index.html` + `public/style.css` + ES modules under `public/js/` (entry: `public/js/app.js`, loaded as `<script type="module">`). Arabic RTL, dark theme (see DESIGN.md). Only `public/` is served over HTTP; never move frontend assets to the project root. NOTE: the pre-modular `public/script.js` monolith has been removed (commit `dc4d32d`) — the ES modules under `public/js/` are the sole frontend now.
 - **Backend:** Node.js + Express in `server/` — handles fetching (CORS), transcript extraction, translation
 - **YouTube:** `server/youtube.js` — uses `youtube-transcript` npm package
+- **YouTube (official/compliant):** `server/youtubeApi.js` + `routes-youtube.js` — YouTube Data API v3 `videos.list` for metadata (API key only, 1 quota unit). It CANNOT fetch caption text: `captions.download` requires OAuth as the video owner and returns 403 for any third party by design. Content for translation must come from a user upload (`/api/video-local`). Never add a caption-download path here.
 - **Article/website fetching:** `server/fetchContent.js` — server-side fetch + cheerio/readability to extract main text
 - **Translation:** `server/translate.js` — unified provider registry (Google → MyMemory → Libre → Gemini → DeepL → zen), auto-fallback + per-engine cooldown; language detection via the free Google endpoint
 - **Config:** `.env` for API keys (NEVER commit real keys)
+- **Job engine:** `server/jobs/queue.js` + `server/jobs/index.js` — concurrency-capped execution for heavy work (STT, dubbing, OCR, downloads), with progress, cancellation, a bounded queue and TTL cleanup. Handlers are registered by the module that owns the logic (see `routes-local-video.js`), never in `jobs/index.js`, to avoid circular requires. `JOB_CONCURRENCY` governs every execution including synchronous routes. NOT BullMQ: it requires Redis and has no memory mode, which would break single-instance deploys; the driver interface is there so BullMQ can be added for horizontal scaling without changing routes.
 - **Rate-limit store:** `server/store.js` — pluggable KV for rate-limit counters. Memory (per-process) by default; set `REDIS_URL` to share counters across server instances. `redis` is an optionalDependency; any connect failure logs once and falls back to memory (never crashes). Cache (`cache.js`) and stats/usage stay file-based (fine for a single instance).
-- **Files/OCR/PDF/TTS:** `server/files.js` + `server/routes-file.js` (11→8 formats), `server/ocr.js` (Tesseract.js), `server/pdf.js` (PDF parsing), `server/tts.js` (MS Edge TTS) + `server/cache.js`/`usage.js`/`logger.js`
+- **Files/OCR/PDF/TTS:** `server/files.js` + `server/routes-file.js` (11→8 formats), `server/ocr.js` (Tesseract.js), `server/pdf.js` (PDF parsing), `server/tts.js` (gTTS — نقطة نهاية Google غير الرسمية) + `server/cache.js`/`usage.js`/`logger.js`
 - **Translation quality:** `server/quality.js` + `server/wer.js` — offline WER benchmark of every provider against `samples/translation/refset.json`. Run `npm run bench:translate` → writes `cache/quality-report.json`; the admin dashboard reads it via `GET /api/stats/quality` (ADMIN_TOKEN-gated). Never run in CI (consumes free translation quota).
 - **Extension:** `extension/` (Chrome Manifest V3: popup.js/background.js) — ترجمة فورية داخل المتصفح
 
@@ -61,7 +63,12 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 
 ## DATABASE
 
-- No database needed for MVP — this is a stateless tool. Do not add Postgres/ORM unless the user explicitly asks for history/saving features.
+- SQLite via Node's built-in `node:sqlite` (P3), file at `DB_FILE` (default `cache/aralink.db`). No ORM, no database server, no native build — that last point matters because a missing native dependency has previously stopped the server booting inside Docker.
+- ALL SQL lives in `server/db/`. Routes and core never write a query, so moving to Postgres later touches two files.
+- `PRAGMA foreign_keys = ON` is required: SQLite disables it by default, and without it `ON DELETE CASCADE` silently does nothing and orphan rows survive.
+- `node:sqlite` is experimental in Node 22 and prints an ExperimentalWarning at boot. Accepted deliberately; the repository layer contains the risk.
+- Schema changes go in `server/db/migrations.js` as a NEW entry appended to the list. Never edit an applied migration.
+- **Storage:** files go through `server/providers/storage/` by KEY, never by path. User-supplied filenames must never form part of a storage key; generate the key and keep the original name in `meta`.
 
 ## TESTING
 
@@ -93,7 +100,6 @@ UI language: **Arabic (RTL)**. Code comments and agent communication: English.
 │   ├── style.css      ← design system styles
 │   ├── js/            ← ES modules: app.js (entry), ui.js, translate.js, result.js,
 │   │                    media.js, features.js, stream.js, dashboard.js, utils.js, constants.js
-│   └── script.js      ← LEGACY pre-modular monolith (superseded — do not edit)
 ├── server/
 │   ├── server.js      ← Express app (routes, proxy, static serving of public/)
 │   ├── fetchContent.js← article/website extraction

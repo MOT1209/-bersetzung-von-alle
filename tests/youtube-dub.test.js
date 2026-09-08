@@ -68,12 +68,12 @@ test('POST /api/youtube/dub: رابط غير صالح → 400', async () => {
     assert.equal(r.status, 400);
   } finally { srv.close(); }
 });
-test('GET /api/jobs/nope → 404', async () => {
+test('GET /api/dub/jobs/nope → 404', async () => {
   const app = require('../server/server');
   const srv = app.listen(0);
   try {
     const port = srv.address().port;
-    const r = await fetch(`http://127.0.0.1:${port}/api/jobs/nope`);
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/jobs/nope`);
     assert.equal(r.status, 404);
   } finally { srv.close(); }
 });
@@ -130,12 +130,12 @@ test('jobs: مهمة جارية وقت الإقلاع تُعلَّم interrupted
   jobs._testClear();
   jobs.reloadFromDisk();
 });
-test('GET /api/projects/:id/jobs: يعيد مهام المشروع', async () => {
+test('GET /api/dub/projects/:id/jobs: يعيد مهام المشروع', async () => {
   const app = require('../server/server');
   const srv = app.listen(0);
   try {
     const port = srv.address().port;
-    const r = await fetch(`http://127.0.0.1:${port}/api/projects/somepid/jobs`);
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/somepid/jobs`);
     assert.equal(r.status, 200);
     const data = await r.json();
     assert.ok(Array.isArray(data.jobs));
@@ -171,14 +171,14 @@ test('cleanup: يحذف المشاريع القديمة ويحمي الجاري�
   assert.ok(!fs.existsSync(oldP));
   fs.rmSync(dir, { recursive: true, force: true });
 });
-test('DELETE /api/projects/:id: معرّف سيئ → 400، مفقود → 404', async () => {
+test('DELETE /api/dub/projects/:id: معرّف سيئ → 400، مفقود → 404', async () => {
   const app = require('../server/server');
   const srv = app.listen(0);
   try {
     const port = srv.address().port;
-    const bad = await fetch(`http://127.0.0.1:${port}/api/projects/bad!pid`, { method: 'DELETE' });
+    const bad = await fetch(`http://127.0.0.1:${port}/api/dub/projects/bad!pid`, { method: 'DELETE' });
     assert.equal(bad.status, 400);
-    const missing = await fetch(`http://127.0.0.1:${port}/api/projects/no-such-proj-zzz`, { method: 'DELETE' });
+    const missing = await fetch(`http://127.0.0.1:${port}/api/dub/projects/no-such-proj-zzz`, { method: 'DELETE' });
     assert.equal(missing.status, 404);
   } finally { srv.close(); }
 });

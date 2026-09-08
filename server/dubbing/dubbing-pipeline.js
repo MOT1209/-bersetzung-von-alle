@@ -194,10 +194,10 @@ async function runDubbingJob(job, jobs) {
     const stat = fs.statSync(finalMp4);
     const result = {
       projectId: job.projectId,
-      videoUrl: `/api/projects/${job.projectId}/dubbed-${targetLang}.mp4`,
-      audioUrl: `/api/projects/${job.projectId}/dubbing-${targetLang}.mp3`,
-      srtUrl: `/api/projects/${job.projectId}/subtitles-${targetLang}.srt`,
-      vttUrl: `/api/projects/${job.projectId}/subtitles-${targetLang}.vtt`,
+      videoUrl: `/api/dub/projects/${job.projectId}/dubbed-${targetLang}.mp4`,
+      audioUrl: `/api/dub/projects/${job.projectId}/dubbing-${targetLang}.mp3`,
+      srtUrl: `/api/dub/projects/${job.projectId}/subtitles-${targetLang}.srt`,
+      vttUrl: `/api/dub/projects/${job.projectId}/subtitles-${targetLang}.vtt`,
       sourceLang, targetLang, mode, segments: segments.length,
       sizeBytes: stat.size, title: meta.title,
     };

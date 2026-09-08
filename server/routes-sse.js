@@ -1,9 +1,10 @@
 // server/routes-sse.js — بث الترجمة عبر SSE (Server-Sent Events)
 // يمكّن الواجهة من عرض الترجمة فورًا مع التقدّم بدلاً من انتظار النتيجة كاملة.
 const express = require('express');
-const { extractVideoId, getTranscript } = require('./youtube');
+const youtube = require('./youtube');
 const translate = require('./translate'); // وصول وقت التنفيذ (نمط routes-translate.js)
 const fetchContent = require('./fetchContent');
+const routesTranslate = require('./routes-translate'); // إعادة استخدام translateBatch (المحاذاة الصارمة 1:1)
 
 // أغلفة وصول وقت التنفيذ: تفكيك الدوال وقت الاستيراد يجمّد المرجع الأصلي،
 // فيصبح المسار غير قابل للتزييف في الاختبارات (نفس الخلل الذي عولج في
@@ -11,6 +12,9 @@ const fetchContent = require('./fetchContent');
 const detectLanguage = (...a) => translate.detectLanguage(...a);
 const applyGlossary = (...a) => translate.applyGlossary(...a);
 const fetchArticleContent = (...a) => fetchContent.fetchArticleContent(...a);
+const extractVideoId = (...a) => youtube.extractVideoId(...a);
+const getTranscript = (...a) => youtube.getTranscript(...a);
+const translateBatch = (...a) => routesTranslate.translateBatch(...a);
 const { transcribeVideoAudio } = require('./audio');
 const { trackUsage } = require('./usage');
 
@@ -235,14 +239,15 @@ async function streamYouTube(res, sendEvent, videoId, targetLang, glossary, tOpt
     for (const batch of allBatches) {
       if (res.writableEnded) return; // فحص انقطاع العميل
 
-      const joined = batch.map((l) => l.original).join('\n\n');
-      const { translated } = await translate.translateTextWithMeta(joined, targetLang, sourceLang, tOpts);
-      const parts = String(translated).split('\n\n').map((p) => p.trim()).filter(Boolean);
+      // محاذاة 1:1 صارمة — نفس عقد المسار غير المتدفّق (translateBatch): إمّا
+      // مطابقة تامّة (بتقسيم الدفعة وإعادة المحاولة عند اللزوم) أو alignment-failed.
+      // الكود السابق كان يكرّر parts[0] بصمت عند عدم التطابق، فيبثّ ترجمة «تبدو
+      // سليمة ومعناها محطّم» — وهو بالضبط ما بُني العقد الصارم لمنعه. الفشل
+      // الصريح يُلتقط في catch أدناه ويُرسَل كحدث error.
+      const { parts } = await translateBatch(batch, targetLang, sourceLang, tOpts);
 
-      // محاذاة 1:1 — لو العدد لا يطابق، نرسل النص كما هو لكل سطر
       for (let i = 0; i < batch.length; i++) {
-        const part = parts[i] || parts[0] || '';
-        const translatedText = applyGlossary(part, glossary);
+        const translatedText = applyGlossary(parts[i], glossary);
         sentCount++;
 
         translatedCaptions.push({

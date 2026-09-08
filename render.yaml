@@ -1,10 +1,32 @@
-# Render.com blueprints — نشر AraLink بسحب واحد
+# Render.com blueprint — نشر AraLink بسحب واحد
+#
+# ⚠️ الخطة Starter لا free — قرار مقصود، لا سهو.
+# الخطة المجانية بلا قرص دائم إطلاقًا ونظام ملفاتها مؤقت: تُمحى قاعدة البيانات
+# (cache/aralink.db) وكل ملفات المشاريع المرفوعة (cache/storage/) عند كل نوم
+# للخدمة (بعد 15 دقيقة خمول) أو إعادة نشر. طالما التطبيق يحفظ مشاريع حقيقية
+# (server/db/ + server/providers/storage — من P3) فالمجانية تعني بيانات تُفقد
+# دوريًا لا استضافة حقيقية. راجع CURRENT_STATE.md §15.
+#
+# التكلفة: $7/شهر (Starter: 512MB رام، 0.5 vCPU) + $0.25/غيغابايت للقرص.
+# القرص هنا 5GB (~$1.25/شهر) — يكفي عشرات الفيديوهات (الحد ~45MB لكل رفع)
+# ويُرفَع لاحقًا من لوحة Render دون تعديل هذا الملف إن امتلأ.
+#
+# ⚠️ حتى بخطة Starter: 512MB رام ضيقة لتشغيل ffmpeg + Whisper + Tesseract
+# متزامنين تحت استخدام حقيقي. JOB_CONCURRENCY أدناه يبقيها عند 1 عمدًا على
+# هذه الموارد — ارفعه فقط بعد ترقية الخطة (Standard فما فوق).
+#
+# للعودة إلى المجانية لعرض تجريبي بلا بيانات دائمة: اجعل plan: free واحذف
+# قسم disk بالكامل (Render يرفض القرص على الخطة المجانية).
 services:
   - type: web
     name: aralink
     runtime: docker
-    plan: free
+    plan: starter
     healthCheckPath: /api/health
+    disk:
+      name: aralink-data
+      mountPath: /app/cache   # يطابق VOLUME /app/cache في Dockerfile
+      sizeGB: 5
     envVars:
       - key: GEMINI_API_KEY
         sync: false            # يُضاف يدويًا من لوحة Render (اختياري)
@@ -16,3 +38,9 @@ services:
         value: "20"
       - key: CORS_ORIGIN
         sync: false            # قائمة بيضاء (فارغة = نفس الأصل فقط) — يُضاف يدويًا عند الحاجة
+      - key: YOUTUBE_API_KEY
+        sync: false            # اختياري — يُفعّل GET /api/youtube/metadata (بيانات وصفية فقط، انظر server/youtubeApi.js)
+      - key: ADMIN_TOKEN
+        sync: false            # مطلوب لتفعيل /api/settings و/api/stats (لوحة التحكم) — بلا قيمة تبقى معطّلة (503) وهو آمن افتراضيًا
+      - key: JOB_CONCURRENCY
+        value: "1"              # محافظ على موارد Starter — ارفعه عند ترقية الخطة (انظر التنبيه أعلاه)

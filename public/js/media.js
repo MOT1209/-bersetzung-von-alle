@@ -51,7 +51,8 @@ export function buildSrt(captions) {
 
 export function downloadSrt() {
   const data = state.current;
-  if (!data || data.type !== 'youtube' || !Array.isArray(data.captions)) return;
+  const isCaptioned = data && (data.type === 'youtube' || data.type === 'local-video');
+  if (!isCaptioned || !Array.isArray(data.captions)) return;
   const srt  = buildSrt(data.captions);
   const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
   const url  = URL.createObjectURL(blob);

@@ -43,7 +43,7 @@ async function pollJob(jobId, onUpdate) {
     const p = setInterval(async () => {
       if (settled) { clearInterval(p); return; }
       try {
-        const r = await fetch(`/api/jobs/${jobId}`);
+        const r = await fetch(`/api/dub/jobs/${jobId}`);
         const job = await r.json();
         onUpdate(job);
         if (job.status === 'completed' || job.status === 'failed') { finish(); clearInterval(p); }
@@ -51,7 +51,7 @@ async function pollJob(jobId, onUpdate) {
     }, 2000);
   }
   try {
-    const es = new EventSource(`/api/jobs/${jobId}/stream`);
+    const es = new EventSource(`/api/dub/jobs/${jobId}/stream`);
     es.addEventListener('progress', (ev) => {
       try {
         const job = JSON.parse(ev.data);
@@ -145,7 +145,7 @@ async function renderTimeline(r) {
   box.innerHTML = '<p class="muted">جاري تحميل المقاطع…</p>';
   let segments = [];
   try {
-    const res = await fetch(`/api/projects/${r.projectId}/translation-${r.targetLang}.json`);
+    const res = await fetch(`/api/dub/projects/${r.projectId}/translation-${r.targetLang}.json`);
     if (res.ok) segments = await res.json();
   } catch {}
   box.innerHTML = '';
@@ -203,7 +203,7 @@ function wireDeleteButton(r) {
     if (!pid) return;
     if (!window.confirm('حذف المشروع وملفاته نهائيًا؟')) return;
     try {
-      const res = await fetch(`/api/projects/${pid}`, { method: 'DELETE' });
+      const res = await fetch(`/api/dub/projects/${pid}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('delete-failed');
       $('yt-result').hidden = true;
       $('yt-progress-label').textContent = 'حُذف المشروع.';

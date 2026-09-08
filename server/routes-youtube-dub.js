@@ -39,14 +39,14 @@ router.post('/youtube/dub', async (req, res) => {
   res.status(202).json({ jobId: first.jobId, projectId: first.projectId, status: 'queued', jobs: created });
 });
 
-router.get('/jobs/:id', (req, res) => {
+router.get('/dub/jobs/:id', (req, res) => {
   const job = jobs.getJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'job-not-found' });
   res.json(jobs.publicJob(job));
 });
 
 // بث حيّ للتقدم عبر SSE
-router.get('/jobs/:id/stream', (req, res) => {
+router.get('/dub/jobs/:id/stream', (req, res) => {
   const job = jobs.getJob(req.params.id);
   if (!job) return res.status(404).json({ error: 'job-not-found' });
   res.setHeader('Content-Type', 'text/event-stream');
@@ -60,14 +60,14 @@ router.get('/jobs/:id/stream', (req, res) => {
 
 // مهام المشروع (للاسترداد بعد إعادة التشغيل — تُقرأ من الذاكرة المستعادة من القرص)
 // مهم: قبل مسار :file حتى لا يُفسَّر 'jobs' كاسم ملف.
-router.get('/projects/:projectId/jobs', (req, res) => {
+router.get('/dub/projects/:projectId/jobs', (req, res) => {
   const pid = String(req.params.projectId || '');
   if (!/^[a-zA-Z0-9_-]{1,40}$/.test(pid)) return res.status(400).json({ error: 'invalid-project' });
   res.json({ projectId: pid, jobs: jobs.listProjectJobs(pid) });
 });
 
 // حذف مشروع كامل (ملفاته من القرص) — تنظيف يدوي بجانب التلقائي
-router.delete('/projects/:projectId', (req, res) => {
+router.delete('/dub/projects/:projectId', (req, res) => {
   const pid = String(req.params.projectId || '');
   if (!/^[a-zA-Z0-9_-]{1,40}$/.test(pid)) return res.status(400).json({ error: 'invalid-project' });
   const full = path.join(PROJECTS_DIR, pid);
@@ -83,7 +83,7 @@ router.delete('/projects/:projectId', (req, res) => {
 
 // ملفات المشاريع: أسماء آمنة فقط (dubbed-XX.mp4 / dubbing-XX.mp3 / subtitles-XX.srt|vtt / source.mp4)
 const SAFE_FILE = /^(dubbed-[a-z]{2,3}(-[A-Z]{2})?\.mp4|dubbing-[a-z]{2,3}(-[A-Z]{2})?\.mp3|subtitles-[a-z]{2,3}(-[A-Z]{2})?\.(srt|vtt)|translation-[a-z]{2,3}(-[A-Z]{2})?\.json|source\.mp4|transcript\.json)$/;
-router.get('/projects/:projectId/:file', (req, res) => {
+router.get('/dub/projects/:projectId/:file', (req, res) => {
   const pid = String(req.params.projectId || '');
   const file = String(req.params.file || '');
   if (!/^[a-zA-Z0-9_-]{1,40}$/.test(pid) || !SAFE_FILE.test(file)) {
