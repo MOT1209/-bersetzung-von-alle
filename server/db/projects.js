@@ -2,7 +2,7 @@
 //
 // كل وصول إلى SQL يمرّ من هنا: النواة والمسارات لا تكتب استعلامًا واحدًا،
 // فالانتقال إلى Postgres لاحقًا يمسّ هذا الملف وحده (البند 43 مطبَّقًا على البيانات).
-const { randomUUID } = require('crypto');
+const { randomUUID, randomBytes, createHash, timingSafeEqual } = require('crypto');
 const { getDb } = require('./index');
 const { storage } = require('../providers/storage');
 
@@ -51,6 +51,12 @@ function rowToAsset(r) {
 
 // ===== المشاريع =====
 
+// توكن الملكية: 32 بايت عشوائية تُعاد **مرة واحدة** عند الإنشاء ولا تُخزَّن أبدًا
+// كنصّ. القاعدة تحفظ sha256 فقط، فمن يقرأ القاعدة لا يستطيع انتحال المالك.
+function hashToken(token) {
+  return createHash('sha256').update(String(token)).digest('hex');
+}
+
 function createProject({ name, sourceType = null, sourceRef = null, targetLangs = [], status = 'draft' } = {}) {
   const clean = String(name || '').trim();
   if (!clean) throw codeError('invalid-project', 'الاسم مطلوب');
@@ -60,11 +66,26 @@ function createProject({ name, sourceType = null, sourceRef = null, targetLangs 
 
   const now = Date.now();
   const id = randomUUID();
+  const ownerToken = randomBytes(32).toString('hex');
   getDb().prepare(`INSERT INTO projects
-      (id, name, source_type, source_ref, target_langs, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, clean, sourceType, sourceRef, JSON.stringify(targetLangs), status, now, now);
-  return getProject(id);
+      (id, name, source_type, source_ref, target_langs, status, created_at, updated_at, owner_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, clean, sourceType, sourceRef, JSON.stringify(targetLangs), status, now, now, hashToken(ownerToken));
+  // التوكن خارج rowToProject عمدًا: لا يظهر في أي قراءة لاحقة، هذه فرصته الوحيدة
+  return { ...getProject(id), ownerToken };
+}
+
+/**
+ * هل يملك حاملُ هذا التوكن المشروعَ؟ مقارنة ثابتة الزمن على التجزئتين.
+ * صفّ قديم بلا owner_hash ⇒ false دائمًا (fail-closed، لا انفتاح ضمني).
+ */
+function verifyProjectOwner(projectId, token) {
+  if (!token) return false;
+  const row = getDb().prepare('SELECT owner_hash FROM projects WHERE id = ?').get(String(projectId || ''));
+  if (!row || !row.owner_hash) return false;
+  const a = Buffer.from(hashToken(token), 'hex');
+  const b = Buffer.from(row.owner_hash, 'hex');
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function getProject(id) {
@@ -161,6 +182,7 @@ async function deleteAsset(id) {
 
 module.exports = {
   createProject, getProject, listProjects, countProjects, updateProject, deleteProject,
+  verifyProjectOwner,
   addAsset, getAsset, listAssets, deleteAsset,
   projectPrefix,
   VALID_STATUS, VALID_KINDS,

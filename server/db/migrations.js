@@ -35,4 +35,15 @@ module.exports = [
       CREATE INDEX idx_projects_created ON projects(created_at DESC);
     `,
   },
+  {
+    version: 2,
+    name: 'project-owner-token',
+    // ملكية المشروع: قبل هذا كان أي زائر يسرد كل المشاريع وينزّل ملفات غيره
+    // ويحذفها. نخزّن تجزئة التوكن لا التوكن نفسه — تسريب القاعدة لا يمنح وصولًا.
+    // NULL مسموح للصفوف القديمة: تصبح بلا مالك، ويرفض المسار الوصول إليها
+    // (fail-closed) بدل أن ينفتح عليها للجميع.
+    up: `
+      ALTER TABLE projects ADD COLUMN owner_hash TEXT;
+    `,
+  },
 ];

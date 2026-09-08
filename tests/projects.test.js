@@ -12,6 +12,7 @@ process.env.DB_FILE = path.join(tmpDir, 'test.db');
 process.env.STORAGE_DIR = path.join(tmpDir, 'storage');
 process.env.RATE_LIMIT_MAX = '1000';
 process.env.RATE_LIMIT_MAX_HEAVY = '1000';
+process.env.ADMIN_TOKEN = 'projects-test-admin';
 
 const db = require('../server/db');
 const repo = require('../server/db/projects');
@@ -31,18 +32,28 @@ after(async () => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* تنظيف */ }
 });
 
-const api = (p, opts) => fetch(baseUrl + p, {
-  headers: { 'Content-Type': 'application/json' }, ...opts,
+// كل عملية على مشروع تحتاج توكن المالك بعد §19؛ التوكن يُعاد عند الإنشاء وحده.
+const api = (p, opts = {}) => fetch(baseUrl + p, {
+  ...opts,
+  headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
 });
-const post = (p, body) => api(p, { method: 'POST', body: JSON.stringify(body) });
+const post = (p, body, token) => api(p, {
+  method: 'POST',
+  body: JSON.stringify(body),
+  headers: token ? { 'X-Project-Token': token } : {},
+});
+const owner = (token) => ({ 'X-Project-Token': token });
+// ADMIN_TOKEN مضبوط في الأعلى — سرد كل المشاريع صار للأدمن وحده
+const asAdmin = { 'x-admin-token': process.env.ADMIN_TOKEN };
 
 // ===== 1) الترحيلات =====
 
 test('الترحيلات: تُطبَّق مرة واحدة وتكون idempotent', () => {
   const handle = db.getDb();
   const applied = handle.prepare('SELECT version, name FROM schema_migrations').all();
-  assert.ok(applied.length >= 1);
+  assert.ok(applied.length >= 2);
   assert.equal(applied[0].version, 1);
+  assert.equal(applied[1].version, 2, 'ترحيل owner_hash (§19) غير مُطبَّق');
   // إعادة التشغيل لا تُعيد التطبيق ولا ترمي
   db.migrate(handle);
   assert.equal(handle.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get().n, applied.length);
@@ -60,7 +71,10 @@ test('createProject/getProject: يحفظ الحقول ويحوّل JSON', () => 
   assert.equal(p.name, 'دورتي');
   assert.deepEqual(p.targetLangs, ['ar', 'de']);
   assert.equal(p.status, 'draft');
-  assert.deepEqual(repo.getProject(p.id), p);
+  // التوكن يُعاد عند الإنشاء وحده ولا يظهر في القراءة (§19)
+  assert.ok(p.ownerToken);
+  const { ownerToken, ...stored } = p;
+  assert.deepEqual(repo.getProject(p.id), stored);
 });
 
 test('createProject: يرفض المدخلات غير الصالحة', () => {
@@ -118,7 +132,7 @@ test('deleteProject: يحذف الأصول متسلسلا والملفات ال�
   const created = await (await post('/api/projects', { name: 'to-delete' })).json();
   const asset = await (await post(`/api/projects/${created.id}/assets`, {
     kind: 'media', content: Buffer.from('content').toString('base64'), filename: 'v.mp4',
-  })).json();
+  }, created.ownerToken)).json();
 
   assert.ok(await storage().exists(asset.storageKey), 'لم يكتب الملف اصلا');
   assert.equal(await repo.deleteProject(created.id), true);
@@ -137,7 +151,7 @@ test('POST/GET /api/projects: إنشاء وقائمة', async () => {
   const created = await res.json();
   assert.equal(created.name, 'via-api');
 
-  const list = await (await api('/api/projects')).json();
+  const list = await (await api('/api/projects', { headers: asAdmin })).json();
   assert.ok(Array.isArray(list.projects));
   assert.ok(list.total >= 1);
   assert.ok(list.projects.some((p) => p.id === created.id));
@@ -153,8 +167,8 @@ test('GET /api/projects/:id: يعيد المشروع مع أصوله، والم�
   const created = await (await post('/api/projects', { name: 'with-assets-api' })).json();
   await post(`/api/projects/${created.id}/assets`, {
     kind: 'subtitle', content: Buffer.from('sub').toString('base64'), filename: 's.srt', mime: 'text/plain',
-  });
-  const full = await (await api(`/api/projects/${created.id}`)).json();
+  }, created.ownerToken);
+  const full = await (await api(`/api/projects/${created.id}`, { headers: owner(created.ownerToken) })).json();
   assert.equal(full.assets.length, 1);
   assert.equal(full.assets[0].kind, 'subtitle');
   assert.equal((await api('/api/projects/ghost')).status, 404);
@@ -162,7 +176,9 @@ test('GET /api/projects/:id: يعيد المشروع مع أصوله، والم�
 
 test('PATCH /api/projects/:id: تعديل، والمجهول 404', async () => {
   const created = await (await post('/api/projects', { name: 'to-patch' })).json();
-  const res = await api(`/api/projects/${created.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'ready' }) });
+  const res = await api(`/api/projects/${created.id}`, {
+    method: 'PATCH', body: JSON.stringify({ status: 'ready' }), headers: owner(created.ownerToken),
+  });
   assert.equal((await res.json()).status, 'ready');
   const missing = await api('/api/projects/ghost', { method: 'PATCH', body: JSON.stringify({ name: 'x' }) });
   assert.equal(missing.status, 404);
@@ -173,10 +189,10 @@ test('رفع أصل: يخزن المحتوى وينزل كما هو', async () =
   const payload = Buffer.from('binary-ish payload');
   const asset = await (await post(`/api/projects/${created.id}/assets`, {
     kind: 'audio', content: payload.toString('base64'), filename: 'a.mp3', mime: 'audio/mpeg',
-  })).json();
+  }, created.ownerToken)).json();
   assert.equal(asset.bytes, payload.length);
 
-  const dl = await api(`/api/projects/${created.id}/assets/${asset.id}/content`);
+  const dl = await api(`/api/projects/${created.id}/assets/${asset.id}/content`, { headers: owner(created.ownerToken) });
   assert.equal(dl.status, 200);
   assert.equal(dl.headers.get('content-type'), 'audio/mpeg');
   assert.deepEqual(Buffer.from(await dl.arrayBuffer()), payload);
@@ -187,7 +203,7 @@ test('رفع أصل: اسم ملف خبيث لا يخرج عن مجلد المش
   const evil = '../../../etc/passwd';
   const asset = await (await post(`/api/projects/${created.id}/assets`, {
     kind: 'media', content: Buffer.from('x').toString('base64'), filename: evil,
-  })).json();
+  }, created.ownerToken)).json();
   // المفتاح يولد ولا يشتق من اسم المستخدم — الاسم الأصلي يبقى في meta فقط
   assert.ok(asset.storageKey.startsWith(`projects/${created.id}/media/`), `مفتاح خطير: ${asset.storageKey}`);
   assert.ok(!asset.storageKey.includes('..'));
@@ -196,9 +212,10 @@ test('رفع أصل: اسم ملف خبيث لا يخرج عن مجلد المش
 
 test('رفع أصل: نوع غير معروف أو محتوى فارغ 400، ومشروع مجهول 404', async () => {
   const created = await (await post('/api/projects', { name: 'reject' })).json();
-  assert.equal((await post(`/api/projects/${created.id}/assets`, { kind: 'ghost', content: 'eA==' })).status, 400);
-  assert.equal((await post(`/api/projects/${created.id}/assets`, { kind: 'media', content: '' })).status, 400);
-  assert.equal((await post('/api/projects/ghost/assets', { kind: 'media', content: 'eA==' })).status, 404);
+  const t = created.ownerToken;
+  assert.equal((await post(`/api/projects/${created.id}/assets`, { kind: 'ghost', content: 'eA==' }, t)).status, 400);
+  assert.equal((await post(`/api/projects/${created.id}/assets`, { kind: 'media', content: '' }, t)).status, 400);
+  assert.equal((await post('/api/projects/ghost/assets', { kind: 'media', content: 'eA==' }, t)).status, 404);
 });
 
 test('أصل من مشروع آخر لا يقرأ عبر مشروع ثان', async () => {
@@ -206,10 +223,10 @@ test('أصل من مشروع آخر لا يقرأ عبر مشروع ثان', asy
   const p2 = await (await post('/api/projects', { name: 'two' })).json();
   const asset = await (await post(`/api/projects/${p1.id}/assets`, {
     kind: 'media', content: Buffer.from('secret').toString('base64'),
-  })).json();
-  // معرف الأصل وحده لا يكفي — يجب أن ينتمي للمشروع في المسار
-  assert.equal((await api(`/api/projects/${p2.id}/assets/${asset.id}/content`)).status, 404);
-  assert.equal((await api(`/api/projects/${p1.id}/assets/${asset.id}/content`)).status, 200);
+  }, p1.ownerToken)).json();
+  // معرف الأصل وحده لا يكفي — يجب أن ينتمي للمشروع في المسار (حتى بتوكن صحيح لـp2)
+  assert.equal((await api(`/api/projects/${p2.id}/assets/${asset.id}/content`, { headers: owner(p2.ownerToken) })).status, 404);
+  assert.equal((await api(`/api/projects/${p1.id}/assets/${asset.id}/content`, { headers: owner(p1.ownerToken) })).status, 200);
 });
 
 test('DELETE /api/projects/:id/assets/:assetId: يحذف الأصل وملفه', async () => {
@@ -217,8 +234,10 @@ test('DELETE /api/projects/:id/assets/:assetId: يحذف الأصل وملفه',
   const created = await (await post('/api/projects', { name: 'del-asset' })).json();
   const asset = await (await post(`/api/projects/${created.id}/assets`, {
     kind: 'export', content: Buffer.from('x').toString('base64'),
-  })).json();
-  const res = await api(`/api/projects/${created.id}/assets/${asset.id}`, { method: 'DELETE' });
+  }, created.ownerToken)).json();
+  const res = await api(`/api/projects/${created.id}/assets/${asset.id}`, {
+    method: 'DELETE', headers: owner(created.ownerToken),
+  });
   assert.equal(res.status, 200);
   assert.equal(repo.getAsset(asset.id), null);
   assert.equal(await storage().exists(asset.storageKey), false);

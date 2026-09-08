@@ -7,16 +7,38 @@
 //   POST   /api/projects/:id/assets رفع أصل (base64) وتخزينه
 //   GET    /api/projects/:id/assets/:assetId/content  تنزيل محتوى الأصل
 //
-// ملاحظة نطاق: لا مستخدمين بعد — كل المشاريع مشتركة. إضافة المالك تصبح عمودًا
-// وفلترًا هنا عند بناء المصادقة، ولا تغيّر شكل هذه المسارات.
+// ===== الملكية (بدل «كل المشاريع مشتركة» السابق) =====
+// لا مستخدمين ولا تسجيل دخول بعد، لكن غياب المستخدمين لا يبرّر أن يسرد أي زائر
+// مشاريع الآخرين وينزّل ملفاتهم ويحذفها — وهو ما كان يحدث فعليًا. البديل الأخفّ:
+// توكن مالك عشوائي يُعاد مرة واحدة عند الإنشاء ويُرسَل في رأس X-Project-Token.
+// هذا «رابط قدرة» (capability) لا هوية: يكفي لعزل المستخدمين عن بعضهم، ويُستبدل
+// بمصادقة حقيقية لاحقًا دون تغيير شكل المسارات.
 const express = require('express');
 const { randomUUID } = require('crypto');
 const repo = require('./db/projects');
 const jobs = require('./jobs');
 const pipeline = require('./projectPipeline'); // يسجّل معالج الوظيفة عند تحميله
 const { storage } = require('./providers/storage');
+const { requireAdmin, isAdmin } = require('./adminAuth');
 
 const router = express.Router();
+
+const PROJECT_TOKEN_HEADER = 'x-project-token';
+
+/**
+ * يتحقق من ملكية المشروع قبل أي عملية عليه.
+ * الأدمن يتجاوز (لوحة التحكم تحتاج رؤية كل شيء).
+ * الرد على مشروع لا يملكه الطالب هو 404 لا 403: لا نؤكّد وجود معرّف لا يملكه.
+ */
+function requireProjectOwner(req, res, next) {
+  const project = repo.getProject(req.params.id);
+  if (!project) return res.status(404).json({ error: 'project-not-found' });
+  if (!isAdmin(req) && !repo.verifyProjectOwner(project.id, req.get(PROJECT_TOKEN_HEADER))) {
+    return res.status(404).json({ error: 'project-not-found' });
+  }
+  req.project = project;
+  next();
+}
 
 const MAX_ASSET_BASE64 = 60 * 1024 * 1024; // ~45MB فعلية بعد فكّ base64
 
@@ -39,8 +61,10 @@ function sendError(res, e) {
 
 router.use(express.json({ limit: '80mb' })); // الأصول تصل base64
 
-// ===== قائمة المشاريع =====
-router.get('/projects', (req, res) => {
+// ===== قائمة كل المشاريع — للأدمن وحده =====
+// كانت مفتوحة للجميع، فكانت تكشف مشاريع كل الزوار وتجعل تنزيل ملفاتهم مسألة
+// نسخ معرّف. لا يملك المستخدم العادي «قائمة» أصلًا: يحتفظ متصفحه بتوكناته.
+router.get('/projects', requireAdmin, (req, res) => {
   try {
     const limit = Number(req.query.limit) || 50;
     const offset = Number(req.query.offset) || 0;
@@ -61,33 +85,28 @@ router.post('/projects', (req, res) => {
 });
 
 // ===== مشروع واحد مع أصوله =====
-router.get('/projects/:id', (req, res) => {
+router.get('/projects/:id', requireProjectOwner, (req, res) => {
   try {
-    const project = repo.getProject(req.params.id);
-    if (!project) return res.status(404).json({ error: 'project-not-found' });
-    res.json({ ...project, assets: repo.listAssets(project.id) });
+    res.json({ ...req.project, assets: repo.listAssets(req.project.id) });
   } catch (e) {
     return sendError(res, e);
   }
 });
 
 // ===== تعديل =====
-router.patch('/projects/:id', (req, res) => {
+router.patch('/projects/:id', requireProjectOwner, (req, res) => {
   try {
-    const updated = repo.updateProject(req.params.id, req.body || {});
-    if (!updated) return res.status(404).json({ error: 'project-not-found' });
-    res.json(updated);
+    res.json(repo.updateProject(req.project.id, req.body || {}));
   } catch (e) {
     return sendError(res, e);
   }
 });
 
 // ===== حذف (يشمل الملفات المخزّنة) =====
-router.delete('/projects/:id', async (req, res) => {
+router.delete('/projects/:id', requireProjectOwner, async (req, res) => {
   try {
-    const ok = await repo.deleteProject(req.params.id);
-    if (!ok) return res.status(404).json({ error: 'project-not-found' });
-    res.json({ deleted: true, id: req.params.id });
+    await repo.deleteProject(req.project.id);
+    res.json({ deleted: true, id: req.project.id });
   } catch (e) {
     return sendError(res, e);
   }
@@ -95,10 +114,9 @@ router.delete('/projects/:id', async (req, res) => {
 
 // ===== رفع أصل =====
 // body: { kind, content (base64), filename?, mime?, lang?, meta? }
-router.post('/projects/:id/assets', async (req, res) => {
+router.post('/projects/:id/assets', requireProjectOwner, async (req, res) => {
   try {
-    const project = repo.getProject(req.params.id);
-    if (!project) return res.status(404).json({ error: 'project-not-found' });
+    const project = req.project;
 
     const { kind, content, filename, mime = null, lang = null, meta = {} } = req.body || {};
     if (!repo.VALID_KINDS.includes(kind)) {
@@ -133,7 +151,7 @@ router.post('/projects/:id/assets', async (req, res) => {
 });
 
 // ===== تنزيل محتوى أصل =====
-router.get('/projects/:id/assets/:assetId/content', async (req, res) => {
+router.get('/projects/:id/assets/:assetId/content', requireProjectOwner, async (req, res) => {
   try {
     const asset = repo.getAsset(req.params.assetId);
     // نتحقق من انتماء الأصل للمشروع: بدونه يصير معرّف الأصل وحده مفتاحًا لأي ملف
@@ -151,7 +169,7 @@ router.get('/projects/:id/assets/:assetId/content', async (req, res) => {
 });
 
 // ===== حذف أصل =====
-router.delete('/projects/:id/assets/:assetId', async (req, res) => {
+router.delete('/projects/:id/assets/:assetId', requireProjectOwner, async (req, res) => {
   try {
     const asset = repo.getAsset(req.params.assetId);
     if (!asset || asset.projectId !== req.params.id) {
@@ -167,10 +185,9 @@ router.delete('/projects/:id/assets/:assetId', async (req, res) => {
 // ===== تشغيل خط المعالجة على أصل وسائط =====
 // POST /api/projects/:id/process  body: { assetId, targetLang? }
 // يعيد 202 ومعرّف وظيفة: العمل أثقل من عمر طلب HTTP، فيُتابع عبر /api/jobs/:id
-router.post('/projects/:id/process', (req, res) => {
+router.post('/projects/:id/process', requireProjectOwner, (req, res) => {
   try {
-    const project = repo.getProject(req.params.id);
-    if (!project) return res.status(404).json({ error: 'project-not-found' });
+    const project = req.project;
 
     const { assetId, targetLang = 'ar' } = req.body || {};
     const asset = repo.getAsset(assetId);
