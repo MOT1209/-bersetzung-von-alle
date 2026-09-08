@@ -273,6 +273,8 @@ async function saveSettings(e) {
   }
   if (!body.ttsEnabled) body.ttsEnabled = false;
   if (!body.autoCache)  body.autoCache  = false;
+  // المحرك المفضّل: يُحفظ محليًا أيضًا حتى تلتقطه منطق الترجمة (translate.js)
+  try { localStorage.setItem('preferredProvider', body.preferredProvider || ''); } catch {}
   try {
     const res  = await fetch('/api/settings', {
       method: 'POST',
@@ -299,6 +301,7 @@ async function loadSettings() {
     if (fields.geminiApiKey)    fields.geminiApiKey.value    = data.geminiApiKey    || '';
     if (fields.preferredProvider) fields.preferredProvider.value = data.preferredProvider || '';
     if (fields.autoCache)       fields.autoCache.checked     = !!data.autoCache;
+    try { localStorage.setItem('preferredProvider', data.preferredProvider || ''); } catch {}
   } catch {}
 }
 

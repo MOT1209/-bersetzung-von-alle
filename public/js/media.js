@@ -3,7 +3,7 @@ import { state, detectArabic, postJson } from './utils.js';
 import {
   resultEmbed, localPlayer, capBar, capPanel, capPanelList,
   ttsPlayer, listenBtn, localBtn, srtBtn, targetLang,
-  showError,
+  showError, showToast,
 } from './ui.js';
 
 /* ---------- WebVTT + VTT clock ---------- */

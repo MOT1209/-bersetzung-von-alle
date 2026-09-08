@@ -133,26 +133,15 @@ function revealResult() {
 export function renderTab(tab) {
   const data = state.current;
   if (!data) return;
-  if (tab === 'original') {
-    const text = data.type === 'youtube'
-      ? (data.captions || []).map((c) => c.original || '').join('\n')
-      : (data.originalBlocks || []).map((b) => (b && b.content) || '').join('\n\n');
-    renderParagraphs(text);
-  } else {
-    const text = data.type === 'youtube'
-      ? (data.captions || []).map((c) => c.translated || c.original || '').join('\n')
-      : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n');
-    renderParagraphs(text);
-  }
-  resultBody.innerHTML = '';
-  const t = tab === 'original'
-    ? (data.type === 'youtube'
-        ? (data.captions || []).map((c) => c.original || '').join('\n')
-        : (data.originalBlocks || []).map((b) => (b && b.content) || '').join('\n\n'))
-    : (data.type === 'youtube'
-        ? (data.captions || []).map((c) => c.translated || c.original || '').join('\n')
-        : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n'));
-  renderParagraphs(t);
+  const isOriginal = tab === 'original';
+  const text = data.type === 'youtube'
+    ? (data.captions || [])
+        .map((c) => (isOriginal ? c.original : c.translated || c.original) || '')
+        .join('\n')
+    : (isOriginal ? data.originalBlocks : data.translatedBlocks || [])
+        .map((b) => (b && b.content) || '')
+        .join('\n\n');
+  renderParagraphs(text);
 }
 
 function renderParagraphs(text) {

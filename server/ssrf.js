@@ -74,11 +74,22 @@ function isBlockedV6(groups) {
   if ((groups[0] & 0xfe00) === 0xfc00) return true;
   // fe80::/10 (link-local) — أول 10 بت = 1111111010
   if ((groups[0] & 0xffc0) === 0xfe80) return true;
+  // 2002::/16 (6to4) — يحمل عنوان IPv4 داخل بتاته اللاحقة (مثل 2002:7f00:1:: = 127.0.0.1)
+  if (groups[0] === 0x2002) return true;
+  // 2001::/32 (Teredo) — أول 32 بت هي 2001:0000، ويعيد توجيه IPv4 داخل البتات اللاحقة
+  // (مع استثناء 2001:200::/28 الرسمي وهو نطاق عام مخصص IETF — يُترك لأن مضيفي تيريدو
+  // يختارون 2001:0000::/32 كبادئة، والتحقق يكون على البادئة الضيقة)
+  if (groups[0] === 0x2001 && groups[1] === 0) return true;
   // ::ffff:0:0/96 (IPv4-mapped) — فكّها وتحقق من عنوان IPv4 الداخلي
   if (
     groups[0] === 0 && groups[1] === 0 && groups[2] === 0 &&
     groups[3] === 0 && groups[4] === 0 && groups[5] === 0xffff
   ) {
+    const inner = groups[6] * 65536 + groups[7];
+    return BLOCKED_V4.some(([lo, hi]) => inner >= lo && inner <= hi);
+  }
+  // ::/96 (IPv4-compatible) — أول 4 مجموعات أصفار ثم عنوان IPv4 (مثل ::7f00:1 = 127.0.0.1)
+  if (groups[0] === 0 && groups[1] === 0 && groups[2] === 0 && groups[3] === 0) {
     const inner = groups[6] * 65536 + groups[7];
     return BLOCKED_V4.some(([lo, hi]) => inner >= lo && inner <= hi);
   }
@@ -132,6 +143,21 @@ async function validatePublicUrl(url) {
     err.code = 'blocked-url';
     throw err;
   };
+
+  // ===== رفض الصيغ غير التقليدية لعناوين IP =====
+  // هنا يكمن فرق تحليل بين المتصفحات/مكدّسات الشبكة (inet_pton يقبل ثمانيًا بالصيغة
+  // العشرية أو السداسية أو الثمانية: 2130706433، 0x7f.0.0.1، 0177.0.0.1) ودالة
+  // ipv4ToInt الخاصة بنا (تعامل كل ثماني كعشري صِرف). المضيف الذي لا يُحلّ بمعيارنا
+  // قد يُحلّ بعناوين داخلية لدى المكتبة — فتُرفض كل صيغة لا تطابق الشكل التقليدي:
+  //   - عدد صحيح عشري/سداسي فقط (مثل http://2130706433 أو http://0x7f000001)
+  //   - ثماني بمقدّمة صفر أو بصيغة سداسية داخل صيغة منقّطة
+  //     (مثل http://0177.0.0.1 يقرأه البعض ثمانيًا = 127.0.0.1، أو http://0x7f.0.0.1)
+  if (/^(\d+|0x[0-9a-f]+)$/i.test(host)) throwBlocked();
+  if (/^([\da-fx]+\.){3}[\da-fx]+$/i.test(host)) {
+    const octets = host.split('.');
+    const canonical = octets.every((o) => /^\d{1,3}$/.test(o) && !(o.length > 1 && o.startsWith('0')));
+    if (!canonical) throwBlocked(); // صيغة غير تقليدية (سداسية/ثمانية بمقدّمة صفر)
+  }
 
   // hostname عنوان IP حرفي؟ تحقق منه مباشرة دون DNS
   if (net.isIP(host)) {

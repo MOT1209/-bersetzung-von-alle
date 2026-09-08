@@ -8,6 +8,7 @@ import {
   result, clearHistoryBtn, isTtsLang, hideError,
 } from './ui.js';
 import { runTranslate, runSmartTranslate, runBatch } from './translate.js';
+import { initYoutubeStudio } from './youtube-studio.js';
 import {
   renderResult, renderTab, renderCompare,
   handleOcrResult, copyResult, shareResult,
@@ -78,6 +79,10 @@ smartBtn.addEventListener('click', runSmartTranslate);
 modeBtns.forEach((btn) => {
   btn.addEventListener('click', () => {
     if (btn.dataset.mode === state.mode) return;
+    // إيقاف أي بثّ جارٍ قبل تبديل الوضع — يمنع إعادة عرض نتيجة قديمة فوق
+    // الوضع الجديد (سباق كان يحدث لأن state.abortCtrl لا يُستدعى في أي مكان).
+    if (typeof state.abortCtrl === 'function') state.abortCtrl();
+    state.abortCtrl = null;
     state.mode = btn.dataset.mode;
     modeBtns.forEach((b) => {
       const active = b === btn;
@@ -156,11 +161,17 @@ textInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlK
 
 /* ===== المقارنة ===== */
 compareBtn.addEventListener('click', () => {
+  const data = state.current;
+  if (!data) return;
   state.compare = !state.compare;
   compareBtn.classList.toggle('active', state.compare);
-  if (state.compare) tabs.forEach((t) => t.classList.remove('active'));
-  else renderTab('translated');
-  renderTab(state.compare ? state.compare : state.activeTab);
+  if (state.compare) {
+    tabs.forEach((t) => t.classList.remove('active'));
+    renderCompare(data);
+  } else {
+    tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === 'translated'));
+    renderTab('translated');
+  }
 });
 
 /* ===== تحميلLangs + سجل + مشاركة ===== */
@@ -168,8 +179,9 @@ checkBackend();
 loadLanguages();
 renderHistory();
 handleShareHash();
+initYoutubeStudio();
 
-/* ===== فتح عبر الرابط外部 ===== */
+/* ===== فتح عبر الرابط الخارجي ===== */
 (function bootstrapFromQuery() {
   try {
     const params    = new URLSearchParams(location.search);
@@ -194,5 +206,13 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     if (!(await checkBackend())) return;
     navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+
+  // بعد النشر يستولي SW جديد على التحكم (skipWaiting + claim) — والصفحة المفتوحة
+  // تظل تعمل بالنسخة القديمة حتى تُحدث. عند تبدّل التحكّم نُحدّث الصفحة مرة واحدة
+  // حتى لا يبقى المستخدم واقفًا على واجهة قديمة بينما الخادم على نسخة جديدة.
+  // لا نحمي من الحلقة (التحديث اللانهائي): التبدّل يحدث مرة واحدة لكل إصدار.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
   });
 }

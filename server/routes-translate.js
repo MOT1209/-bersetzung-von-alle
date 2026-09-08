@@ -160,9 +160,16 @@ router.post('/translate-smart', async (req, res) => {
 });
 
 // ===== POST /api/srt — بناء ملف SRT =====
+// قائمة الترجمة تأتي من جسم الطلب (محدود أصلًا بـ 2MB عبر express.json)، لكن نكفّ
+// النمو عدديًا أيضًا: فيديو مدته 3 ساعات يحتاج ~10-11 ألف مقطعًا، فسقف 50000 يمنع
+// حلقات بناء ضخمة بدون تقييد مشروع (حتى لو كبر حد الجسم مستقبلًا).
+const MAX_SRT_CAPTIONS = 50000;
 router.post('/srt', (req, res) => {
   const { captions } = req.body || {};
   if (!Array.isArray(captions) || !captions.length) {
+    return res.status(400).json({ error: 'invalid-captions' });
+  }
+  if (captions.length > MAX_SRT_CAPTIONS) {
     return res.status(400).json({ error: 'invalid-captions' });
   }
   const srt = buildSrt(captions);

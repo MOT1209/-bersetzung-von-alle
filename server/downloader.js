@@ -72,8 +72,19 @@ async function downloadAudio(url, outPath, timeoutMs = 180000) {
 }
 
 /** تنزيل فيديو بملف تقدمي واحد (22=720p، 18=360p) — بدون حاجة لدمج ffmpeg */
-async function downloadVideo(url, outPath, timeoutMs = 300000) {
-  await ytDownload(url, outPath, ['-f', '22/18/best'], timeoutMs);
+async function downloadVideo(url, outPath, timeoutMs = 300000, maxBytes = 0) {
+  // حدّ الحجم: يُقطع التنزيل مبكرًا إن تجاوزته نيةُ الملف (يمنع استنزاف القرص والنطاق)
+  const capArgs = maxBytes > 0 ? ['--max-filesize', `${Math.max(1, Math.floor(maxBytes / 1024 / 1024))}M`] : [];
+  await ytDownload(url, outPath, ['-f', '22/18/best', ...capArgs], timeoutMs);
+  if (maxBytes > 0) {
+    const st = await fs.promises.stat(outPath).catch(() => null);
+    if (st && st.size > maxBytes) {
+      await fs.promises.unlink(outPath).catch(() => {});
+      const err = new Error(`video-too-large (${st.size} > ${maxBytes} bytes)`);
+      err.code = 'video-too-large';
+      throw err;
+    }
+  }
 }
 
 module.exports = { ytDownload, downloadAudio, downloadVideo, resolveYtDlp, ytDlpBin };

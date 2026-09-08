@@ -37,38 +37,38 @@ function buildTinyPdf(text, { compress = true, asArray = false } = {}) {
 // نص أطول من حد 50 حرفًا حتى لا تُعتبر النتيجة فارغة
 const LONG_TEXT = 'Hello World. This is a longer PDF text content that we expect to extract.';
 
-test('extractPdfText: يستخرج النص من دفق FlateDecode مضغوط', () => {
+test('extractPdfText: يستخرج النص من دفق FlateDecode مضغوط', async () => {
   const pdf = buildTinyPdf(LONG_TEXT);
-  const text = extractPdfText(pdf);
+  const text = await extractPdfText(pdf);
   assert.ok(text.includes('Hello World'), `النص المستخرج: "${text}"`);
   assert.ok(text.includes('longer PDF text content'), `النص المستخرج: "${text}"`);
 });
 
-test('extractPdfText: يستخرج النص من مصفوفة TJ', () => {
+test('extractPdfText: يستخرج النص من مصفوفة TJ', async () => {
   const pdf = buildTinyPdf(LONG_TEXT, { asArray: true });
-  const text = extractPdfText(pdf);
+  const text = await extractPdfText(pdf);
   assert.ok(text.includes('Hello World'), `النص المستخرج: "${text}"`);
   assert.ok(text.includes('expect to extract'), `النص المستخرج: "${text}"`);
 });
 
-test('extractPdfText: يدعم الدفق غير المضغوط (نص خام)', () => {
+test('extractPdfText: يدعم الدفق غير المضغوط (نص خام)', async () => {
   const pdf = buildTinyPdf(LONG_TEXT, { compress: false });
-  const text = extractPdfText(pdf);
+  const text = await extractPdfText(pdf);
   assert.ok(text.includes('Hello World'), `النص المستخرج: "${text}"`);
 });
 
-test('extractPdfText: نص قصير جدًا (< 50 حرفًا) يعيد سلسلة فارغة', () => {
+test('extractPdfText: نص قصير جدًا (< 50 حرفًا) يعيد سلسلة فارغة', async () => {
   const pdf = buildTinyPdf('tiny text');
-  assert.equal(extractPdfText(pdf), '');
+  assert.equal(await extractPdfText(pdf), '');
 });
 
-test('extractPdfText: Buffer فارغ أو null يعيد سلسلة فارغة', () => {
-  assert.equal(extractPdfText(Buffer.alloc(0)), '');
-  assert.equal(extractPdfText(null), '');
+test('extractPdfText: Buffer فارغ أو null يعيد سلسلة فارغة', async () => {
+  assert.equal(await extractPdfText(Buffer.alloc(0)), '');
+  assert.equal(await extractPdfText(null), '');
 });
 
-test('extractPdfText: محتوى غير PDF يعيد سلسلة فارغة', () => {
-  assert.equal(extractPdfText(Buffer.from('just some plain bytes, not a pdf at all', 'latin1')), '');
+test('extractPdfText: محتوى غير PDF يعيد سلسلة فارغة', async () => {
+  assert.equal(await extractPdfText(Buffer.from('just some plain bytes, not a pdf at all', 'latin1')), '');
 });
 
 test('extractPdfTitle: يستخرج العنوان من قاموس معلومات PDF', () => {
