@@ -42,18 +42,25 @@ module.exports = {
   ZEN_MODEL: process.env.ZEN_MODEL || 'deepseek-v4-flash-free',
   // ترتيب المزوّدين المفضّل (فاصلة) — تُتخطى المزوّدات غير المتوفرة تلقائيًا
   PROVIDER_ORDER: process.env.PROVIDER_ORDER || '', // مثل: 'google,mymemory,libre,gemini'
-  // نموذج التفريغ الصوتي. tiny سريع لكنه ضعيف جدًا على العربية والتركية.
+  // نموذج التفريغ الصوتي. small هو الافتراضي — أدق بكثير من tiny على العربية والتركية.
   // للغات الأربع المستهدفة (ar/de/tr/en) يُنصح بـ small على الأقل عند توفر
   // الذاكرة: Xenova/whisper-tiny (39MB) < base (74MB) < small (244MB).
   // الإنجليزية والألمانية مقبولتان على base؛ العربية والتركية تحتاج small+.
-  WHISPER_MODEL: process.env.WHISPER_MODEL || 'Xenova/whisper-tiny',
+  // الحجم الأكبر يحتاج ذاكرة/معالجة أكثر — عدّل عبر .env إن كان الجهاز ضعيفًا.
+  WHISPER_MODEL: process.env.WHISPER_MODEL || 'Xenova/whisper-small',
 
   // محرك التفريغ الصوتي: 'sherpa' (أسرع بكثير، sherpa-onnx) أو 'transformers' (الاحتياطي Xenova)
   // إن لم يكن sherpa-onnx مثبتًا أو فشل تحميل نموذجه يعود audio.js تلقائيًا إلى 'transformers'
   STT_ENGINE: process.env.STT_ENGINE || 'sherpa',
 
-  // نموذج sherpa-onnx: whisper-tiny متعدد اللغات (يدعم 100+ لغة، int8 ~75MB) من HuggingFace
+  // حجم نموذج sherpa-onnx: tiny|base|small (الافتراضي tiny).
+  // tiny (~75MB int8) سريع لكنه ضعيف على العربية/التركية؛ small (~244MB int8) أدق بكثير.
+  // على أجهزة ذات ذاكرة محدودة، tiny أو base قد يكونان أفضل خيار.
+  SHERPA_WHISPER_VARIANT: process.env.SHERPA_WHISPER_VARIANT || 'tiny',
+
+  // نموذج sherpa-onnx: متعدد اللغات (يدعم 100+ لغة) من HuggingFace
   // المسارات قابلة للتعديل عبر المتغيرات؛ يُنزَّل النموذج تلقائيًا عند أول تشغيل ويُخزَّن محليًا
+  // مجلد افتراضي يشمل حجم النموذج لتجنب تصادم ملفات tiny/base/small
   SHERPA_MODEL_DIR: process.env.SHERPA_MODEL_DIR || path.join(MODEL_DIR, 'sherpa-whisper-tiny'),
   SHERPA_ENCODER: process.env.SHERPA_ENCODER || '', // يُملأ تلقائيًا من SHERPA_MODEL_DIR
   SHERPA_DECODER: process.env.SHERPA_DECODER || '',
@@ -82,6 +89,9 @@ module.exports = {
   JOB_CONCURRENCY: Number(process.env.JOB_CONCURRENCY) || 2,
   JOB_MAX_QUEUED: Number(process.env.JOB_MAX_QUEUED) || 50, // رفض صريح بدل نموّ ذاكرة
   JOB_TTL_MS: Number(process.env.JOB_TTL_MS) || 3600000, // بقاء نتيجة الوظيفة ساعة
+  // سائق الطابور: 'memory' (افتراضي) أو 'redis' مستقبلاً — مهما كان غير معروف
+  // يُواصل التشغيل على الذاكرة مع تحذير في السجل (لا إقلاع Crashes).
+  QUEUE_DRIVER: process.env.QUEUE_DRIVER || 'memory',
 
   // ===== فيديو محلي: أقصى مدة بالدقائق (الافتراضي 5 — STT بطيء ~5.5x المدة على هذا الجهاز) =====
   LOCAL_VIDEO_MAX_MIN: Number(process.env.LOCAL_VIDEO_MAX_MIN) || 5,
@@ -103,4 +113,7 @@ module.exports = {
   // كله يعني أن التنظيف لا يبدأ إلا والقرص ممتلئ فعلًا — أي بعد فوات الأوان.
   PROJECTS_RETENTION_DAYS: Number(process.env.PROJECTS_RETENTION_DAYS) || 7,
   PROJECTS_MAX_BYTES: Number(process.env.PROJECTS_MAX_BYTES) || 3221225472,
+
+  // ===== سجل التكاليف: عدد مقاطع TTS، حروف الترجمة، ثوانٍ ffmpeg =====
+  COST_FILE: process.env.COST_FILE || path.join(__dirname, '..', 'cache', 'cost.json'),
 };

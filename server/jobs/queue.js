@@ -1,5 +1,23 @@
 // server/jobs/queue.js — محرك الوظائف: تنفيذ محدود التزامن بحالة وتقدّم وإلغاء
 //
+// Queue driver boundary (AGENTS.md: Redis optional).
+//
+// This module is the ONLY place that knows how a job is dispatched. Routes and
+// jobs/index.js use the public shape below and nothing else:
+//
+//   registerHandler(type, fn)  fn(payload, ctx) → Promise<result>
+//   enqueue(type, payload)     → public job record (queued)
+//   run(type, payload)         → Promise<result> (bounded by concurrency)
+//   get(id) / cancel(id)       → public job record
+//   stats()                    → { concurrency, running, queued, tracked, maxQueued }
+//   subscribe(id, listener)    → unsubscribe fn (SSE)
+//   close()                    → graceful shutdown
+//   events / STATUS            → EventEmitter / status enum
+//
+// A future Redis/BullMQ driver must satisfy the same surface; it is layered
+// behind createQueue(opts.driver) and selected via QUEUE_DRIVER — no route
+// changes. Memory remains the default: single instance, no Redis required.
+//
 // ═══ المشكلة التي يحلّها (CURRENT_STATE.md §7.1) ═══
 // العمليات الثقيلة (تفريغ صوتي، دبلجة، OCR، تنزيل فيديو) كانت تعمل داخل دورة
 // طلب HTTP. تصحيحٌ مهم: هي **لا تحجب** حلقة أحداث Node (execFile يشغّل عملية
@@ -43,6 +61,10 @@ function codeError(code, message) {
  *  - ttlMs: مدة بقاء الوظيفة المنتهية قبل التنظيف
  */
 function createQueue(opts = {}) {
+  const driver = opts.driver || 'memory';
+  if (driver !== 'memory') {
+    console.warn(`[jobs] unknown queue driver "${driver}" — falling back to memory`);
+  }
   const concurrency = Math.max(1, Number(opts.concurrency) || 2);
   const maxQueued = Math.max(1, Number(opts.maxQueued) || 100);
   const ttlMs = Math.max(1000, Number(opts.ttlMs) || 3600000);

@@ -12,6 +12,7 @@ import { teardownPlayers } from './media.js';
 import { saveToHistory, getGlossary } from './features.js';
 import { streamTranslate, supportsStreaming } from './stream.js';
 import { uploadAndTranslateMedia } from './projectUpload.js';
+import { isRtlText } from './localEngine.mjs';
 
 function safeGetLocal(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
@@ -124,6 +125,7 @@ export async function runTranslate() {
           chunks.filter(Boolean).forEach(t => {
             const p = document.createElement('p');
             p.className = 'blk streaming-blk';
+            p.dir = isRtlText(t) ? 'rtl' : 'ltr';
             p.textContent = t;
             resultBody.appendChild(p);
           });

@@ -107,6 +107,74 @@ router.get('/dub/projects/:projectId/jobs', requireProjectOwner, (req, res) => {
   res.json({ projectId: pid, jobs: jobs.listProjectJobs(pid) });
 });
 
+// PATCH /api/dub/projects/:projectId/segments/:index — تعديل ترجمة مقطع + إعادة توليد TTS
+// (PROJECT_ID_RE معرّف مرة واحدة أعلى الملف)
+router.patch('/dub/projects/:projectId/segments/:index', async (req, res) => {
+  const pid = String(req.params.projectId || '');
+  if (!PROJECT_ID_RE.test(pid)) return res.status(400).json({ error: 'invalid-project' });
+
+  const { lang, translated } = req.body || {};
+  if (!LANG_RE.test(String(lang || ''))) return res.status(400).json({ error: 'invalid-lang', errorAr: 'اللغة غير صالحة.' });
+
+  const index = Number(req.params.index);
+  if (!Number.isInteger(index) || index < 0) return res.status(400).json({ error: 'invalid-index', errorAr: 'رقم المقطع غير صالح.' });
+
+  if (typeof translated !== 'string' || !translated.trim() || translated.length > 1500) {
+    return res.status(400).json({ error: 'invalid-text', errorAr: 'النص غير صالح (فارغ أو طويل جدًا).' });
+  }
+
+  // Guard: if a job for this project is still processing → 409
+  const projectJobs = jobs.listProjectJobs(pid);
+  if (projectJobs.some((j) => j.status === 'processing')) {
+    return res.status(409).json({ error: 'job-running', errorAr: 'لا يمكن التعديل أثناء تشغيل الدبلجة.' });
+  }
+
+  const dir = path.join(PROJECTS_DIR, pid);
+  const segsPath = path.join(dir, `translation-${lang}.json`);
+  if (!fs.existsSync(segsPath)) return res.status(404).json({ error: 'translation-not-found' });
+
+  let segments;
+  try { segments = JSON.parse(fs.readFileSync(segsPath, 'utf8')); } catch { return res.status(404).json({ error: 'translation-not-found' }); }
+  if (!Array.isArray(segments) || index >= segments.length) {
+    return res.status(400).json({ error: 'invalid-index', errorAr: 'رقم المقطع خارج النطاق.' });
+  }
+
+  // Update translated text, keep everything else
+  const seg = segments[index];
+  seg.translated = translated.trim();
+
+  // Regenerate TTS for this segment only
+  let audioError = null;
+  try {
+    const { textToMp3BufferWithVoice } = require('./tts');
+    const { fitAudioToSlot } = require('./dubbing/timing-engine');
+    const clipsDir = path.join(dir, `tts-${lang}`);
+    fs.mkdirSync(clipsDir, { recursive: true });
+    const pad = String(index).padStart(3, '0');
+    const rawPath = path.join(clipsDir, `seg-${pad}-raw.mp3`);
+    const fitPath = path.join(clipsDir, `seg-${pad}.mp3`);
+
+    const buf = await textToMp3BufferWithVoice(seg.translated, lang, seg.voice);
+    fs.writeFileSync(rawPath, buf);
+    const slotSec = Math.max(1, (seg.end - seg.start) || seg.duration || 2);
+    await fitAudioToSlot(rawPath, fitPath, slotSec);
+    seg.audio = `seg-${pad}.mp3`;
+  } catch (e) {
+    // TTS failure: still save the text edit (user's fix is never lost).
+    // Cost is intentionally NOT recorded here — textToMp3BufferWithVoice
+    // already increments the TTS counter internally for successful synthesis.
+    audioError = e.code || e.message || 'tts-failed';
+    seg.audio = null;
+  }
+
+  // Atomic-ish write: tmp + rename so a crash never truncates the file
+  const tmpPath = `${segsPath}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(segments));
+  fs.renameSync(tmpPath, segsPath);
+
+  res.json({ projectId: pid, lang, index, segment: seg, derivedStale: true, ...(audioError ? { audioError } : {}) });
+});
+
 // حذف مشروع كامل (ملفاته من القرص) — تنظيف يدوي بجانب التلقائي
 router.delete('/dub/projects/:projectId', requireProjectOwner, (req, res) => {
   const pid = req.dubProjectId;

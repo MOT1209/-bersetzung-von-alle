@@ -198,3 +198,236 @@ test('DELETE /api/dub/projects/:id: معرّف سيئ → 400، مفقود → 4
     assert.equal(missing.status, 404);
   } finally { srv.close(); }
 });
+
+// ===== Subtitle editor: PATCH /api/dub/projects/:projectId/segments/:index =====
+// Helper: generate a short valid mp3 buffer via ffmpeg (for stubbing TTS in success tests)
+function makeFakeMp3Buffer() {
+  const tmpFile = path.join(os.tmpdir(), `fake-tts-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`);
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:a', 'libmp3lame', '-b:a', '64k', tmpFile],
+      { timeout: 10000 }, (err) => {
+        if (err) return reject(err);
+        const buf = fs.readFileSync(tmpFile);
+        fs.unlinkSync(tmpFile);
+        resolve(buf);
+      });
+  });
+}
+
+test('PATCH segments: تعديل ناجح — يحفظ النص ويولّد الصوت', async () => {
+  const app = require('../server/server');
+  const { PROJECTS_DIR } = require('../server/dubbing/dubbing-pipeline');
+  const pid = 'patch-ok-' + Date.now().toString(36);
+  const lang = 'ar';
+  const dir = path.join(PROJECTS_DIR, pid);
+  fs.mkdirSync(dir, { recursive: true });
+  const segsPath = path.join(dir, `translation-${lang}.json`);
+  const segments = [
+    { start: 0, end: 3, duration: 3, text: 'Hello', speaker: 'speaker_1', original: 'Hello', translated: 'مرحبا', voice: { id: 'ar-SA-HamedNeural', gender: 'male' }, audio: 'seg-000.mp3' },
+    { start: 3, end: 6, duration: 3, text: 'World', speaker: 'speaker_1', original: 'World', translated: 'عالم', voice: { id: 'ar-SA-HamedNeural', gender: 'male' }, audio: 'seg-001.mp3' },
+  ];
+  fs.writeFileSync(segsPath, JSON.stringify(segments));
+
+  // Stub TTS to return a valid mp3 buffer
+  const tts = require('../server/tts');
+  const origTts = tts.textToMp3BufferWithVoice;
+  const fakeBuf = await makeFakeMp3Buffer();
+  tts.textToMp3BufferWithVoice = async () => fakeBuf;
+
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/${pid}/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang, translated: 'مرحبا بك' }),
+    });
+    assert.equal(r.status, 200);
+    const data = await r.json();
+    assert.equal(data.projectId, pid);
+    assert.equal(data.lang, lang);
+    assert.equal(data.index, 0);
+    assert.equal(data.segment.translated, 'مرحبا بك');
+    assert.equal(data.derivedStale, true);
+    assert.ok(!data.audioError, 'لا يوجد خطأ صوتي');
+    // The file was actually updated on disk
+    const saved = JSON.parse(fs.readFileSync(segsPath, 'utf8'));
+    assert.equal(saved[0].translated, 'مرحبا بك');
+    assert.equal(saved[1].translated, 'عالم'); // untouched
+  } finally {
+    tts.textToMp3BufferWithVoice = origTts;
+    srv.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('PATCH segments: معرّف مشروع سيئ → 400', async () => {
+  const app = require('../server/server');
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/bad!pid/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: 'ar', translated: 'test' }),
+    });
+    assert.equal(r.status, 400);
+    const data = await r.json();
+    assert.equal(data.error, 'invalid-project');
+  } finally { srv.close(); }
+});
+
+test('PATCH segments: لغة غير صالحة → 400', async () => {
+  const app = require('../server/server');
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/p-test/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: 'INVALID-LANG!!', translated: 'test' }),
+    });
+    assert.equal(r.status, 400);
+    const data = await r.json();
+    assert.equal(data.error, 'invalid-lang');
+  } finally { srv.close(); }
+});
+
+test('PATCH segments: نص فارغ → 400', async () => {
+  const app = require('../server/server');
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/p-test/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: 'ar', translated: '   ' }),
+    });
+    assert.equal(r.status, 400);
+    const data = await r.json();
+    assert.equal(data.error, 'invalid-text');
+  } finally { srv.close(); }
+});
+
+test('PATCH segments: نص طويل جدًا (>1500) → 400', async () => {
+  const app = require('../server/server');
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/p-test/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: 'ar', translated: 'أ'.repeat(1501) }),
+    });
+    assert.equal(r.status, 400);
+    const data = await r.json();
+    assert.equal(data.error, 'invalid-text');
+  } finally { srv.close(); }
+});
+
+test('PATCH segments: فهرس خارج النطاق → 400', async () => {
+  const app = require('../server/server');
+  const { PROJECTS_DIR } = require('../server/dubbing/dubbing-pipeline');
+  const pid = 'patch-oob-' + Date.now().toString(36);
+  const dir = path.join(PROJECTS_DIR, pid);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'translation-ar.json'), JSON.stringify([
+    { start: 0, end: 3, duration: 3, text: 'Hi', speaker: 's1', original: 'Hi', translated: 'أهلا', voice: { id: 'ar-SA-HamedNeural', gender: 'male' }, audio: null },
+  ]));
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/${pid}/segments/5`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: 'ar', translated: 'test' }),
+    });
+    assert.equal(r.status, 400);
+    const data = await r.json();
+    assert.equal(data.error, 'invalid-index');
+  } finally {
+    srv.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('PATCH segments: ملف ترجمة مفقود → 404', async () => {
+  const app = require('../server/server');
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/nonexistent-proj/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: 'ar', translated: 'test' }),
+    });
+    assert.equal(r.status, 404);
+    const data = await r.json();
+    assert.equal(data.error, 'translation-not-found');
+  } finally { srv.close(); }
+});
+
+test('PATCH segments: فشل TTS لا يُفقد التعديل — يُحفظ النص مع audio: null', async () => {
+  const app = require('../server/server');
+  const { PROJECTS_DIR } = require('../server/dubbing/dubbing-pipeline');
+  const pid = 'patch-ttsfail-' + Date.now().toString(36);
+  const lang = 'ar';
+  const dir = path.join(PROJECTS_DIR, pid);
+  fs.mkdirSync(dir, { recursive: true });
+  const segsPath = path.join(dir, `translation-${lang}.json`);
+  const segments = [
+    { start: 0, end: 3, duration: 3, text: 'Hello', speaker: 's1', original: 'Hello', translated: 'مرحبا', voice: { id: 'ar-SA-HamedNeural', gender: 'male' }, audio: 'seg-000.mp3' },
+  ];
+  fs.writeFileSync(segsPath, JSON.stringify(segments));
+
+  // Stub textToMp3BufferWithVoice to throw
+  const tts = require('../server/tts');
+  const orig = tts.textToMp3BufferWithVoice;
+  tts.textToMp3BufferWithVoice = async () => { throw Object.assign(new Error('tts-offline'), { code: 'tts-offline' }); };
+
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/${pid}/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang, translated: 'مرحبا بك أيها العالم' }),
+    });
+    assert.equal(r.status, 200); // NOT 500
+    const data = await r.json();
+    assert.equal(data.segment.translated, 'مرحبا بك أيها العالم'); // text saved
+    assert.equal(data.segment.audio, null); // audio cleared
+    assert.equal(data.audioError, 'tts-offline');
+    assert.equal(data.derivedStale, true);
+    // Verify on disk
+    const saved = JSON.parse(fs.readFileSync(segsPath, 'utf8'));
+    assert.equal(saved[0].translated, 'مرحبا بك أيها العالم');
+    assert.equal(saved[0].audio, null);
+  } finally {
+    tts.textToMp3BufferWithVoice = orig;
+    srv.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('PATCH segments: مهمة جارية → 409', async () => {
+  const app = require('../server/server');
+  const { PROJECTS_DIR } = require('../server/dubbing/dubbing-pipeline');
+  const jobs = require('../server/jobs/job-manager');
+  const pid = 'patch-running-' + Date.now().toString(36);
+  const dir = path.join(PROJECTS_DIR, pid);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'translation-ar.json'), JSON.stringify([
+    { start: 0, end: 3, duration: 3, text: 'Hi', speaker: 's1', original: 'Hi', translated: 'أهلا', voice: { id: 'ar-SA-HamedNeural', gender: 'male' }, audio: null },
+  ]));
+  // Create a processing job for this project
+  const job = jobs.createJob({ type: 'youtube-dub', projectId: pid, params: {} });
+  jobs.updateJob(job.id, { status: 'processing', stage: 'TTS…', progress: 50 });
+  const srv = app.listen(0);
+  try {
+    const port = srv.address().port;
+    const r = await fetch(`http://127.0.0.1:${port}/api/dub/projects/${pid}/segments/0`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lang: 'ar', translated: 'test' }),
+    });
+    assert.equal(r.status, 409);
+    const data = await r.json();
+    assert.equal(data.error, 'job-running');
+  } finally {
+    srv.close();
+    jobs._testClear();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

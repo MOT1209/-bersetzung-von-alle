@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 const { getSummary, getTimeseries, getProviders, getLanguages, getHourly } = require('./stats');
 const { loadReport } = require('./quality');
+const { getCost } = require('./cost');
 
 // GET /api/stats/summary — totals, today, week, byType
 router.get('/summary', async (req, res, next) => {
@@ -52,6 +53,15 @@ router.get('/hourly', async (req, res, next) => {
   try {
     const data = await getHourly();
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/stats/cost — cost/quota ledger (admin only)
+router.get('/cost', async (req, res, next) => {
+  try {
+    res.json(await getCost());
   } catch (err) {
     next(err);
   }

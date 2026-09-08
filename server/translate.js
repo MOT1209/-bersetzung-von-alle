@@ -206,6 +206,13 @@ async function translateTextWithMeta(text, targetLang, sourceLang, opts) {
     cacheSet(chunk, sourceLang, targetLang, out);
     results.push(out);
 
+    // Record cost: translation chars rounded to nearest 1000 (best-effort)
+    try {
+      const { trackCost } = require('./cost');
+      const rounded = Math.round(chunk.length / 1000) * 1000;
+      if (rounded > 0) trackCost({ translationChars: rounded, type: 'translate' }).catch(() => {});
+    } catch { /* cost module unavailable */ }
+
     // تأخير صغير بين القطع الشبكية لتجنّب انفجار الطلبات
     // (يحمي من حجب Google المجاني وحصص Gemini في الدقيقة)
     if (results.length + fromCacheCount < chunks.length) {

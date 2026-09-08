@@ -42,13 +42,13 @@ graph TD
 ## Task Status
 
 ### Wave 1
-- [ ] [task-01-tts-listen-edge](./tasks/task-01-tts-listen-edge.md) — Use EdgeTTS (with voice) for the `/api/tts` listen endpoint
-- [ ] [task-02-stt-model-upgrade](./tasks/task-02-stt-model-upgrade.md) — Upgrade both sherpa and transformers Whisper models for better Arabic/Turkish STT
-- [ ] [task-03-queue-driver-boundary](./tasks/task-03-queue-driver-boundary.md) — Formalize and document the job-queue driver boundary (BullMQ-ready contract, memory default)
-- [ ] [task-04-cost-tracking](./tasks/task-04-cost-tracking.md) — Track TTS segments, translation chars, and ffmpeg time per job; expose via `/api/stats/cost`
+- [x] [task-01-tts-listen-edge](./tasks/task-01-tts-listen-edge.md) — Use EdgeTTS (with voice) for the `/api/tts` listen endpoint
+- [x] [task-02-stt-model-upgrade](./tasks/task-02-stt-model-upgrade.md) — Upgrade both sherpa and transformers Whisper models for better Arabic/Turkish STT
+- [x] [task-03-queue-driver-boundary](./tasks/task-03-queue-driver-boundary.md) — Formalize and document the job-queue driver boundary (BullMQ-ready contract, memory default)
+- [x] [task-04-cost-tracking](./tasks/task-04-cost-tracking.md) — Track TTS segments, translation chars, and ffmpeg time per job; expose via `/api/stats/cost`
 
 ### Wave 2
-- [ ] [task-05-subtitle-editor-backend](./tasks/task-05-subtitle-editor-backend.md) — PATCH endpoint to edit a segment's translation and regenerate only that segment's TTS
+- [x] [task-05-subtitle-editor-backend](./tasks/task-05-subtitle-editor-backend.md) — PATCH endpoint to edit a segment's translation and regenerate only that segment's TTS
 
 ### Wave 3
 - [ ] [task-06-storage-s3-driver](./tasks/task-06-storage-s3-driver.md) — Add optional S3/R2 storage driver behind the existing key-based storage interface
