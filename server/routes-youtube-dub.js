@@ -108,7 +108,7 @@ router.get('/dub/projects/:projectId/jobs', requireProjectOwner, (req, res) => {
 });
 
 // PATCH /api/dub/projects/:projectId/segments/:index — تعديل ترجمة مقطع + إعادة توليد TTS
-const PROJECT_ID_RE = /^[a-zA-Z0-9_-]{1,40}$/;
+// (PROJECT_ID_RE معرّف مرة واحدة أعلى الملف)
 router.patch('/dub/projects/:projectId/segments/:index', async (req, res) => {
   const pid = String(req.params.projectId || '');
   if (!PROJECT_ID_RE.test(pid)) return res.status(400).json({ error: 'invalid-project' });
