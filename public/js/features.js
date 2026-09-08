@@ -11,7 +11,7 @@ import {
   showToast, showError, hideProgress, showProgress,
 } from './ui.js';
 import {
-  normalizeDictionary, translateWithDictionary, isRtlText, setDebug,
+  normalizeDictionary, translateWithDictionary, isRtlText,
 } from './localEngine.mjs';
 
 /* ========== سجل الترجمات ========== */
@@ -175,10 +175,6 @@ function glossaryPairsToDict(list) {
     if (p && typeof p.from === 'string' && typeof p.to === 'string') dict[p.from] = p.to;
   }
   return dict;
-}
-
-function dictToGlossaryPairs(dict) {
-  return Object.entries(dict).map(([from, to]) => ({ from, to }));
 }
 
 function setImportStatus(text, isError) {
