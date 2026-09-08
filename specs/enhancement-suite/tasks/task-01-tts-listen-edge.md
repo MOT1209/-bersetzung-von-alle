@@ -2,7 +2,7 @@
 
 ## Status
 
-pending
+complete
 
 ## Wave
 
@@ -128,4 +128,4 @@ The signature of `textToMp3BufferWithVoice` should become: `textToMp3BufferWithV
 ## Notes
 
 - `server/edge-tts.js` has a 10-minute circuit breaker (`tripBreaker`) — when tripped, `synthesize` throws `edge-cooling` and the caller already falls back to gTTS. Keep that behavior; do not remove it.
-- There is an existing `server/routes-tts.test.js` (or similar under `tests/`) that asserts the response contract — keep it passing and add coverage for the new `voice`/`gender`/`rate` fields.
+- There is no dedicated TTS route test; `/api/tts` is covered by `tests/smoke.test.js` and `tests/rateLimitCoverage.test.js` (both assert the path exists). Keep both passing after your change.

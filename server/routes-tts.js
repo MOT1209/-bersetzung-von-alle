@@ -1,13 +1,20 @@
 // server/routes-tts.js — مسار تحويل النص إلى صوت (POST /api/tts)
+// Uses EdgeTTS (natural voice) with gTTS fallback for long text or Edge failures.
 const express = require('express');
-const { textToMp3Buffer } = require('./tts');
+const { textToMp3BufferWithVoice } = require('./tts');
 
 const router = express.Router();
 
 router.post('/tts', async (req, res) => {
-  const { text, lang } = req.body || {};
+  const { text, lang, voice, gender, rate } = req.body || {};
   try {
-    const buffer = await textToMp3Buffer(text, lang || 'ar');
+    // Build voice option: string voice name, { gender } object, or null (default by lang)
+    const voiceOption = voice
+      ? voice
+      : (gender ? { gender } : null);
+    const buffer = await textToMp3BufferWithVoice(text, lang || 'ar', voiceOption, {
+      rate: Number(rate) || 1,
+    });
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', String(buffer.length));
     res.send(buffer);

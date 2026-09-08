@@ -3,6 +3,7 @@
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
+const { timedExec } = require('./ffmpeg-cost');
 
 async function probeDuration(filePath) {
   try {
@@ -39,14 +40,14 @@ async function fitAudioToSlot(inPath, outPath, originalSec) {
   if (!filter) {
     // بدون تعديل: ننسخ (أو نقصّ الزائد الطفيف فقط عند النهاية مع تلاشٍ)
     if (plan.action === 'overflow') {
-      await execFileAsync('ffmpeg', ['-y', '-i', inPath, '-t', String(originalSec.toFixed(2)),
+      await timedExec(execFileAsync, 'ffmpeg', ['-y', '-i', inPath, '-t', String(originalSec.toFixed(2)),
         '-af', 'afade=t=out:st=0:d=0.3', '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
     } else {
-      await execFileAsync('ffmpeg', ['-y', '-i', inPath, '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
+      await timedExec(execFileAsync, 'ffmpeg', ['-y', '-i', inPath, '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
     }
     return { ...plan, ttsSec };
   }
-  await execFileAsync('ffmpeg', ['-y', '-i', inPath, '-filter:a', filter,
+  await timedExec(execFileAsync, 'ffmpeg', ['-y', '-i', inPath, '-filter:a', filter,
     '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
   return { ...plan, ttsSec };
 }

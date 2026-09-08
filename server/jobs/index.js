@@ -5,10 +5,16 @@
 const config = require('../config');
 const { createQueue, STATUS } = require('./queue');
 
+const driver = config.QUEUE_DRIVER;
+if (driver && driver !== 'memory') {
+  console.warn(`[jobs] QUEUE_DRIVER="${driver}" — redis driver not implemented; using memory`);
+}
+
 const queue = createQueue({
   concurrency: config.JOB_CONCURRENCY,
   maxQueued: config.JOB_MAX_QUEUED,
   ttlMs: config.JOB_TTL_MS,
+  driver,
 });
 
 module.exports = queue;

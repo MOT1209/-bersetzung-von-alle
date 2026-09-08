@@ -4,6 +4,7 @@
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const execFileAsync = promisify(execFile);
+const { timedExec } = require('./ffmpeg-cost');
 
 async function mixSegments(clips, outPath, { mode = 'full-dub', totalSec = 0, originalAudio = null } = {}) {
   // clips: [{ file, start }]
@@ -34,7 +35,7 @@ async function mixSegments(clips, outPath, { mode = 'full-dub', totalSec = 0, or
       : `${labels.join(';')};${mixInputs}amix=inputs=${n}:normalize=0[aout]`;
   }
   args.push('-filter_complex', filter, '-map', '[aout]', '-t', end.toFixed(2), '-c:a', 'libmp3lame', '-b:a', '128k', outPath);
-  await execFileAsync('ffmpeg', args, { timeout: 180000 });
+  await timedExec(execFileAsync, 'ffmpeg', args, { timeout: 180000 });
   return outPath;
 }
 

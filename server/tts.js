@@ -152,7 +152,8 @@ async function textToMp3Buffer(text, lang = 'ar', opts) {
 // ← gTTS (احتياطي دائم). النصوص الطويلة (>1500 حرف) تذهب لـ gTTS مباشرة
 // لأن Edge أبطأ عليها والدمج المقطعي موجود أصلًا هناك.
 const EDGE_TEXT_LIMIT = 1500;
-async function textToMp3BufferWithVoice(text, lang = 'ar', voice = null) {
+// opts: { rate?: number } — forwarded to Edge synthesize only; gTTS has no rate.
+async function textToMp3BufferWithVoice(text, lang = 'ar', voice = null, opts = {}) {
   const clean = String(text || '').trim();
   if (!clean) {
     const err = new Error('invalid-text');
@@ -168,13 +169,23 @@ async function textToMp3BufferWithVoice(text, lang = 'ar', voice = null) {
       const edge = require('./edge-tts');
       const voiceName = typeof voice === 'string' ? voice
         : edgeVoiceFor(lang, voice && voice.gender);
-      if (voiceName) return await edge.synthesize(clean, { voice: voiceName });
+      if (voiceName) {
+        const synOpts = { voice: voiceName };
+        if (opts.rate !== null && opts.rate !== undefined && opts.rate !== 1) synOpts.rate = Number(opts.rate);
+        const buf = await edge.synthesize(clean, synOpts);
+        // Record cost: one TTS segment per successful synthesis (best-effort)
+        try { const { trackCost } = require('./cost'); trackCost({ ttsSegments: 1, type: 'tts' }).catch(() => {}); } catch { /* cost module unavailable */ }
+        return buf;
+      }
     } catch (e) {
       // فشل Edge (بما فيه cooling) → سقوط صامت إلى gTTS أدناه
       if (e && (e.code === 'invalid-text' || e.code === 'text-too-long')) throw e;
     }
   }
-  return textToMp3Buffer(clean, lang);
+  const buf = await textToMp3Buffer(clean, lang);
+  // Record cost: one TTS segment for the gTTS path (best-effort)
+  try { const { trackCost } = require('./cost'); trackCost({ ttsSegments: 1, type: 'tts' }).catch(() => {}); } catch { /* cost module unavailable */ }
+  return buf;
 }
 
 module.exports = {
