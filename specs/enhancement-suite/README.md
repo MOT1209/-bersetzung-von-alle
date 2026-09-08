@@ -48,7 +48,7 @@ graph TD
 - [x] [task-04-cost-tracking](./tasks/task-04-cost-tracking.md) — Track TTS segments, translation chars, and ffmpeg time per job; expose via `/api/stats/cost`
 
 ### Wave 2
-- [ ] [task-05-subtitle-editor-backend](./tasks/task-05-subtitle-editor-backend.md) — PATCH endpoint to edit a segment's translation and regenerate only that segment's TTS
+- [x] [task-05-subtitle-editor-backend](./tasks/task-05-subtitle-editor-backend.md) — PATCH endpoint to edit a segment's translation and regenerate only that segment's TTS
 
 ### Wave 3
 - [ ] [task-06-storage-s3-driver](./tasks/task-06-storage-s3-driver.md) — Add optional S3/R2 storage driver behind the existing key-based storage interface

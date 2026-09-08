@@ -55,6 +55,7 @@ const CRITICAL = [
   ['GET', '/api/stats/summary'],
   ['GET', '/api/stats/quality'],
   ['GET', '/api/stats/cost'],
+  ['PATCH', '/api/dub/projects/p-test/segments/0'],
 ];
 
 async function hit(method, route) {
