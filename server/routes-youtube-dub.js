@@ -93,6 +93,10 @@ router.get('/dub/jobs/:id/stream', requireJobOwner, (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
   res.write(`event: progress\ndata: ${JSON.stringify(jobs.publicJob(job))}\n\n`);
+  // مهمة انتهت **قبل** الاشتراك: لن يقع أي حدث بعدها، فلا شيء يُغلق الاتصال.
+  // (broadcast يُنادى من updateJob وحده.) هذه الحالة شائعة: فشل سريع مثل
+  // ytdlp-missing يقع قبل أن يفتح المتصفح البثّ — فكان يبقى معلّقًا إلى الأبد.
+  if (job.status === 'completed' || job.status === 'failed') return res.end();
   jobs.subscribe(job.id, res);
 });
 

@@ -1,7 +1,5 @@
 // server/dubbing/export-service.js — التصدير النهائي: mux فيديو + صوت + ترجمات
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
+const { ffmpeg } = require('./ffmpeg');
 
 function srtTime(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -20,14 +18,14 @@ function buildVtt(segments) {
 
 async function muxVideo(videoPath, dubbedAudioPath, outMp4) {
   // -shortest: الصوت المولّد يحدد النهاية؛ الفيديو الأصلي هو المرجع البصري
-  await execFileAsync('ffmpeg', ['-y', '-i', videoPath, '-i', dubbedAudioPath,
+  await ffmpeg(['-y', '-i', videoPath, '-i', dubbedAudioPath,
     '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-map', '0:v:0', '-map', '1:a:0',
     '-shortest', '-movflags', '+faststart', outMp4], { timeout: 300000 });
   return outMp4;
 }
 
 async function extractOriginalAudio(videoPath, outWav) {
-  await execFileAsync('ffmpeg', ['-y', '-i', videoPath, '-vn', '-ac', '1', '-ar', '44100', outWav], { timeout: 120000 });
+  await ffmpeg(['-y', '-i', videoPath, '-vn', '-ac', '1', '-ar', '44100', outWav], { timeout: 120000 });
   return outWav;
 }
 

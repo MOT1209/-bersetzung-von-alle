@@ -1,12 +1,10 @@
 // server/dubbing/timing-engine.js — محرك التوقيت: مطابقة مدة TTS مع المقطع الأصلي
 // لا نقطع الكلمات الأخيرة عشوائيًا: نحسب عامل السرعة ثم نستخدم atempo في ffmpeg.
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
+const { ffmpeg, ffprobe } = require('./ffmpeg');
 
 async function probeDuration(filePath) {
   try {
-    const { stdout } = await execFileAsync('ffprobe',
+    const { stdout } = await ffprobe(
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath],
       { timeout: 15000 });
     const d = Number(String(stdout).trim());
@@ -39,14 +37,14 @@ async function fitAudioToSlot(inPath, outPath, originalSec) {
   if (!filter) {
     // بدون تعديل: ننسخ (أو نقصّ الزائد الطفيف فقط عند النهاية مع تلاشٍ)
     if (plan.action === 'overflow') {
-      await execFileAsync('ffmpeg', ['-y', '-i', inPath, '-t', String(originalSec.toFixed(2)),
+      await ffmpeg(['-y', '-i', inPath, '-t', String(originalSec.toFixed(2)),
         '-af', 'afade=t=out:st=0:d=0.3', '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
     } else {
-      await execFileAsync('ffmpeg', ['-y', '-i', inPath, '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
+      await ffmpeg(['-y', '-i', inPath, '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
     }
     return { ...plan, ttsSec };
   }
-  await execFileAsync('ffmpeg', ['-y', '-i', inPath, '-filter:a', filter,
+  await ffmpeg(['-y', '-i', inPath, '-filter:a', filter,
     '-c:a', 'libmp3lame', '-b:a', '96k', outPath], { timeout: 30000 });
   return { ...plan, ttsSec };
 }
