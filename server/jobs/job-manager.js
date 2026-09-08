@@ -61,13 +61,28 @@ function createJob({ type, projectId, params }) {
     logs: [],
   };
   jobs.set(id, job);
-  if (jobs.size > MAX_JOBS) {
-    const oldest = [...jobs.values()].sort((a, b) => a.createdAt - b.createdAt)[0];
-    jobs.delete(oldest.id);
-    lastPersistedProgress.delete(oldest.id);
-  }
+  evictOldestTerminal();
   persistJob(job);
   return job;
+}
+
+// إخراج من الذاكرة عند تجاوز السقف — **المنتهية وحدها** (CURRENT_STATE.md §21).
+//
+// كان الإخراج يأخذ الأقدم بـcreatedAt بصرف النظر عن الحالة. ومهمة الدبلجة طويلة
+// بطبعها (دقائق)، فهي أقدم ما في الخريطة وأول المرشّحين — وهي تعمل. وبعد إخراجها
+// يعيد updateJob القيمة null بصمت، فتتوقّف تحديثات التقدّم عن الحفظ، ولا تُكتب
+// حالتها النهائية إطلاقًا، ثم يقرأ reloadFromDisk آخر لقطة (processing) ويعلّمها
+// interrupted: **مهمة نجحت فعلًا تُعرض للمستخدم كمنقطعة**.
+//
+// إن لم توجد مهمة منتهية يرتفع السقف مؤقتًا — أهون من إتلاف عمل جارٍ.
+function evictOldestTerminal() {
+  if (jobs.size <= MAX_JOBS) return;
+  const terminal = [...jobs.values()]
+    .filter((j) => j.status === 'completed' || j.status === 'failed')
+    .sort((a, b) => a.createdAt - b.createdAt)[0];
+  if (!terminal) return;
+  jobs.delete(terminal.id);
+  lastPersistedProgress.delete(terminal.id);
 }
 
 function getJob(id) { return jobs.get(String(id || '')) || null; }
@@ -132,10 +147,21 @@ function reloadFromDisk() {
   return { restored, interrupted };
 }
 
-// تُستدعى مرة واحدة عند تحميل الوحدة (إقلاع الخادم)
-reloadFromDisk();
+// تُستدعى مرة واحدة عند إقلاع الخادم — لكن **مؤجَّلة** إلى الدورة التالية (§21):
+// الدالة متزامنة (readdirSync + readFileSync + JSON.parse لكل job-*.json تحت
+// projects/، حتى سبعة أيام من الاحتفاظ)، فاستدعاؤها وقت تحميل الوحدة يحجب حلقة
+// الأحداث قبل أن يبدأ الخادم الاستماع. setImmediate يفرغ قبل أي طلب HTTP، فلا
+// يتغيّر السلوك الظاهر. تبقى الدالة متزامنة لأن الاختبارات تناديها مباشرة.
+setImmediate(reloadFromDisk);
 
 // ===== SSE: بث حيّ للتقدم =====
+// حذف مجموعة المشتركين حين تفرغ: بدونه يبقى في الخريطة مدخلٌ فارغ لكل مهمة
+// بُثَّت، إلى الأبد — تسريب بطيء لكنه بلا سقف (§21).
+function dropIfEmpty(key) {
+  const s = sseClients.get(key);
+  if (s && !s.size) sseClients.delete(key);
+}
+
 function subscribe(id, res) {
   const key = String(id);
   if (!sseClients.has(key)) sseClients.set(key, new Set());
@@ -143,17 +169,28 @@ function subscribe(id, res) {
   res.on('close', () => {
     const s = sseClients.get(key);
     if (s) s.delete(res);
+    dropIfEmpty(key);
   });
 }
 
 function broadcast(id) {
-  const s = sseClients.get(String(id));
+  const key = String(id);
+  const s = sseClients.get(key);
   const job = getJob(id);
   if (!s || !s.size || !job) return;
   const payload = `event: progress\ndata: ${JSON.stringify(publicJob(job))}\n\n`;
+  // حالة نهائية = لا مزيد من الأحداث: نرسل الأخير ثم **يغلق الخادم** الاتصال.
+  // كان الإغلاق متروكًا للعميل وحده، فأي عميل لا يغلق (أو تبويب معلّق) يُبقي
+  // المقبس مفتوحًا بلا نهاية ولا نبضة تكشفه. قارن routes-jobs.js الذي يغلق.
+  const done = job.status === 'completed' || job.status === 'failed';
   for (const res of [...s]) {
-    try { res.write(payload); } catch { s.delete(res); }
+    try {
+      res.write(payload);
+      if (done) res.end();
+    } catch { s.delete(res); }
   }
+  if (done) { s.clear(); }
+  dropIfEmpty(key);
 }
 
 function publicJob(job) {
