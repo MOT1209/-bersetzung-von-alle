@@ -1,11 +1,11 @@
 /* ---------- ميزات إضافية: سجل + مسرد + إعدادات + قواعد + تشكيل + ملف ---------- */
-import { state, safeGet, safeSet, postJson, mapError, detectArabic } from './utils.js';
+import { state, safeGet, safeSet, postJson, detectArabic } from './utils.js';
 import {
-  $, targetLang, urlInput, textInput, tashkeelBtn,
+  tashkeelBtn,
   glossaryFrom, glossaryTo, glossaryAddBtn, glossaryListEl,
   ruleDomain, ruleSelector, ruleAddBtn, ruleListEl,
   settingsBtn, settingsModal, settingsForm, settingsCancelBtn, settingsCloseBtn,
-  clearHistoryBtn, historyListEl,
+  historyListEl,
   showToast, showError, hideProgress, showProgress,
 } from './ui.js';
 

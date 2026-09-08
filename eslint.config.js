@@ -1,6 +1,6 @@
 module.exports = [
   {
-    files: ['**/*.js'],
+    files: ['server/**/*.js', 'tests/**/*.js', 'scripts/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'commonjs',
@@ -38,6 +38,57 @@ module.exports = [
     },
   },
   {
-    ignores: ['node_modules/**', 'public/**'],
+    // الواجهة: وحدات ES في المتصفح — قواعد خفيفة تلتقط الأخطاء الحقيقية
+    // (متغيرات غير معرّفة) دون إغراق الملفات القديمة بتحذيرات أسلوبية.
+    files: ['public/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        location: 'readonly',
+        localStorage: 'readonly',
+        sessionStorage: 'readonly',
+        fetch: 'readonly',
+        EventSource: 'readonly',
+        AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
+        Blob: 'readonly',
+        FileReader: 'readonly',
+        FormData: 'readonly',
+        getComputedStyle: 'readonly',
+        history: 'readonly',
+        // عموميات تُحمَّل من CDN/SDK خارجية: Chart.js (لوحة الإدارة) و YT (مشغّل يوتيوب)
+        Chart: 'readonly',
+        YT: 'readonly',
+        Audio: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearTimeout: 'readonly',
+        clearInterval: 'readonly',
+        requestAnimationFrame: 'readonly',
+        console: 'readonly',
+        alert: 'readonly',
+        confirm: 'readonly',
+      },
+    },
+    rules: {
+      'no-undef': 'error',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-var': 'error',
+      'prefer-const': 'error',
+      eqeqeq: ['error', 'always'],
+      semi: ['error', 'always'],
+      quotes: ['error', 'single', { avoidEscape: true }],
+    },
+  },
+  {
+    ignores: ['node_modules/**'],
   },
 ];

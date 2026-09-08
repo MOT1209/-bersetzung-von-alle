@@ -79,7 +79,7 @@ export async function runTranslate() {
       const resultBody = document.getElementById('result-body');
       resultBody.innerHTML = '';
       result.hidden = false;
-      let chunks = [];
+      const chunks = [];
 
       const abort = streamTranslate({
         url: state.mode === 'url' ? url : undefined,

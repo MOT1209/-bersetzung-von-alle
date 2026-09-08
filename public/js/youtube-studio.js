@@ -128,6 +128,48 @@ function jobStatusToStep(job) {
   return 'analyzing';
 }
 
+function fmtTime(s) {
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// مخطط زمني تفاعلي: قائمة المقاطع من ملف translation (نفس timeline الدبلجة)
+async function renderTimeline(r) {
+  const box = $('yt-timeline');
+  const player = $('yt-player');
+  if (!box || !player) return;
+  box.innerHTML = '<p class="muted">جاري تحميل المقاطع…</p>';
+  let segments = [];
+  try {
+    const res = await fetch(`/api/projects/${r.projectId}/translation-${r.targetLang}.json`);
+    if (res.ok) segments = await res.json();
+  } catch {}
+  box.innerHTML = '';
+  if (!segments.length) { box.innerHTML = '<p class="muted">لا توجد مقاطع متاحة.</p>'; return; }
+  const rows = segments.map((s) => {
+    const d = document.createElement('div');
+    d.className = 'yt-seg';
+    d.tabIndex = 0;
+    d.setAttribute('role', 'button');
+    d.innerHTML = `<span class="yt-seg-time">${fmtTime(s.start || 0)}</span> <span class="yt-seg-spk">${s.speaker || ''}</span> <span class="yt-seg-txt">${escapeHtml(s.translated || s.original || '')}</span>`;
+    const jump = () => { try { player.currentTime = Math.max(0, (s.start || 0) - 0.2); player.play(); } catch {} };
+    d.addEventListener('click', jump);
+    d.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
+    box.appendChild(d);
+    return { el: d, start: s.start || 0, end: s.end || (s.start || 0) + 2 };
+  });
+  player.ontimeupdate = () => {
+    const t = player.currentTime || 0;
+    const cur = rows.findIndex((x) => t >= x.start && t < x.end);
+    rows.forEach((x, idx) => x.el.classList.toggle('current', idx === cur));
+    if (cur >= 0) rows[cur].el.scrollIntoView({ block: 'nearest' });
+  };
+}
+
 function renderResult(r) {
   const box = $('yt-result');
   if (!box) return;
@@ -144,5 +186,29 @@ function renderResult(r) {
   set('yt-dl-video', r.videoUrl, 'dubbed.mp4');
   set('yt-dl-audio', r.audioUrl, 'dubbed.mp3');
   set('yt-dl-srt', r.srtUrl, 'subtitles.srt');
+  wireDeleteButton(r);
+  renderTimeline(r);
   box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// زر حذف المشروع (تنظيف القرص) — يربط مرة واحدة فقط
+function wireDeleteButton(r) {
+  const btn = $('yt-delete');
+  if (!btn) return;
+  if (r && r.projectId) btn.dataset.project = r.projectId;
+  if (btn.dataset.bound) return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', async () => {
+    const pid = btn.dataset.project || '';
+    if (!pid) return;
+    if (!window.confirm('حذف المشروع وملفاته نهائيًا؟')) return;
+    try {
+      const res = await fetch(`/api/projects/${pid}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete-failed');
+      $('yt-result').hidden = true;
+      $('yt-progress-label').textContent = 'حُذف المشروع.';
+    } catch {
+      window.alert('تعذر حذف المشروع.');
+    }
+  });
 }

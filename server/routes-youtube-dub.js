@@ -7,6 +7,11 @@ const { extractVideoId } = require('./youtube');
 const jobs = require('./jobs/job-manager');
 const { startDubJobs } = require('./dubbing/dubbing-service');
 const { PROJECTS_DIR } = require('./dubbing/dubbing-pipeline');
+const { scheduleCleanup } = require('./dubbing/cleanup');
+const config = require('./config');
+
+// تنظيف دوري للمشاريع القديمة (أول تشغيل بعد دقيقة، مؤقت unref لا يعيق الاختبارات)
+scheduleCleanup({ maxAgeDays: config.PROJECTS_RETENTION_DAYS, maxBytes: config.PROJECTS_MAX_BYTES });
 
 const router = express.Router();
 const ALLOWED_MODES = new Set(['full-dub', 'voice-over', 'mix', 'subtitles']);
@@ -53,8 +58,31 @@ router.get('/jobs/:id/stream', (req, res) => {
   jobs.subscribe(job.id, res);
 });
 
+// مهام المشروع (للاسترداد بعد إعادة التشغيل — تُقرأ من الذاكرة المستعادة من القرص)
+// مهم: قبل مسار :file حتى لا يُفسَّر 'jobs' كاسم ملف.
+router.get('/projects/:projectId/jobs', (req, res) => {
+  const pid = String(req.params.projectId || '');
+  if (!/^[a-zA-Z0-9_-]{1,40}$/.test(pid)) return res.status(400).json({ error: 'invalid-project' });
+  res.json({ projectId: pid, jobs: jobs.listProjectJobs(pid) });
+});
+
+// حذف مشروع كامل (ملفاته من القرص) — تنظيف يدوي بجانب التلقائي
+router.delete('/projects/:projectId', (req, res) => {
+  const pid = String(req.params.projectId || '');
+  if (!/^[a-zA-Z0-9_-]{1,40}$/.test(pid)) return res.status(400).json({ error: 'invalid-project' });
+  const full = path.join(PROJECTS_DIR, pid);
+  if (!full.startsWith(PROJECTS_DIR)) return res.status(400).json({ error: 'invalid-project' });
+  if (!fs.existsSync(full)) return res.status(404).json({ error: 'not-found' });
+  try {
+    fs.rmSync(full, { recursive: true, force: true });
+    res.json({ deleted: pid });
+  } catch {
+    res.status(500).json({ error: 'server-error', errorAr: 'تعذر حذف المشروع.' });
+  }
+});
+
 // ملفات المشاريع: أسماء آمنة فقط (dubbed-XX.mp4 / dubbing-XX.mp3 / subtitles-XX.srt|vtt / source.mp4)
-const SAFE_FILE = /^(dubbed-[a-z]{2,3}(-[A-Z]{2})?\.mp4|dubbing-[a-z]{2,3}(-[A-Z]{2})?\.mp3|subtitles-[a-z]{2,3}(-[A-Z]{2})?\.(srt|vtt)|source\.mp4|transcript\.json)$/;
+const SAFE_FILE = /^(dubbed-[a-z]{2,3}(-[A-Z]{2})?\.mp4|dubbing-[a-z]{2,3}(-[A-Z]{2})?\.mp3|subtitles-[a-z]{2,3}(-[A-Z]{2})?\.(srt|vtt)|translation-[a-z]{2,3}(-[A-Z]{2})?\.json|source\.mp4|transcript\.json)$/;
 router.get('/projects/:projectId/:file', (req, res) => {
   const pid = String(req.params.projectId || '');
   const file = String(req.params.file || '');

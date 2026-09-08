@@ -1362,3 +1362,14 @@ body {
   .studio-layout { grid-template-columns: 1fr; }
   .yt-player { position: sticky; top: 0; }
 }
+
+/* ===== المخطط الزمني التفاعلي (Video Studio) ===== */
+.yt-timeline-head { font-weight: 700; font-size: .9rem; margin-top: 12px; }
+.yt-timeline { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 260px; overflow-y: auto; }
+.yt-seg { display: flex; gap: 8px; align-items: baseline; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: .85rem; cursor: pointer; }
+.yt-seg:hover { border-color: var(--primary); }
+.yt-seg.current { border-color: var(--primary); background: rgba(59,130,246,.12); }
+.yt-seg-time { font-weight: 800; color: var(--primary); white-space: nowrap; }
+.yt-seg-spk { color: var(--text-muted); font-size: .75rem; white-space: nowrap; }
+.yt-seg-txt { flex: 1; }
+.muted { color: var(--text-muted); }

@@ -123,4 +123,34 @@ async function textToMp3Buffer(text, lang = 'ar') {
   return concatMp3s(buffers);
 }
 
-module.exports = { textToMp3Buffer, splitIntoChunks };
+// ===== الواجهة الصوتية: نص + صوت المتحدث → Buffer mp3 =====
+// voice: { gender } أو اسم صوت Edge مباشرة. السلسلة: Edge (إن مفعّل ومعرّف)
+// ← gTTS (احتياطي دائم). النصوص الطويلة (>1500 حرف) تذهب لـ gTTS مباشرة
+// لأن Edge أبطأ عليها والدمج المقطعي موجود أصلًا هناك.
+const EDGE_TEXT_LIMIT = 1500;
+async function textToMp3BufferWithVoice(text, lang = 'ar', voice = null) {
+  const clean = String(text || '').trim();
+  if (!clean) {
+    const err = new Error('invalid-text');
+    err.code = 'invalid-text';
+    throw err;
+  }
+  let config = null;
+  try { config = require('./config'); } catch { /* بلا إعدادات */ }
+  const engine = (config && config.TTS_ENGINE) || 'edge';
+  if (engine !== 'gtts' && clean.length <= EDGE_TEXT_LIMIT) {
+    try {
+      const { edgeVoiceFor } = require('./dubbing/voice-manager');
+      const edge = require('./edge-tts');
+      const voiceName = typeof voice === 'string' ? voice
+        : edgeVoiceFor(lang, voice && voice.gender);
+      if (voiceName) return await edge.synthesize(clean, { voice: voiceName });
+    } catch (e) {
+      // فشل Edge (بما فيه cooling) → سقوط صامت إلى gTTS أدناه
+      if (e && (e.code === 'invalid-text' || e.code === 'text-too-long')) throw e;
+    }
+  }
+  return textToMp3Buffer(clean, lang);
+}
+
+module.exports = { textToMp3Buffer, splitIntoChunks, textToMp3BufferWithVoice };

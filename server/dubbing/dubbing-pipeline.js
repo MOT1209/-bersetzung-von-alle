@@ -156,7 +156,7 @@ async function runDubbingJob(job, jobs) {
       const fitPath = path.join(clipsDir, `seg-${String(i).padStart(3, '0')}.mp3`);
       try {
         if (!fs.existsSync(rawPath) || !fs.statSync(rawPath).size) {
-          const buf = await tts.textToMp3Buffer(s.translated || s.original, targetLang);
+          const buf = await tts.textToMp3BufferWithVoice(s.translated || s.original, targetLang, s.voice);
           fs.writeFileSync(rawPath, buf);
         }
         const slotSec = Math.max(1, (s.end - s.start) || s.duration || 2);
@@ -193,6 +193,7 @@ async function runDubbingJob(job, jobs) {
 
     const stat = fs.statSync(finalMp4);
     const result = {
+      projectId: job.projectId,
       videoUrl: `/api/projects/${job.projectId}/dubbed-${targetLang}.mp4`,
       audioUrl: `/api/projects/${job.projectId}/dubbing-${targetLang}.mp3`,
       srtUrl: `/api/projects/${job.projectId}/subtitles-${targetLang}.srt`,
