@@ -1,15 +1,15 @@
 /* ---------- عرض النتائج + التصدير ---------- */
 import { EXPORT_FORMATS } from './constants.js';
-import { state, postJson, mapError } from './utils.js';
+import { state } from './utils.js';
 import {
   result, resultEmbed, resultBody, metaTitle, metaLine, sourceNotice, cacheBadge,
-  copyBtn, shareBtn, shareView, shareLink, shareCloseBtn, exportRow,
-  srtBtn, listenBtn, localBtn, dubBtn, compareBtn, tashkeelBtn, tabs, targetLang,
-  showToast, showError, hideProgress, showProgress, isTtsLang,
+  copyBtn, shareBtn, shareView, shareLink, exportRow,
+  srtBtn, listenBtn, dubBtn, compareBtn, tashkeelBtn, targetLang,
+  showToast, showError, isTtsLang,
 } from './ui.js';
 import {
-  buildWebVtt, vttClock, setupYtPlayer, buildCaptionPanel,
-  startCaptionSync, teardownPlayers,
+  setupYtPlayer, buildCaptionPanel,
+  startCaptionSync,
 } from './media.js';
 import { stopDubbing } from './dub.js';
 

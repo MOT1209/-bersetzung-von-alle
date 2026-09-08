@@ -108,6 +108,11 @@ app.use('/api', require('./routes-file'));
 app.use('/api/video-local', heavyLimiter);
 app.use('/api', require('./routes-local-video'));
 
+// OCR — قبل express.json العام لأن له حد جسم 15mb خاصًا به (الصور الكبيرة),
+// وبما أن routes-ocr يُركِّب express.json({limit:'15mb'}) بدلًا من 2mb العام.
+app.use('/api/ocr', heavyLimiter);
+app.use('/api', require('./routes-ocr'));
+
 app.use(express.json({ limit: '2mb' }));
 
 // ===== بثّ الترجمة عبر SSE — قبل compression عمدًا =====
@@ -116,6 +121,9 @@ app.use(express.json({ limit: '2mb' }));
 // مؤقتًا وتصل الترجمة دفعة واحدة في النهاية — أي يعمل الطلب ويضيع البثّ صامتًا.
 // حد الطلبات مغطّى بخط الأساس على '/api' أعلاه (مطابق لـ /api/translate).
 app.use('/api', require('./routes-sse'));
+
+// ===== دبلجة يوتيوب إلى MP4 (jobs + SSE progress) — قبل compression عمدًا (نفس سبب routes-sse) =====
+app.use('/api', require('./routes-youtube-dub'));
 
 // ===== متابعة الوظائف — قبل compression عمدًا للسبب نفسه =====
 // '/api/jobs/:id/stream' بثّ SSE، والضاغط يخزّنه فيصل دفعة واحدة في النهاية.
@@ -190,11 +198,9 @@ app.use('/api', require('./routes-youtube'));
 app.use('/api/video', heavyLimiter);
 app.use('/api', videoRouter);
 
-// ===== الموجة 2: تشكيل عربي + فيديو محلي + OCR (كلها تحت heavyLimiter — مكلفة) =====
+// ===== الموجة 2: تشكيل عربي (المكوّنات المكلفة الأخرى — OCR والفيديو المحلي — أُعيدت قبل express.json) =====
 app.use('/api/tashkeel', heavyLimiter);
 app.use('/api', require('./routes-tashkeel'));
-app.use('/api/ocr', heavyLimiter);
-app.use('/api', require('./routes-ocr'));
 
 // ===== معالجة الأخطاء العامة =====
 app.use((err, req, res, _next) => {
@@ -213,6 +219,14 @@ app.use((err, req, res, _next) => {
 
 // ===== تشغيل الخادم =====
 if (require.main === module) {
+  // تحذير أمني صامت لا يمنع التشغيل: ADMIN_TOKEN قصير (أقل من 16 حرفًا) يسهل
+  // تخمينه ببعض المحاولات ويفتح إعدادات المفاتيح (routes-settings) ولوحة الإحصائيات.
+  // لا نفرض حدًا لأن فرضه يكسر النشرات القائمة؛ ننبّه فقط لتغييره.
+  const adminToken = process.env.ADMIN_TOKEN || '';
+  if (adminToken && adminToken.length < 16) {
+    console.warn('⚠️  ADMIN_TOKEN قصير (< 16 حرفًا). مسارات /api/settings و /api/stats محمية به — يُنصح بمفتاح أطول.');
+  }
+
   const server = app.listen(config.PORT, () => {
     console.log(`🚀 AraLink يعمل على http://localhost:${config.PORT}`);
   });

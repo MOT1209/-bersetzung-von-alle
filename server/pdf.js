@@ -2,18 +2,26 @@
 // الفكرة: نجد تدفقات FlateDecode (المضغوطة بـ zlib) ونفك ضغطها بـ zlib المدمج في Node،
 // ثم نستخرج السلاسل النصية من عوامل عرض النص Tj و TJ في دفق المحتوى.
 const zlib = require('zlib');
+const { promisify } = require('util');
 const MAX_DECOMPRESSED = 32 * 1024 * 1024;
 
+// فك الضغط لامتزامن (async) — النسخ الأقدم كانت inflateSync فتحجب حلقة الأحداث
+// أثناء فك 25MB مضغوط (والمفترض تكديرها على عدة تدفقات في ملف واحد) فيتجمد
+// الخادم كله لمئات المللي ثانية. النسخة اللاحقة مكافئها، لكن بلا حجب.
+const inflateP = promisify(zlib.inflate);
+const inflateRawP = promisify(zlib.inflateRaw);
+const gunzipP = promisify(zlib.gunzip);
+
 // ===== فك ضغط بمحاولات متعددة (zlib / raw / gzip) — يعيد null عند الفشل =====
-function tryDecompress(buf) {
+async function tryDecompress(buf) {
   const attempts = [
-    () => zlib.inflateSync(buf, { maxOutputLength: MAX_DECOMPRESSED }), // FlateDecode القياسي (غلاف zlib)
-    () => zlib.inflateRawSync(buf, { maxOutputLength: MAX_DECOMPRESSED }), // بدون رأس zlib — بعض المولّدات تكتب raw
-    () => zlib.gunzipSync(buf, { maxOutputLength: MAX_DECOMPRESSED }), // بعض المولّدات تستخدم gzip
+    () => inflateP(buf, { maxOutputLength: MAX_DECOMPRESSED }), // FlateDecode القياسي (غلاف zlib)
+    () => inflateRawP(buf, { maxOutputLength: MAX_DECOMPRESSED }), // بدون رأس zlib — بعض المولّدات تكتب raw
+    () => gunzipP(buf, { maxOutputLength: MAX_DECOMPRESSED }), // بعض المولّدات تستخدم gzip
   ];
   for (const fn of attempts) {
     try {
-      const out = fn();
+      const out = await fn();
       if (out && out.length) return out;
     } catch {
       // جرّب الخوارزمية التالية
@@ -103,7 +111,7 @@ function extractPdfTitle(buffer) {
 
 // ===== الوظيفة الرئيسية: استخراج النص من Buffer ملف PDF =====
 // يعيد النص المستخرج، أو سلسلة فارغة إن كان قصيرًا جدًا (< 50 حرفًا) أو غير قابل للقراءة.
-function extractPdfText(buffer) {
+async function extractPdfText(buffer) {
   if (!buffer || !buffer.length) return '';
   const data = buffer.toString('latin1');
   const texts = [];
@@ -130,7 +138,7 @@ function extractPdfText(buffer) {
     }
 
     let decoded = null;
-    if (isFlate) decoded = tryDecompress(Buffer.from(raw, 'latin1'));
+    if (isFlate) decoded = await tryDecompress(Buffer.from(raw, 'latin1'));
     if (!decoded) decoded = Buffer.from(raw, 'latin1'); // قد يكون النص خامًا غير مضغوط
 
     // فحص: هل هذا دفق محتوى نصي؟ (يحتوي عوامل عرض نص)

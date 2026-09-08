@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { downloadVideo } = require('./downloader');
+const config = require('./config');
 
 const router = express.Router();
 
@@ -90,7 +91,7 @@ router.get('/video/:videoId', async (req, res) => {
         entry = { promise: Promise.resolve(stat), file: outPath, size: stat.size, refs: 0, cleanupTimer: null, settled: true };
       } else {
         entry = {
-          promise: downloadVideo('https://www.youtube.com/watch?v=' + videoId, outPath, 240000)
+          promise: downloadVideo('https://www.youtube.com/watch?v=' + videoId, outPath, 240000, config.MAX_VIDEO_BYTES)
             .then(() => fs.promises.stat(outPath))
             .catch((e) => {
               // تنظيف الفشل وإزالة من الخريطة لإعادة المحاولة لاحقاً

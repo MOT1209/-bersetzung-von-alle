@@ -100,11 +100,11 @@ function renderQuality(data) {
   }
   const langs = data.langs || [];
   const rows = (data.summary || []).map((s) => {
-    const perLang = langs.map((l) => `<td style="text-align:center">${s.perLang && s.perLang[l] != null ? s.perLang[l] : '—'}</td>`).join('');
+    const perLang = langs.map((l) => `<td style="text-align:center">${s.perLang?.[l] ?? '—'}</td>`).join('');
     return `<tr>
       <td style="font-weight:700">${s.provider}</td>
-      <td style="text-align:center;font-weight:700">${s.avgScore != null ? s.avgScore : '—'}</td>
-      <td style="text-align:center">${s.avgWer != null ? s.avgWer : '—'}</td>
+      <td style="text-align:center;font-weight:700">${s.avgScore ?? '—'}</td>
+      <td style="text-align:center">${s.avgWer ?? '—'}</td>
       <td style="text-align:center">${s.succeeded}/${s.samples}</td>
       ${perLang}
     </tr>`;
@@ -154,8 +154,9 @@ async function init() {
 
     document.getElementById('auth-gate').hidden = true;
     document.getElementById('dashboard').hidden = false;
-  } catch (e) {
-    // لا كوكي صالح (أو انتهى) — أظهر البوابة بلا رسالة خطأ عند أول زيارة
+  } catch {
+    // لا كوكي صالح (أو انتهى) — أظهر البوابة بلا رسالة خطأ عند أول زيارة.
+    // لا localStorage.removeItem هنا: التوكن لم يعد يُحفظ محليًا أصلًا (§19).
     showAuthGate();
   }
 }

@@ -1349,3 +1349,36 @@ body {
   font-size: .8rem;
   padding: 6px 14px;
 }
+
+/* ===== استوديو الدبلجة (YouTube Dubbing v2) — desktop كاستوديو، mobile مكدس ===== */
+.studio-card { margin-top: 16px; }
+.studio-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.studio-title { font-size: 1.25rem; font-weight: 800; margin: 0 0 4px; }
+.studio-sub { color: var(--text-muted); font-size: .9rem; margin: 0 0 12px; }
+.yt-langs, .yt-modes { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: .92rem; }
+.yt-progress { margin-top: 12px; }
+.yt-progress-track { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.yt-progress-bar { height: 100%; width: 0; background: var(--primary); transition: width .4s; }
+.yt-steps { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.yt-step { font-size: .85rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+.yt-step.active { color: var(--text); border-color: var(--primary); }
+.yt-step.done { color: var(--success, #22c55e); }
+.yt-result { display: flex; flex-direction: column; gap: 10px; }
+.yt-player { width: 100%; border-radius: 12px; background: #000; aspect-ratio: 16/9; }
+.yt-downloads { display: flex; flex-wrap: wrap; gap: 8px; }
+.yt-timeline-note { font-size: .8rem; color: var(--text-muted); margin-top: 8px; }
+@media (max-width: 820px) {
+  .studio-layout { grid-template-columns: 1fr; }
+  .yt-player { position: sticky; top: 0; }
+}
+
+/* ===== المخطط الزمني التفاعلي (Video Studio) ===== */
+.yt-timeline-head { font-weight: 700; font-size: .9rem; margin-top: 12px; }
+.yt-timeline { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 260px; overflow-y: auto; }
+.yt-seg { display: flex; gap: 8px; align-items: baseline; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: .85rem; cursor: pointer; }
+.yt-seg:hover { border-color: var(--primary); }
+.yt-seg.current { border-color: var(--primary); background: rgba(59,130,246,.12); }
+.yt-seg-time { font-weight: 800; color: var(--primary); white-space: nowrap; }
+.yt-seg-spk { color: var(--text-muted); font-size: .75rem; white-space: nowrap; }
+.yt-seg-txt { flex: 1; }
+.muted { color: var(--text-muted); }

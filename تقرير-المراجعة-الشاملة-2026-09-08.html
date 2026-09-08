@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقرير المراجعة الشاملة — AraLink | 8 سبتمبر 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b1220;--card:#111b2e;--border:#24334d;--text:#e8eef7;--muted:#93a3bb;--primary:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Cairo,system-ui,sans-serif;line-height:1.8}
+.wrap{max-width:1000px;margin:0 auto;padding:24px 16px 64px}
+header.hero{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;margin-bottom:20px}
+h1{margin:0 0 6px;font-size:1.6rem}h2{font-size:1.2rem;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}
+.sub{color:var(--muted);margin:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.stat b{display:block;font-size:1.5rem}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin:12px 0}
+table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{border:1px solid var(--border);padding:8px 10px;text-align:right;vertical-align:top}
+th{background:#0e1728}code{direction:ltr;display:inline-block;background:#0e1728;border:1px solid var(--border);border-radius:6px;padding:0 6px;font-size:.82rem}
+.badge{display:inline-block;border-radius:999px;padding:1px 10px;font-size:.78rem;font-weight:700}
+.b-red{background:rgba(239,68,68,.15);color:var(--bad)}.b-yel{background:rgba(245,158,11,.15);color:var(--warn)}.b-grn{background:rgba(34,197,94,.15);color:var(--ok)}
+ul{margin:8px 0}li{margin:4px 0}.muted{color:var(--muted);font-size:.88rem}
+footer{color:var(--muted);font-size:.82rem;margin-top:32px;text-align:center}
+@media(max-width:640px){table{font-size:.8rem}}
+</style>
+</head>
+<body><div class="wrap">
+
+<header class="hero">
+<h1>🔍 تقرير المراجعة الشاملة — AraLink</h1>
+<p class="sub">التاريخ: 8 سبتمبر 2026 • النطاق: شجرة العمل الحالية بما فيها <code>YouTube Dubbing v2</code> • المنهجية: <code>code-review-excellence</code> (قراءة فقط — لم يُعدَّل أي كود أثناء المراجعة)</p>
+<div class="grid">
+<div class="stat"><b class="ok">12/12</b>اختبارات الدبلجة الجديدة</div>
+<div class="stat"><b class="ok">374/374</b>آخر نتيجة كاملة مسجلة*</div>
+<div class="stat"><b class="bad">1</b>مشكلة حرجة (نظافة git)</div>
+<div class="stat"><b class="warn">4</b>ملاحظات متوسطة</div>
+<div class="stat"><b>3</b>ملاحظات صغيرة</div>
+</div>
+<p class="muted">* التشغيل الكامل تعذّر إعادته في جلسة المراجعة (تجاوز 180 ثانية — بطء بيئة/شبكة). أُعيد تشغيل <code>tests/youtube-dub.test.js</code> وحده: 12/12 ✅. التفاصيل في قسم «ما لم يُفحص».</p>
+</header>
+
+<h2>1️⃣ الحكم العام</h2>
+<div class="card"><b>💬 Comment — قابل للدمج بعد تنظيف شجرة git.</b> كود الدبلجة الجديد حقيقي (ffmpeg مزج ودمج + E2E ينتج MP4 قابلًا للتشغيل)، والأمان محافظ عليه، ولا توجد عيوب منطقية مانعة. المشكلة الوحيدة الحرجة ليست في الكود بل في <b>خلط حذف <code>.claude/skills/</code> (~22 ألف سطر) مع ميزة الدبلجة في نفس الشجرة</b> — يجب فصله في commit مستقل قبل أي دمج.</div>
+
+<h2>2️⃣ ما تم بشكل جيد 🎉</h2>
+<div class="card"><ul>
+<li><b>خط أنابيب حقيقي لا Mock:</b> <code>server/dubbing/dubbing-pipeline.js</code> ينفذ transcript → ترجمة → TTS → timing → mix → mux إلى <code>projects/{id}/dubbed-ar.mp4</code>، واختبار E2E يولّد MP4 ويفحصه بـ ffprobe.</li>
+<li><b>لا Base64 للفيديو:</b> النتيجة ملفات تُخدم عبر <code>/api/projects/:id/:file</code> بأسماء آمنة (regex) — مطابق للمواصفة.</li>
+<li><b>إعادة استخدام لا إعادة بناء:</b> الترجمة عبر <code>translateTextWithMeta</code> (سلسلة الاحتياط + كاش)، التفريغ عبر <code>audio.js</code>، التنزيل عبر <code>downloader.js</code> — لا تكرار.</li>
+<li><b>أمان سليم:</b> فحص <code>videoId</code> فقط (allowlist يوتيوب)، كل استدعاءات ffmpeg عبر <code>execFile</code> (بلا shell)، مسارات مشاريع مُطهّرة، حد حجم فيديو مُصحَّح (<code>1048576M←1024M</code>)، مسار SSE قبل <code>compression</code>.</li>
+<li><b>Fallback واعٍ:</b> <code>Gemini Video → captions → Whisper</code> مع cooldown يمنع ضرب الحصة الميتة داخل نفس الـ job.</li>
+<li><b>إصلاحات جانبية صحيحة:</b> harness اختبار <code>srtCap</code> (حد 2MB + معالج <code>input-too-large</code>)، إضافة <code>youtube-studio.js</code> إلى SW precache.</li>
+</ul></div>
+
+<h2>3️⃣ النتائج (مرتبة حسب الخطورة)</h2>
+<table>
+<tr><th>الخطورة</th><th>ما</th><th>أين (دليل)</th><th>الأثر + الإصلاح</th></tr>
+<tr><td><span class="badge b-red">🔴 حرجة</span></td><td>حذف <code>.claude/skills/</code> مخلوط مع ميزة الدبلجة في شجرة واحدة</td><td><code>git status</code>: ~60 مسارًا محذوفًا (~22k سطر) + <code>git diff --stat</code></td><td>يستحيل مراجعة الميزة بثقة ويُسمّم الـ blame. <b>الإصلاح:</b> commit منفصل للحذف (أو إرجاعه) قبل دمج الدبلجة.</td></tr>
+<tr><td><span class="badge b-yel">🟡 مهم</span></td><td>تسرّب <code>setInterval</code> في تتبع التقدم — المؤقت <code>t</code> لا يُمسح أبدًا عند اكتمال المهمة</td><td><code>public/js/youtube-studio.js:49</code> + <code>setTimeout</code> بلا أثر في السطر 48</td><td>طلبات <code>/api/jobs/:id</code> كل 10 ثوانٍ إلى الأبد بعد كل دبلجة. <b>الإصلاح:</b> <code>clearInterval(t)</code> عند <code>completed/failed</code> وحذف الـ setTimeout الزائد.</td></tr>
+<tr><td><span class="badge b-yel">🟡 مهم</span></td><td>ملفات اختبار حقيقية غير متعقبة قد تضيع: <code>srtCap</code> و <code>fetchPinned</code></td><td><code>git ls-files --others</code> + <code>tests/</code></td><td>إصلاح harness الـ 413 يعيش في ملف غير مضاف. <b>الإصلاح:</b> <code>git add tests/srtCap.test.js tests/fetchPinned.test.js tests/youtube-dub.test.js</code> عمدًا.</td></tr>
+<tr><td><span class="badge b-yel">🟡 مهم</span></td><td>مهام الذاكرة بلا recovery — إعادة تشغيل الخادم تقتل الدبلجات الجارية</td><td><code>server/jobs/job-manager.js</code> (Map داخل العملية)</td><td>مقبول لـ MVP أحادي النسخة لكنه بند DoD («Job recovery»). <b>الإصلاح لاحقًا:</b> إpersistence عبر <code>store.js</code>/Redis أو إعادة بناء الحالة من <code>projects/</code>.</td></tr>
+<tr><td><span class="badge b-yel">🟡 مهم</span></td><td>كود الواجهة خارج التغطية: <code>public/**</code> مُتجاهَل في eslint</td><td><code>eslint.config.js:41</code></td><td>أخطاء مثل تسرّب المؤقت لا يلتقطها الـ lint. <b>الإصلاح:</b> إعداد eslint للواجهة أو فحص يدوي قبل الدمج.</td></tr>
+<tr><td><span class="badge b-grn">🟢 صغيرة</span></td><td>بقايا صينية في تعليق: «كشف متحدثين启发式»</td><td><code>server/dubbing/segment-processor.js:31</code></td><td>تجميلي فقط — استبدلها بـ «启发式/تقريبي» عربية خالصة.</td></tr>
+<tr><td><span class="badge b-grn">🟢 صغيرة</span></td><td>مخلفات غير متعقبة يجب تجاهلها/حذفها</td><td><code>bash.exe.stackdump</code> + تقارير HTML قديمة + <code>public/icons/icon-*.png</code> غير مضافة</td><td>أضف <code>*.stackdump</code> لـ <code>.gitignore</code> (تمت إضافة <code>projects/</code> ✅) وقرر مصير الأيقونات والتقارير.</td></tr>
+<tr><td><span class="badge b-grn">🟢 صغيرة</span></td><td><code>voiceParams().pitch</code> لا يستخدمه gTTS فعليًا</td><td><code>server/dubbing/voice-manager.js</code></td><td>كود ميت اليوم لكنه واجهة مستقبلية سليمة — يُترك مع تعليق واضح (موجود ✅).</td></tr>
+</table>
+
+<h2>4️⃣ نتائج الفحوصات</h2>
+<div class="card"><ul>
+<li><code>node --check</code>: كل ملفات <code>server/</code> سليمة ✅ — <code>public/js/youtube-studio.js</code> سليم كـ ESM (يفشل <code>--check</code> الافتراضي لأنه CommonJS — متوقع وليس عيبًا) ✅</li>
+<li><code>node --test tests/youtube-dub.test.js</code>: <b>12/12 ✅</b> (روابط، مقاطع، متحدثون، أصوات، توقيت، SRT/VTT، رفض API، E2E حقيقي mix+mux ~24 ثانية).</li>
+<li>آخر تشغيل كامل مسجل: <b>374/374 + lint نظيف</b>. إعادة التشغيل الكامل في هذه الجلسة تجاوزت 180 ثانية (42 ملف اختبار + ffmpeg + شبكة) — لم تُعَد.</li>
+<li>فحص دخاني للخادم (منفذ 3999): <code>/api/health → ok</code>، الاستوديو في HTML، رابط سيئ → <code>invalid-url</code> عربي، مهمة مجهولة → 404 ✅</li>
+</ul></div>
+
+<h2>5️⃣ الأمن (OWASP — ما فُحص فعلًا)</h2>
+<div class="card"><ul>
+<li>✅ <b>SSRF:</b> يوتيوب مقيّد بـ <code>videoId</code> (لا URLs حرة)، و<code>fetchContent</code> المثبّت سابقًا لم يُمس.</li>
+<li>✅ <b>Injection:</b> كل ffmpeg عبر <code>execFile</code> بمصفوفة وسائط؛ أسماء الملفات والمشاريع بـ regex صارمة.</li>
+<li>✅ <b>Path traversal:</b> فحص <code>startsWith(PROJECTS_DIR)</code> + أنماط آمنة.</li>
+<li>✅ <b>DoS:</b> حد حجم فيديو (مُصحَّح)، سقف 5 لغات/طلب، دفعات TTS محدودة، rate limit قائم.</li>
+<li>⚠️ <b>لم يُفحص:</b> اختراق حمولات TTS ضخمة لكل مقطع، سباق تنزيلين لنفس المشروع، صلاحيات قراءة مشاريع الغير (أي عارف للـ ID يقرأ — مقبول لـ MVP بلا auth).</li>
+</ul></div>
+
+<h2>6️⃣ التوصيات (بالترتيب)</h2>
+<div class="card"><ol>
+<li>افصل حذف <code>.claude/</code> في commit مستقل، ثم <code>git add</code> لملفات الدبلجة والاختبارات الجديدة.</li>
+<li>أصلح تسرّب <code>setInterval</code> في <code>youtube-studio.js</code> (دقيقتان).</li>
+<li>نظّف المخلفات (<code>*.stackdump</code> إلى gitignore، مصير الأيقونات/التقارير).</li>
+<li>أصلح التعليق الصيني + قرر تغطية lint للواجهة.</li>
+<li>وثّق قيد «لا recovery بعد إعادة التشغيل» في README أو نفّذ persistence خفيف.</li>
+<li>تجربة E2E حية بفيديو قصير حقيقي قبل الإعلان (دقيقة، عربي، full-dub).</li>
+</ol></div>
+
+<h2>7️⃣ ما فُحص وما لم يُفحص</h2>
+<div class="card">
+<p><b>فُحص:</b> كل ملفات <code>server/dubbing/</code> و<code>server/jobs/</code> و<code>routes-youtube-dub.js</code> قراءةً + <code>node --check</code>، اختبارات الدبلجة (12/12)، دخان HTTP حي، إعداد eslint، شجرة git.</p>
+<p><b>لم يُفحص:</b> التشغيل الكامل (42 ملفًا — مهلة بيئة)، تجربة متصفح حية (desktop/mobile، RTL بصري، مشغل الفيديو)، دبلجة فيديو حقيقي طويل، أداء/ذاكرة تحت حمل متوازٍ، مراجعة <code>fetchContent/translate</code> القديمة (خارج نطاق هذه الدفعة).</p>
+<p><b>الجملة الصادقة:</b> هذه المراجعة غطّت دفعة الدبلجة والسلامة الهيكلية — ولم تثبت خلو التطبيق كله من العيوب.</p>
+</div>
+
+<footer>وُلّد تلقائيًا من مراجعة شجرة العمل • AraLink • 2026-09-08 • الملفات الجديدة: <code>server/dubbing/</code> (7) + <code>server/jobs/</code> (1) + <code>routes-youtube-dub.js</code> + <code>youtube-studio.js</code> + <code>tests/youtube-dub.test.js</code></footer>
+
+</div></body></html>

@@ -34,6 +34,9 @@ async function runClassic({ url, text, target, glossary, provider }) {
 
 /* ========== الترجمة الأساسية ========== */
 export async function runTranslate() {
+  // إيقاف أي بثّ سابق جارٍ قبل بدء ترجمة جديدة
+  if (typeof state.abortCtrl === 'function') state.abortCtrl();
+  state.abortCtrl = null;
   const provider  = safeGetLocal('preferredProvider') || undefined;
   const target    = targetLang.value;
   const glossary  = getGlossary();
@@ -98,7 +101,7 @@ export async function runTranslate() {
       const resultBody = document.getElementById('result-body');
       resultBody.innerHTML = '';
       result.hidden = false;
-      let chunks = [];
+      const chunks = [];
 
       const abort = streamTranslate({
         url: state.mode === 'url' ? url : undefined,

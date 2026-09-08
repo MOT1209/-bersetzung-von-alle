@@ -1,11 +1,11 @@
 /* ---------- ميزات إضافية: سجل + مسرد + إعدادات + قواعد + تشكيل + ملف ---------- */
-import { state, safeGet, safeSet, postJson, mapError, detectArabic } from './utils.js';
+import { state, safeGet, safeSet, postJson, detectArabic } from './utils.js';
 import {
-  $, targetLang, urlInput, textInput, tashkeelBtn,
+  tashkeelBtn,
   glossaryFrom, glossaryTo, glossaryAddBtn, glossaryListEl,
   ruleDomain, ruleSelector, ruleAddBtn, ruleListEl,
   settingsBtn, settingsModal, settingsForm, settingsCancelBtn, settingsCloseBtn,
-  clearHistoryBtn, historyListEl,
+  historyListEl,
   showToast, showError, hideProgress, showProgress,
 } from './ui.js';
 
@@ -273,6 +273,8 @@ async function saveSettings(e) {
   }
   if (!body.ttsEnabled) body.ttsEnabled = false;
   if (!body.autoCache)  body.autoCache  = false;
+  // المحرك المفضّل: يُحفظ محليًا أيضًا حتى تلتقطه منطق الترجمة (translate.js)
+  try { localStorage.setItem('preferredProvider', body.preferredProvider || ''); } catch {}
   try {
     const res  = await fetch('/api/settings', {
       method: 'POST',
@@ -299,6 +301,7 @@ async function loadSettings() {
     if (fields.geminiApiKey)    fields.geminiApiKey.value    = data.geminiApiKey    || '';
     if (fields.preferredProvider) fields.preferredProvider.value = data.preferredProvider || '';
     if (fields.autoCache)       fields.autoCache.checked     = !!data.autoCache;
+    try { localStorage.setItem('preferredProvider', data.preferredProvider || ''); } catch {}
   } catch {}
 }
 

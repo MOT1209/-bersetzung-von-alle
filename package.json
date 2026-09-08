@@ -9,7 +9,7 @@
     "start": "node server/server.js",
     "check": "node scripts/check.js",
     "test": "node --test \"tests/*.test.js\"",
-    "lint": "eslint server/ tests/ --max-warnings=0",
+    "lint": "eslint server/ tests/ public/js/ --max-warnings=0",
     "download:ocr": "node scripts/download-ocr-data.js",
     "bench:translate": "node scripts/bench-translate.js",
     "demo:media": "node scripts/demo-media.js"

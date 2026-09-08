@@ -176,6 +176,63 @@
       </div>
     </section>
 
+    <!-- استوديو دبلجة يوتيوب: URL → job → فيديو نهائي (YouTube Dubbing v2) -->
+    <section id="youtube-studio" class="card studio-card" aria-label="استوديو دبلجة يوتيوب">
+      <div class="studio-layout">
+        <div class="studio-main">
+          <h2 class="studio-title">🎬 استوديو دبلجة يوتيوب</h2>
+          <p class="studio-sub">الصق الرابط، اختر اللغة والوضع، اضغط ابدأ — واستلم فيديو MP4 مدبلجًا.</p>
+          <div class="field">
+            <label class="field-label" for="yt-url">رابط يوتيوب</label>
+            <input type="url" id="yt-url" class="input input-url" dir="ltr" placeholder="https://youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
+          </div>
+          <fieldset class="field">
+            <legend class="field-label">اللغات الهدف (حتى 5 — كل لغة Job مستقل)</legend>
+            <div class="yt-langs">
+              <label><input type="checkbox" class="yt-lang" value="ar" checked> العربية</label>
+              <label><input type="checkbox" class="yt-lang" value="en"> الإنجليزية</label>
+              <label><input type="checkbox" class="yt-lang" value="de"> الألمانية</label>
+              <label><input type="checkbox" class="yt-lang" value="fr"> الفرنسية</label>
+              <label><input type="checkbox" class="yt-lang" value="tr"> التركية</label>
+            </div>
+          </fieldset>
+          <fieldset class="field">
+            <legend class="field-label">الوضع</legend>
+            <div class="yt-modes">
+              <label><input type="radio" name="yt-mode" value="full-dub" checked> دبلجة كاملة</label>
+              <label><input type="radio" name="yt-mode" value="voice-over"> تعليق صوتي</label>
+              <label><input type="radio" name="yt-mode" value="mix"> مزج</label>
+            </div>
+          </fieldset>
+          <button type="button" id="yt-start" class="btn-primary">▶ ابدأ الدبلجة</button>
+          <div id="yt-progress" class="yt-progress" hidden>
+            <div class="yt-progress-track"><div id="yt-progress-bar" class="yt-progress-bar"></div></div>
+            <p id="yt-progress-label" class="progress-label">في الانتظار…</p>
+            <div id="yt-steps" class="yt-steps"></div>
+          </div>
+          <section id="yt-error" class="error-card" role="alert" hidden>
+            <p class="error-message"></p>
+            <button type="button" id="yt-retry" class="btn-secondary">إعادة المحاولة</button>
+          </section>
+        </div>
+        <div class="studio-side">
+          <div id="yt-result" class="yt-result" hidden>
+            <video id="yt-player" class="yt-player" controls preload="metadata" playsinline></video>
+            <p id="yt-meta" class="meta-line"></p>
+            <div class="yt-downloads">
+              <a id="yt-dl-video" class="btn-primary" href="#" download>⬇ تحميل MP4</a>
+              <a id="yt-dl-audio" class="btn-secondary" href="#" download>⬇ تحميل الصوت</a>
+              <a id="yt-dl-srt" class="btn-secondary" href="#" download>📄 تحميل SRT</a>
+              <button type="button" id="yt-delete" class="btn-secondary btn-danger-outline">🗑 حذف المشروع</button>
+            </div>
+            <div class="yt-timeline-head">📜 المقاطع — اضغط أي مقطع للقفز إليه في الفيديو</div>
+            <div id="yt-timeline" class="yt-timeline" aria-label="المخطط الزمني للمقاطع"></div>
+          </div>
+          <div class="yt-timeline-note">الجدول الزمني مرتبط بالفيديو الأصلي — كل مقطع صوتي في موضعه الدقيق.</div>
+        </div>
+      </div>
+    </section>
+
     <!-- عرض المشاركة: نص مترجم وصل عبر رابط #share=... -->
     <section id="share-view" class="share-view reveal" aria-label="نص مترجم مشارَك" hidden>
       <div class="share-header">

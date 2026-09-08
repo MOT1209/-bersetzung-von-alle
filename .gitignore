@@ -49,3 +49,10 @@ bun.lock
 reports/
 reports/**
 coverage/
+
+# Dubbing projects (generated MP4/audio — never commit)
+projects/
+
+# Crash dumps (local only)
+/tmp/
+*.stackdump

@@ -85,4 +85,19 @@ module.exports = {
 
   // ===== فيديو محلي: أقصى مدة بالدقائق (الافتراضي 5 — STT بطيء ~5.5x المدة على هذا الجهاز) =====
   LOCAL_VIDEO_MAX_MIN: Number(process.env.LOCAL_VIDEO_MAX_MIN) || 5,
+
+  // ===== فيديو يوتيوب (بثّ): أقصى حجم للملف المُنزَّل (بايت — الافتراضي 1GB) =====
+  // يمنع استنزاف القرص والنطاق عبر معرفات فيديو طويلة (أفلام مُعاينة 720p تتجاوز 1GB).
+  // `--max-filesize` في yt-dlp يقطع التنزيل مبكرًا، والفحص بعد التنزيل يشمل أيضًا
+  // الملفات التي وصلت قبل ضبط هذا الحد أو من مسارات أخرى.
+  MAX_VIDEO_BYTES: Number(process.env.MAX_VIDEO_BYTES) || 1073741824,
+
+  // ===== محرك النطق: 'edge' (أصوات عصبية ذكر/أنثى) أو 'gtts' (احتياطي مجاني) =====
+  // Edge هو الافتراضي؛ أي فشل فيه يعود تلقائيًا إلى gTTS للمقطع نفسه
+  // (قاطع دائرة 10 دقائق يمنع إضاعة المهلات عند تعطّل الخدمة).
+  TTS_ENGINE: process.env.TTS_ENGINE || 'edge',
+
+  // ===== مشاريع الدبلجة: مدة الاحتفاظ بالأيام (الافتراضي 7) وحجم أقصى للقرص =====
+  PROJECTS_RETENTION_DAYS: Number(process.env.PROJECTS_RETENTION_DAYS) || 7,
+  PROJECTS_MAX_BYTES: Number(process.env.PROJECTS_MAX_BYTES) || 5368709120,
 };

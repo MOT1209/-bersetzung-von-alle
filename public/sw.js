@@ -18,9 +18,12 @@ const PRECACHE = [
   '/js/translate.js',
   '/js/stream.js',
   '/js/dub.js',
+  '/js/youtube-studio.js',
   '/js/dashboard.js',
   '/manifest.webmanifest',
-  '/icons/icon.svg'
+  '/icons/icon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {

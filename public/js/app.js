@@ -8,19 +8,20 @@ import {
   result, clearHistoryBtn, isTtsLang, hideError,
 } from './ui.js';
 import { runTranslate, runSmartTranslate, runBatch } from './translate.js';
+import { initYoutubeStudio } from './youtube-studio.js';
 import {
-  renderResult, renderTab, renderCompare,
-  handleOcrResult, copyResult, shareResult,
+  renderTab,
+  copyResult, shareResult,
 } from './result.js';
 import {
   downloadSrt, listenToResult, playLocalVideo,
-  handleResultDblClick, teardownPlayers, stopCaptionSync,
+  handleResultDblClick, stopCaptionSync,
 } from './media.js';
 import { toggleDubbing, stopDubbing } from './dub.js';
 import {
-  saveToHistory, renderHistory, clearHistory, handleShareHash,
+  renderHistory, clearHistory, handleShareHash,
   initGlossary, initRules, initSettings, setupTashkeelButton,
-  setupFileMode, getGlossary,
+  setupFileMode,
 } from './features.js';
 
 /* ===== فحص توفّر الخادم =====
@@ -168,6 +169,7 @@ checkBackend();
 loadLanguages();
 renderHistory();
 handleShareHash();
+initYoutubeStudio();
 
 /* ===== فتح عبر رابط خارجي ===== */
 (function bootstrapFromQuery() {

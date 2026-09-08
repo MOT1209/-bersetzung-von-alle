@@ -1,9 +1,9 @@
 /* ---------- مشغل يوتيوب + WebVTT + SRT + TTS ---------- */
-import { state, detectArabic, postJson } from './utils.js';
+import { state } from './utils.js';
 import {
   resultEmbed, localPlayer, capBar, capPanel, capPanelList,
-  ttsPlayer, listenBtn, localBtn, srtBtn, targetLang,
-  showError,
+  ttsPlayer, listenBtn, localBtn, targetLang,
+  showError, showToast,
 } from './ui.js';
 
 /* ---------- WebVTT + VTT clock ---------- */
@@ -179,7 +179,7 @@ export function buildCaptionPanel() {
   capPanelList.innerHTML = '';
   capPanelItems = [];
   if (!caps.length) { capPanel.hidden = true; return; }
-  caps.forEach((c, i) => {
+  caps.forEach((c) => {
     const row = document.createElement('div');
     row.className = 'cap-item cap-clickable';
     row.setAttribute('role', 'button');
