@@ -30,8 +30,16 @@ jobs:
       # ffmpeg مطلوب لاختبار E2E في tests/youtube-dub.test.js (mix + mux).
       # Dockerfile يثبّته أصلًا، فهذا يجعل CI يطابق بيئة الإنتاج بدل أن يخالفها.
       # بدونه يتخطّى الاختبارُ نفسَه فيمرّ CI أخضر وهو لا يفحص شيئًا.
+      #
+      # مستودع Google Chrome المدمج في صورة ubuntu-latest يفشل أحيانًا بـ
+      # Hash Sum mismatch (جوجل تعيد نشر الفهرس والكاش أقدم منه) ويجعل
+      # apt-get update يخرج بـ 100 رغم أننا لا نثبّت منه شيئًا. نحذفه أولًا:
+      # كل ما نحتاجه (ffmpeg) يأتي من مستودعات Ubuntu نفسها.
       - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
 
       - name: Run checks
         run: npm run check
