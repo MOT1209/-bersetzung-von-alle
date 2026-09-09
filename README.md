@@ -1,214 +1,216 @@
-# 🤖 نظام AI Agent — مشروع AraLink (مترجم الروابط)
+# AraLink — أرا لينك
 
-نظام وكيل ذكاء اصطناعي كامل مبني على
-[Agentic Coding Starter Kit](https://github.com/leonvanzyl/agentic-coding-starter-kit)
-مع مهارات مخصصة لمشروع الترجمة.
+**أداة ترجمة ذكية تحوّل أي رابط إلى أي لغة**
 
-## 🧠 ما هو هذا النظام؟
+*A smart translation tool that turns any URL into any language.*
 
-هو **عقل إرشادي لأي وكيل برمجة** (pi، Codex، Cursor، Claude Code). عندما يفتح الوكيل هذا
-المجلد، يقرأ ملفات الإرشادات ويصبح قادرًا على:
+![Node.js >=22](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-621%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-~77%25-lines-blue)
+![Version](https://img.shields.io/badge/version-1.0.0-informational)
 
-| الملف | الوظيفة |
-|---|---|
-| `AGENTS.md` | القواعد الحاكمة: التخطيط، التقسيم، الوكالات الفرعية، العمارة، الاختبار |
-| `CLAUDE.md` | نفس الإرشادات لمستخدمي Claude Code |
-| `DESIGN.md` | نظام تصميم واجهة الترجمة (RTL عربي، ألوان، مكونات) |
-| `.agents/skills/` | 18 مهارة عمل (تخطيط، تنفيذ، مراجعة، أمان، تصميم...) |
-| `.claude/skills/` | نفس المهارات لـ Claude Code |
-| `specs/translation-tool/` | مواصفة تنفيذ كاملة مقسمة إلى أمواج متوازية |
+---
 
-## 🛠️ المهارات المثبتة
+## ماذا يفعل / What It Does
 
-- **create-spec** — تحويل محادثة التخطيط إلى مواصفة تنفيذ (spec)
-- **implement-feature** — تنفيذ المواصفة موجة-بموجة مع بوابات مراجعة
-- **translate-link** 🆕 — مهارة مخصصة لمشروع الترجمة (إلزامية قبل لمس كود الترجمة)
-- **checkpoint** — حفظ نقاط التقدم
-- **skill-creator** — إنشاء مهارات جديدة
-- **security-scanner**، **review-pr**، **ship-it**، **frontend-design** وغيرها
+الصق أي رابط ← اختر لغة ← اقرأ الترجمة. لا تسجيل، لا تعقيد.
 
-## 📦 المواصفة الجاهزة: `specs/translation-tool/`
+Paste any URL → choose a language → read the translation. No sign-up, no complexity.
 
-مواصفة كاملة لأداة الترجمة، مقسمة إلى 3 أمواج (منفذة بالكامل ✅):
+### مصادر الترجمة / Translation Sources
 
-```
-الموجة 1 (متوازية)        الموجة 2 (متوازية)        الموجة 3
-┌───────────────┐        ┌───────────────┐        ┌───────────────┐
-│ 01 الإعداد    │        │ 04 المقالات   │        │ 06 الصقل      │
-│ 02 محرك       │ ─────► │ 05 يوتيوب     │ ─────► │    والأخطاء   │
-│    الترجمة    │        └───────────────┘        └───────────────┘
-│ 03 الواجهة    │
-└───────────────┘
-```
+| المصدر | ماذا يفعل | How it works |
+|--------|-----------|-------------|
+| **يوتيوب / YouTube** | استخراج النص + ترجمة فورية مع ترجمات مدمجة في الصفحة | Transcript extraction + in-page subtitles via YouTube IFrame API |
+| **مقالات ومواقع / Articles** | استخراج النص الرئيسي من أي صفحة وترجمته | Server-side fetch + readability extraction |
+| **ملفات / Files** | 11 صيغة إدخال → 8 صيغة إخراج مع حفظ البنية | SRT timings, JSON keys, CSV/XLSX rows preserved |
+| **نص ملصق / Pasted text** | ترجمة مباشرة لأي نص مقسّم تلقائيًا | Auto-chunked, ~4500 chars per request |
+| **صور / Images** | OCR عبر Tesseract.js → ترجمة النص المستخرج | Text extraction then translation |
+| **PDF** | استخراج النص من ملفات PDF → ترجمة | Server-side parsing + translation |
 
-## 🔊 ميزة الصوت: `specs/audio-pipeline/`
+### ميزة الصوت / Audio Pipeline
 
-منفذة بالكامل ✅ — للفيديوهات **بدون ترجمات نصية**: تحميل الصوت (yt-dlp) → تفريغه محليًا
-(Whisper tiny عبر transformers.js، بدون مفتاح API) → ترجمة النص مع توقيتات + تنزيل SRT.
-وأي نتيجة تُقرأ بصوت عربي عبر زر **«🔊 استمع بالعربية»** (gTTS مجاني).
+للفيديوهات بدون ترجمات نصية: تحميل الصوت (yt-dlp) → تفريغ محلي
+(Whisper عبر sherpa-onnx، بدون مفتاح API) → ترجمة مع توقيتات →
+تنزيل SRT + صوت عربي (gTTS).
 
-## ⚡ المرحلة الثانية: السرعة + الفيديو المترجم + كل اللغات — `specs/speed-video-langs/`
+*For videos without captions: audio download → local transcription (Whisper, no API key) → translate with timings → SRT + Arabic audio.*
 
-منفذة بالكامل ✅ :
-- **محرك تفريغ أسرع**: sherpa-onnx (أسرع من الوقت الفعلي على CPU) بدل transformers.js،
-  مع احتياطي تلقائي؛ وتحويل m4a→f32 مباشر بدون ملف wav وسيط (كان حتى 350MB).
-- **كاش ترجمة دائم**: `cache/translation-cache.json` — إعادة نفس الرابط/النص فورية وبدون حصة
-  Google (يعالج 429) + شارة «⚡ من الذاكرة المؤقتة» + صلاحية افتراضية 30 يومًا
-  (`CACHE_TTL_MS`، و`0` لتعطيل الانتهاء).
-- **130 لغة**: زر اختيار كامل بأسماء عربية + بحث فوري (`GET /api/languages`).
-- **مشغل الفيديو المترجم**: الفيديو يشتغل داخل الصفحة وشريط الترجمة المترجمة يتحدث معه
-  (YouTube IFrame API)، النقر على جملة ينقل الفيديو لها، وزر **«▶ تشغيل بترجمات مدمجة»**
-  ينزّل الفيديو ويعرضه بترجمات WebVTT مرسومة فوقه (`GET /api/video/:id`).
-- **إصلاح جوهري**: تنزيل يوتيوب عبر `server/downloader.js` (yt-dlp.exe مباشرة بـ execFile) —
-  الغلاف النصي السابق كان يكسر الصيغ ويعلّق.
+### الميزة الرئيسية / Highlighted Features
 
-## 🗂️ المنصة: ملفات + مزوّدون — `specs/wave1-providers-files/`
+- **6 مزوّدات مجانية** — Google / MyMemory / Libre / Gemini / DeepL / zen (OpenAI-compatible) مع احتياط تلقائي
+- **كاش ترجمة دائم** — `cache/translation-cache.json`، شارة ⚡ من الذاكرة المؤقتة، صلاحية 30 يومًا
+- **امتداد متصفح / Browser extension** — Chrome Manifest V3، ترجم أي صفحة بنقرة واحدة
+- **sentence-level audio** — مشغل فيديو مع ترجمة جملة بجملة (YouTube IFrame API)
+- **تصدير مترجم مع ترجمات مدمجة** — تنزيل فيديو مع WebVTT مرسوم فوقه (`GET /api/video/:id`)
+- **واجهة عربية RTL** — Cairo/Tajawal، وضع فاتح/داكن، 130+ لغة
 
-منفذة بالكامل ✅ — ترقية أرا لينك إلى منصة ترجمة حقيقية:
+---
 
-- **6 مزوّدات موحّدة كلها مجانية**: Google / MyMemory / Libre / Gemini / DeepL (Free) /
-  `zen` (بوابة opencode zen المتوافقة مع OpenAI — تصلح أيضًا لـ Ollama وLM Studio المحليين).
-- **`GET /api/providers`** يعيد كل المزوّدين وحالتهم؛ والطلب يقبل `provider` (فرض واحد) أو
-  `providers` (ترتيب مخصّص) مع بقاء الاحتياط التلقائي.
-- **مفاتيح اختيارية** عبر `.env`: `DEEPL_API_KEY`، و`ZEN_API_KEY` مع
-  `ZEN_BASE_URL` (مثال Ollama: `http://localhost:11434/v1`) و`ZEN_MODEL`، و`PROVIDER_ORDER`.
-- **ترجمة ملفات**: 11 صيغة إدخال (txt, md, docx, xlsx, csv, srt, vtt, json, xml, epub, pptx)
-  و8 صيغ إخراج (txt, md, docx, srt, vtt, json, csv, xml) — مع الحفاظ على البنية:
-  توقيتات SRT/VTT، مفاتيح JSON/XML، صفوف CSV/XLSX.
-- **نقطتان جديدتان**: `POST /api/translate-file` (ترجمة ملف base64) و`POST /api/export`
-  (تنزيل النتيجة بأي صيغة، مع أسماء ملفات عربية صحيحة).
-- **الواجهة**: وضع «📄 ترجمة ملف» (سحب/إفلات) + أزرار تصدير + قائمة «المحرك المفضّل»
-  في الإعدادات مع حقول DeepL وOpenAI.
-- **قيد v1 موثّق**: تصدير pptx/epub بـ txt/md/docx فقط (لا إعادة بناء الصيغة).
-
-
-## 🧩 الإضافات: امتداد المتصفح + OCR/TTS/PDF
-
-- **امتداد المتصفح**: مجلد `extension/` (Chrome Manifest V3) — ترجم أي صفحة بنقرة واحدة عبر `popup.js` + `background.js`.
-- **OCR/TTS/PDF**: استخراج النص من الصور (`server/ocr.js` + Tesseract.js) وملفات PDF (`server/pdf.js`) وتحويل النتيجة إلى صوت عربي (`server/tts.js` عبر MS Edge TTS) — مع معاينة وتصدير.
-
-## 📊 لوحة جودة الترجمة
-
-قياس موضوعي لكل مزوّد ترجمة بدل الانطباع:
+## البدء السريع / Quick Start
 
 ```bash
-npm run bench:translate                 # كل المزوّدين المتاحين
-npm run bench:translate -- --provider google --lang ar,fr
-```
+# استنساخ المستودع / Clone
+git clone https://github.com/MOT1209/-bersetzung-von-alle.git
+cd -bersetzung-von-alle
 
-يترجم `samples/translation/refset.json` (جُمل مرجعية) عبر كل مزوّد، يقارن الناتج
-بالترجمة الصحيحة عبر **WER** (تطبيع خاص بالعربية والتركية في `server/wer.js`)،
-ويكتب `cache/quality-report.json`. تعرضه لوحة التحكم (`/admin.html`) كجدول
-درجة/WER لكل مزوّد ولغة عبر `GET /api/stats/quality` (محمي بـ `ADMIN_TOKEN`).
-الدرجة = `1 − WER` (1 = مطابق). ⚠️ القياس يستهلك حصص الترجمة — شغّله يدويًا.
-
-### 🏃 أداء محرك الترجمة (بلا شبكة)
-
-```bash
-npm run perf:translate   # cache/perf-report.json
-```
-
-`scripts/perf-translate.js` يقيس **الأداء المحلي** عبر مزوّد مزيّف (لا يستهلك حصصًا):
-تقسيم النص (قصير/طويل بـ ms لكل 1000 حرف)، كشف الأسطر غير القابلة للترجمة، الكاش
-(إخفاق مقابل إصابة وسرعة التخزين)، حمل سلسلة الاحتياط عند فشل مزوّد، منحنى الذاكرة
-على 1000 ترجمة، وإنتاجية 20 ترجمة متزامنة — وينتهي بحكم «الأداء مقبول / يحتاج تحسين».
-الدقة متأثرة بالجهاز؛ لا تستخدمه في CI بل لمقارنة النسخ يدويًا.
-
-## 📖 القاموس المحلي + اتجاه النتيجة (RTL/LTR)
-
-ميزة العرض `feature/translation-improvements`:
-
-- **محرك ترجمة محلي** (`public/js/localEngine.mjs`): مُجزّئ توكنز يدعم العربية واللاتينية
-  (يفصل علامات الترقيم — بما فيها العربية ، ؛ ؟ — ويحفظ المسافات حرفياً)، تطبيع
-  lowercase + إزالة الحركات، مطابقة غير حساسة لحالة الأحرف مع إعادة تطبيق Capitalization،
-  وحماية من تلوث النموذج الأولي (prototype pollution) عند تحميل قواميس غير موثوقة.
-- **استيراد قاموس JSON**: من ⚙️ الإعدادات → «📥 استيراد قاموس JSON» — يُتحقق من الملف
-  (JSON كائن، مفاتيح/قيم نصية، حد 2MB و20000 مدخلة) ويُدمج في الذاكرة دون إعادة تحميل
-  الصفحة، ثم يُرسل مع كل ترجمة كمسرد. يوجد قاموسان نموذجيان في `public/locales/`
-  (`en.json` إن→عربي، `ar.json` عربي→إن) يُخدمان على `/locales/*.json`.
-- **اتجاه النتيجة**: كل فقرة نتيجة تأخذ `dir` حسب أول حرف قوي في نصها (`isRtlText`)،
-  مع `text-align` و`unicode-bidi: embed` — فتُعرض الترجمة الإنجليزية LTR والعربية RTL
-  حتى داخل الصفحة العربية.
-- **وضع debug**: `setDebug(true)` في console المتصفح يسجّل خطوات المعالجة واقتراحات
-  الكلمات القريبة (Levenshtein) للكلمات غير المطابقة.
-
-الاختبارات: `tests/localEngine.test.mjs` (33 وحدة) و`tests/locales.test.js`
-(7 تكامل — تشمل حالة القبول `Hello, world!` → `مرحبا, عالم!`). راجع
-`TEST_CASES.md` للاختبارات اليدوية و`DEPLOY_NOTES.md` لملاحظات النشر.
-
-## 🧪 الاختبارات وقياس التغطية
-
-```bash
-npm test                # تشغيل كل الاختبارات (node --test)
-npm run test:coverage   # الاختبارات + تقرير تغطية c8 (نصي)
-npm run test:coverage:html  # تقرير HTML في coverage/index.html
-```
-
-الحدود الدنيا للتغطية (تُفرض تلقائيًا): خطوط 70% / فروع 60% / دوال 70% —
-الإعداد في `.c8rc.json`. تقرير HTML وLCOV يُكتبان في `coverage/` (مُتجاهَل في git).
-
-## 🛡️ الأمان (تحصين 2026)
-
-- **CORS**: متغير `CORS_ORIGIN` في `.env` — قائمة أصول مسموحة مفصولة بفواصل
-  (مثال: `https://app.example.com`)، وافتراضيًا (فارغ) = **نفس الأصل فقط**، وتُحجب
-  طلبات المتصفحات من نطاقات أخرى تلقائيًا.
-- **حد الطلبات القابل للتوسّع**: عدّادات لكل IP عبر `server/store.js` — ذاكرة
-  لكل عملية افتراضيًا، أو Redis مشترك بضبط `REDIS_URL` (لازم عند تشغيل أكثر من
-  نسخة خادم). `redis` تبعية اختيارية وأي فشل اتصال يسقط تلقائيًا للذاكرة.
-- **رؤوس أمان**: `helmet` مع **CSP مُفعّلة بتوجيهات صريحة** (`server/server.js`) — تسمح
-  فقط بـ `self` + مشغّل يوتيوب (`www.youtube.com` / `youtube-nocookie.com`) + خطوط Google
-  + `cdn.jsdelivr.net` للسكربتات؛ إضافةً إلى `X-Frame-Options` و`X-Content-Type-Options: nosniff`
-  و`Referrer-Policy` و`HSTS`. و`trust proxy` عند `NODE_ENV=production` لضبط `req.ip` خلف Render.
-
-## 🚀 طريقة الاستخدام
-
-### 1) مع أي وكيل برمجة (pi، Codex، Cursor، Claude Code)
-
-افتح هذا المجلد ثم اكتب للوكيل:
-
-```text
-نفّذ المواصفة specs/translation-tool/ موجة بموجة باستخدام مهارة implement-feature.
-```
-
-### 2) تخطيط ميزة جديدة
-
-```text
-أنشئ مواصفة لميزة الترجمة الصوتية (dubbing) باستخدام مهارة create-spec.
-```
-
-### 3) تنفيذ يدوي مباشر
-
-```bash
+# تثبيت التبعيات / Install dependencies
 npm install
-npm run dev        # يبدأ الخادم على http://localhost:3000
+
+# تشغيل الخادم / Start the server
+npm run dev        # http://localhost:3000
 ```
 
-## 📁 هيكل المشروع المستهدف (من AGENTS.md)
+الخادم يعمل بدون مفاتيح API — المزوّدات المجانية تعمل تلقائيًا.
+أضف مفاتيح اختيارية في `.env` لتفعيل مزوّدات إضافية (انظر الجدول أدناه).
 
-```text
-/                    ← أداة ترجمة، وليست تطبيق Next.js
-├── public/          ← الملفات المنشورة عبر HTTP (وهي وحدها)
-│   ├── index.html   ← الواجهة (RTL عربي) — تحمّل js/app.js كوحدة
-│   ├── style.css    ← نظام التصميم
-│   ├── js/          ← وحدات ES: app.js (المدخل) + ui/translate/result/media/features/stream/dashboard
-│   └── script.js    ← الملف الأحادي القديم (مُستبدَل — لا يُحرَّر)
+*The server runs without API keys — free providers work out of the box.
+Add optional keys in `.env` for additional providers (see env table below).*
+
+### نسخة مسبقة / One-Click Deploy
+
+- **Docker:** `docker build -t aralink . && docker run -p 3000:3000 aralink`
+- **Render:** تعريف `render.yaml` جاهز — `_NEW` في Render ثم اختر المجلد
+
+---
+
+## البنية التقنية / Architecture
+
+| الطبقة | التقنية | Details |
+|--------|---------|---------|
+| **الواجهة / Frontend** | ES modules (`public/js/`) | RTL Arabic, Cairo font, dark/light themes, `index.html` |
+| **الخادم / Backend** | Node.js + Express | 15 routers in `server/routes-*.js` |
+| **قاعدة البيانات / DB** | SQLite (`node:sqlite` المدمج) | Single file `cache/aralink.db`, no native build required |
+| **محرك الترجمة / Translation** | 6 مزوّدات موحّدة | Unified registry, auto-fallback, per-engine cooldown |
+| **الوظائف الثقيلة / Jobs** | `server/jobs/` | Concurrency-capped (STT/dub/OCR), progress + cancellation |
+| **التخزين / Storage** | Local disk or S3/R2/MinIO | Key-based (`server/providers/storage/`), pluggable driver |
+
+---
+
+## الجودة والاختبارات / Quality & Testing
+
+```bash
+npm test                    # 621 اختبار (node --test)
+npm run lint                # ESLint — صفر تحذيرات
+npm run check               # فحص بنائي لـ 104 ملف
+
+npm run test:coverage       # c8 coverage (text)
+npm run test:coverage:html  # تقرير HTML في coverage/
+
+npm run bench:translate     # قياس جودة المزوّدين (WER) → cache/quality-report.json
+npm run perf:translate      # قياس الأداء المحلي → cache/perf-report.json
+```
+
+| المقياس | القيمة | Gate |
+|---------|--------|------|
+| اختبارات ناجحة | **621** | — |
+| تغطية خطوط | **~77.9%** | 70% (`.c8rc.json`) |
+| تغطية فروع | **~73.1%** | 60% |
+| تغطية دوال | **~80.6%** | 70% |
+| تحذيرات Lint | **0** | `--max-warnings=0` |
+
+> ⚠️ `bench:translate` يستهلك حصّة الترجمة المجانية — شغّله يدويًا فقط، لا في CI.
+
+---
+
+## للمطورين / For Developers
+
+### هيكل المشروع / Repo Layout
+
+```
+/
+├── public/              ← الواجهة (HTTP فقط)
+│   ├── index.html       ← الصفحة الرئيسية (RTL)
+│   ├── style.css        ← نظام التصميم
+│   └── js/              ← وحدات ES: app.js, ui.js, translate.js, result.js ...
 ├── server/
-│   ├── server.js    ← خادم Express
-│   ├── fetchContent.js ← استخراج المقالات
-│   ├── youtube.js   ← ترجمات يوتيوب
-│   ├── translate.js ← محرك الترجمة
-│   ├── files.js     ← استيراد/تصدير الملفات (11 صيغة)
-│   ├── routes-file.js ← مسارات ترجمة الملفات والتصدير
-│   ├── usage.js     ← عدّاد الاستخدام
-│   ├── logger.js    ← سجلات موحدة
-│   └── config.js
-├── .env             ← مفاتيح API (سرية)
-├── specs/           ← المواصفات
-└── .agents/skills/  ← مهارات الوكيل
+│   ├── server.js        ← Express app
+│   ├── translate.js     ← محرك الترجمة + كشف اللغة
+│   ├── fetchContent.js  ← استخراج المقالات
+│   ├── youtube.js       ← ترجمات يوتيوب
+│   ├── files.js         ← استيراد/تصدير (11→8 صيغ)
+│   ├── routes-*.js      ← مسارات API (15 ملف)
+│   ├── jobs/            ← محرك الوظائف الثقيلة
+│   ├── db/              ← migrations + queries
+│   └── config.js        ← تحميل الإعدادات
+├── extension/           ← امتداد Chrome (Manifest V3)
+├── tests/               ← 60 ملف اختبار
+├── docs/openapi.json    ← OpenAPI 3.1 (~42 نقطة نهاية)
+└── specs/               ← مواصفات الميزات (wave-based)
 ```
 
-## 📚 المصادر
+### التوثيق / Documentation
 
-- [Agentic Coding Starter Kit](https://github.com/leonvanzyl/agentic-coding-starter-kit)
-- [Leon's Agent Skills](https://github.com/leonvanzyl/skills)
-- [Skills CLI](https://github.com/vercel-labs/skills)
+| الملف | المحتوى |
+|-------|---------|
+| `docs/openapi.json` | مواصفة OpenAPI 3.1 لكل نقاط النهاية |
+| `/api/docs` | Swagger UI (فعّله بـ `SWAGGER_ENABLED=true`) |
+| `AGENTS.md` | إرشادات الوكالات البرمجية |
+| `DESIGN.md` | نظام التصميم البصري (ألوان، مكونات، طباعة) |
+| `TEST_CASES.md` | اختبارات يدوية |
+| `DEPLOY_NOTES.md` | ملاحظات النشر |
+
+### إضافة مزوّد ترجمة / Adding a Provider
+
+1. أضف الملف في `server/translate.js` (سجل المزوّدات)
+2. أضف المتغير في `server/config.js`
+3. أضف المفتاح في `.env.example`
+4. اكتب اختبار في `tests/provider.test.js`
+
+### لوحة التحكم / Admin Dashboard
+
+`/admin.html` — محمية بـ `ADMIN_TOKEN` (ترويسة `x-admin-token`).
+تعرض إحصائيات الاستخدام + جودة الترجمة + تكاليف العمليات.
+
+### الوكالات البرمجية / Agentic Coding
+
+المستودع يحتوي على مواصفات (`specs/`) ومهارات (`.agents/skills/`) لتنفيذ الميزات
+عبر وكالات برمجية (Claude Code, Codex, etc.). راجع `AGENTS.md` للتفاصيل.
+
+---
+
+## متغيرات البيئة / Environment Variables
+
+| المتغير | الافتراضي | الوصف |
+|---------|-----------|-------|
+| `PORT` | `3000` | منفذ الخادم |
+| `DB_FILE` | `cache/aralink.db` | مسار ملف SQLite |
+| `STATS_DRIVER` | `sqlite` | `sqlite` أو `json` |
+| `ADMIN_TOKEN` | *(معطّل)* | رمز لوحة التحكم الإدارية |
+| `SWAGGER_ENABLED` | `false` | تفعيل Swagger UI على `/api/docs` |
+| `CACHE_TTL_MS` | `2592000000` | صلاحية الكاش (30 يومًا، `0` لتعطيل الانتهاء) |
+| `CORS_ORIGIN` | *(فارغ)* | أصول مسموحة (فاصلة) — فارغ = نفس الأصل فقط |
+| `REDIS_URL` | *(معطّل)* | مشاركة عدّادات Rate-limit عبر Redis |
+| `JOB_CONCURRENCY` | `2` | سقف الوظائف المتزامنة |
+| `GEMINI_API_KEY` | | مفتاح Gemini (اختياري) |
+| `DEEPL_API_KEY` | | مفتاح DeepL المجاني (اختياري) |
+| `ZEN_API_KEY` | | مفتاح zen/Ollama (اختياري) |
+| `ZEN_BASE_URL` | `https://opencode.ai/zen/v1` | بوابة zen (Ollama: `localhost:11434/v1`) |
+| `YOUTUBE_API_KEY` | | YouTube Data API v3 (بيانات وصفية فقط) |
+
+> 📄 الكاملة في `.env.example` (161 سطر من التعليقات التوضيحية).
+
+---
+
+## الأمان / Security
+
+- **Helmet** مع CSP صارم (YouTube embed + Google Fonts + jsdelivr فقط)
+- **CORS** افتراضيًا same-origin فقط (فارغ = لا أصول مسموحة خارجية)
+- **Rate-limit** لكل IP — ذاكرة (نسخة واحدة) أو Redis (توسّع أفقي)
+- **`trust proxy`** في وضع الإنتاج (خلف Render)
+- لا أسرار محفوظة في المستودع
+
+---
+
+## الخطط المستقبلية / Roadmap
+
+- [ ] تصدير PPTX/EPUB بالصيغة الأصلية (حاليًا txt/md/docx فقط)
+- [ ] طابور وظائف Redis للتوسّع الأفقي (`QUEUE_DRIVER=redis`)
+- [ ] شارة جودة ترجمة مرئية لكل نتيجة
+- [ ] نشر Docker Hub رسمي
+
+---
+
+<p align="center">
+  <sub>صُنع بحب للمحتوى العربي — <em>Built with ❤️ for Arabic content</em></sub>
+</p>
