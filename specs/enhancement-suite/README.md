@@ -56,7 +56,7 @@ graph TD
 - [x] [task-08-cost-frontend](./tasks/task-08-cost-frontend.md) — Cost/quota cards in the admin dashboard
 
 ### Wave 4
-- [ ] [task-09-multilang-preview](./tasks/task-09-multilang-preview.md) — Parallel per-language progress grid + per-result players in the studio
+- [x] [task-09-multilang-preview](./tasks/task-09-multilang-preview.md) — Parallel per-language progress grid + per-result players in the studio
 
 ## Conventions for Implementers
 

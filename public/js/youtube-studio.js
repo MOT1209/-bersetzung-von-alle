@@ -58,6 +58,14 @@ const SEGMENT_ERROR_AR = {
   'job-running': 'يوجد مهمة جارية — أعد المحاولة لاحقًا.',
 };
 
+// Arabic display names for language codes in the multi-language grid header.
+const LANG_LABEL_AR = {
+  ar: 'العربية', en: 'الإنجليزية', de: 'الألمانية',
+  fr: 'الفرنسية', tr: 'التركية',
+};
+
+function langLabel(code) { return LANG_LABEL_AR[code] || code; }
+
 function els() {
   return {
     url: $('yt-url'), langs: [...document.querySelectorAll('.yt-lang:checked')].map((c) => c.value),
@@ -149,21 +157,108 @@ export function initYoutubeStudio() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.errorAr || data.error || 'server-error');
-      const jobId = data.jobId;
-      // التوكن يصل في هذا الرد وحده — احفظه قبل أي طلب لاحق وإلا ضاع المشروع
+      // Track all jobs from the POST response (multi-language support).
+      // Each job gets its own progress tracker; the FIRST job also drives
+      // the main progress bar so single-language UX stays visually unchanged.
+      const allJobs = (Array.isArray(data.jobs) && data.jobs.length)
+        ? data.jobs
+        : [{ jobId: data.jobId, projectId: data.projectId }];
+      const langs = allJobs.map((j) => j.targetLang || data.targetLang || 'ar');
+      // Clamp defensively to 5 (backend max).
+      const jobs = allJobs.slice(0, 5);
+      // Save ownership tokens for all projects so file requests succeed.
       if (data.ownerToken && data.projectId) rememberToken(data.projectId, data.ownerToken);
+      // Show multi-language grid when >1 language; otherwise keep single-player layout.
+      const grid = $('yt-multilang');
+      if (jobs.length > 1 && grid) {
+        grid.innerHTML = '';
+        grid.hidden = false;
+      }
       E.plabel.textContent = 'بدأت الدبلجة — تتبع التقدم لحظيًا…';
-      await pollJob(jobId, (job) => {
-        E.plabel.textContent = `${job.stage || STAGES_AR[job.status]} (${job.progress || 0}٪)`;
-        const bar = $('yt-progress-bar');
-        if (bar) bar.style.width = `${job.progress || 0}%`;
-        setSteps(job.stage in STAGES_AR ? jobStatusToStep(job) : job.stage);
-        if (job.status === 'completed' && job.result) renderResult(job.result);
-        if (job.status === 'failed') {
-          showErrorAr(job.errorAr || 'تعذر إكمال الدبلجة — أعد المحاولة.');
-          start.disabled = false;
+      // Poll each job independently; failures in one language don't block others.
+      jobs.forEach((j, i) => {
+        const lang = langs[i] || 'ar';
+        const langName = langLabel(lang);
+        const container = (jobs.length > 1 && grid) ? grid : null;
+        const pollFn = (onUpdate) => pollJob(j.jobId, onUpdate, j.projectId);
+        if (container) {
+          // Multi-language: create a per-language card with its own progress/player.
+          const card = document.createElement('div');
+          card.className = 'yt-lang-card';
+          card.dataset.lang = lang;
+          card.innerHTML =
+            `<div class="yt-lang-header"><span class="yt-lang-badge">${langName}</span><span class="yt-lang-status">⏳ في الانتظار…</span></div>` +
+            '<div class="yt-lang-progress"><div class="yt-lang-progress-track"><div class="yt-lang-progress-bar" style="width:0"></div></div></div>' +
+            '<div class="yt-lang-body" hidden>' +
+              '<video class="yt-player" controls preload="metadata" playsinline></video>' +
+              '<p class="meta-line yt-meta"></p>' +
+              '<div class="yt-downloads">' +
+                '<a class="btn-primary yt-dl-video" href="#" download>⬇ تحميل MP4</a>' +
+                '<a class="btn-secondary yt-dl-audio" href="#" download>⬇ تحميل الصوت</a>' +
+                '<a class="btn-secondary yt-dl-srt" href="#" download>📄 تحميل SRT</a>' +
+              '</div>' +
+              '<div class="yt-timeline-head">📜 المقاطع</div>' +
+              '<div class="yt-timeline" aria-label="المخطط الزمني للمقاطع"></div>' +
+            '</div>' +
+            '<div class="yt-lang-error" hidden><p class="error-message"></p>' +
+              '<button type="button" class="btn-secondary yt-lang-retry">إعادة المحاولة</button></div>';
+          container.appendChild(card);
+          pollFn((job) => {
+            const bar = card.querySelector('.yt-lang-progress-bar');
+            const status = card.querySelector('.yt-lang-status');
+            if (bar) bar.style.width = `${job.progress || 0}%`;
+            if (status) status.textContent = `${job.stage || STAGES_AR[job.status] || job.status} (${job.progress || 0}٪)`;
+            if (job.status === 'completed' && job.result) {
+              card.querySelector('.yt-lang-progress').hidden = true;
+              card.querySelector('.yt-lang-body').hidden = false;
+              renderLangCard(job.result, card);
+            }
+            if (job.status === 'failed') {
+              card.querySelector('.yt-lang-progress').hidden = true;
+              const errEl = card.querySelector('.yt-lang-error');
+              if (errEl) errEl.hidden = false;
+              const msgEl = card.querySelector('.yt-lang-error .error-message');
+              if (msgEl) msgEl.textContent = job.errorAr || `فشل التوليد للغة ${langName}`;
+              // Wire the per-language retry button.
+              const retryBtn = card.querySelector('.yt-lang-retry');
+              if (retryBtn) retryBtn.onclick = () => {
+                errEl.hidden = true;
+                card.querySelector('.yt-lang-progress').hidden = false;
+                card.querySelector('.yt-lang-body').hidden = true;
+                const retryBar = card.querySelector('.yt-lang-progress-bar');
+                if (retryBar) retryBar.style.width = '0%';
+                pollFn((retryJob) => {
+                  if (bar) bar.style.width = `${retryJob.progress || 0}%`;
+                  if (status) status.textContent = `${retryJob.stage || STAGES_AR[retryJob.status] || retryJob.status} (${retryJob.progress || 0}٪)`;
+                  if (retryJob.status === 'completed' && retryJob.result) {
+                    card.querySelector('.yt-lang-progress').hidden = true;
+                    card.querySelector('.yt-lang-body').hidden = false;
+                    renderLangCard(retryJob.result, card);
+                  }
+                  if (retryJob.status === 'failed') {
+                    card.querySelector('.yt-lang-progress').hidden = true;
+                    errEl.hidden = false;
+                    if (msgEl) msgEl.textContent = retryJob.errorAr || `فشل التوليد للغة ${langName}`;
+                  }
+                });
+              };
+            }
+          });
+        } else {
+          // Single-language: poll the first (only) job with the main progress UI.
+          pollFn((job) => {
+            E.plabel.textContent = `${job.stage || STAGES_AR[job.status]} (${job.progress || 0}٪)`;
+            const bar = $('yt-progress-bar');
+            if (bar) bar.style.width = `${job.progress || 0}%`;
+            setSteps(job.stage in STAGES_AR ? jobStatusToStep(job) : job.stage);
+            if (job.status === 'completed' && job.result) renderResult(job.result);
+            if (job.status === 'failed') {
+              showErrorAr(job.errorAr || 'تعذر إكمال الدبلجة — أعد المحاولة.');
+              start.disabled = false;
+            }
+          });
         }
-      }, data.projectId);
+      });
     } catch (e) {
       showErrorAr(e.message || 'تعذر بدء الدبلجة.');
     } finally {
@@ -193,9 +288,9 @@ function escapeHtml(s) {
 
 // مخطط زمني تفاعلي: قائمة المقاطع من ملف translation (نفس timeline الدبلجة)
 // أضيف: تعديل المقطع + حفظ + إشعار التقادم + تحديث صوتي بعد الحفظ
-async function renderTimeline(r) {
-  const box = $('yt-timeline');
-  const player = $('yt-player');
+async function renderTimeline(r, card, playerEl) {
+  const box = (card && card.querySelector) ? card.querySelector('.yt-timeline') : $('yt-timeline');
+  const player = playerEl || $('yt-player');
   if (!box || !player) return;
   box.innerHTML = '<p class="muted">جاري تحميل المقاطع…</p>';
   // Reset stale tracking when a different project is loaded (same-project
@@ -222,7 +317,7 @@ async function renderTimeline(r) {
 
     // Save button inside the segment
     if (ev.target.closest('.yt-seg-save')) {
-      handleSegmentSave(seg);
+      handleSegmentSave(seg, player, card);
       return;
     }
     // Cancel button inside the segment
@@ -364,7 +459,7 @@ function handleSegmentCancel(seg) {
 }
 
 // Save the edited segment text via PATCH endpoint
-async function handleSegmentSave(seg) {
+async function handleSegmentSave(seg, playerParam, cardParam) {
   if (!seg.hasAttribute('data-editing')) return;
   const idx = Number(seg.dataset.index);
   const ta = seg.querySelector('.yt-seg-ta');
@@ -415,7 +510,7 @@ async function handleSegmentSave(seg) {
     }
 
     // Audio refresh: if the player is currently playing this segment, update the audio src
-    refreshAudioForSegment(idx, updatedSegment);
+    refreshAudioForSegment(idx, updatedSegment, playerParam, cardParam);
 
   } catch {
     showSegError(seg, 'تعذر الاتصال بالخادم.');
@@ -510,9 +605,9 @@ function updateStaleNotice(show) {
 // After a successful save, note the regenerated audio clip for the segment:
 // keep the row's audio basename + the player's reference up to date so the
 // next playback cycle uses the new clip without re-queuing the whole timeline.
-function refreshAudioForSegment(idx, updatedSegment) {
-  const player = $('yt-player');
-  const box = $('yt-timeline');
+function refreshAudioForSegment(idx, updatedSegment, playerParam, cardParam) {
+  const player = playerParam || $('yt-player');
+  const box = cardParam ? cardParam.querySelector('.yt-timeline') : $('yt-timeline');
   if (!player || !updatedSegment.audio) return;
   const row = box ? box.querySelector(`.yt-seg[data-index="${idx}"]`) : null;
   if (row) row.dataset.audio = updatedSegment.audio;
@@ -525,24 +620,30 @@ function seekToSegment(start, player) {
 }
 
 function renderResult(r) {
-  const box = $('yt-result');
-  if (!box) return;
-  box.hidden = false;
-  const player = $('yt-player');
+  // Single-language path delegates to the shared language-card renderer.
+  // The primary card's container is the existing yt-result section.
+  renderLangCard(r, $('yt-result'));
+}
+
+// Shared language-card renderer: builds a player + downloads + editable
+// timeline inside the given container. Used by both the primary (single-lang)
+// path and each card in the multi-language grid.
+function renderLangCard(r, card) {
+  if (!r || !card) return;
+  card.hidden = false;
+  const player = card.querySelector('video') || $('yt-player');
   if (player) { player.src = withToken(r.videoUrl, r.projectId); player.poster = ''; }
-  const meta = $('yt-meta');
-  if (meta) meta.textContent = `الأصل: ${r.sourceLang || '?'} → الهدف: ${r.targetLang} • ${r.segments} مقطعًا • وضع ${r.mode}`;
-  const set = (id, href, dl) => {
-    const a = $(id);
-    if (!a) return;
-    a.href = href; if (dl) a.setAttribute('download', dl);
-  };
-  set('yt-dl-video', withToken(r.videoUrl, r.projectId), 'dubbed.mp4');
-  set('yt-dl-audio', withToken(r.audioUrl, r.projectId), 'dubbed.mp3');
-  set('yt-dl-srt', withToken(r.srtUrl, r.projectId), 'subtitles.srt');
+  const meta = card.querySelector('.yt-meta');
+  if (meta) meta.textContent = `${langLabel(r.targetLang)} — الأصل: ${r.sourceLang || '?'} → الهدف: ${r.targetLang} • ${r.segments} مقطعًا • وضع ${r.mode}`;
+  const dlVideo = card.querySelector('.yt-dl-video');
+  if (dlVideo) { dlVideo.href = withToken(r.videoUrl, r.projectId); dlVideo.setAttribute('download', 'dubbed.mp4'); }
+  const dlAudio = card.querySelector('.yt-dl-audio');
+  if (dlAudio) { dlAudio.href = withToken(r.audioUrl, r.projectId); dlAudio.setAttribute('download', 'dubbed.mp3'); }
+  const dlSrt = card.querySelector('.yt-dl-srt');
+  if (dlSrt) { dlSrt.href = withToken(r.srtUrl, r.projectId); dlSrt.setAttribute('download', 'subtitles.srt'); }
   wireDeleteButton(r);
-  renderTimeline(r);
-  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  renderTimeline(r, card, player);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // زر حذف المشروع (تنظيف القرص) — يربط مرة واحدة فقط
