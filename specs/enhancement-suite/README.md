@@ -51,9 +51,9 @@ graph TD
 - [x] [task-05-subtitle-editor-backend](./tasks/task-05-subtitle-editor-backend.md) — PATCH endpoint to edit a segment's translation and regenerate only that segment's TTS
 
 ### Wave 3
-- [ ] [task-06-storage-s3-driver](./tasks/task-06-storage-s3-driver.md) — Add optional S3/R2 storage driver behind the existing key-based storage interface
-- [ ] [task-07-subtitle-editor-frontend](./tasks/task-07-subtitle-editor-frontend.md) — Editable timeline in the YouTube studio with per-segment re-gen
-- [ ] [task-08-cost-frontend](./tasks/task-08-cost-frontend.md) — Cost/quota cards in the admin dashboard
+- [x] [task-06-storage-s3-driver](./tasks/task-06-storage-s3-driver.md) — Add optional S3/R2 storage driver behind the existing key-based storage interface
+- [x] [task-07-subtitle-editor-frontend](./tasks/task-07-subtitle-editor-frontend.md) — Editable timeline in the YouTube studio with per-segment re-gen
+- [x] [task-08-cost-frontend](./tasks/task-08-cost-frontend.md) — Cost/quota cards in the admin dashboard
 
 ### Wave 4
 - [ ] [task-09-multilang-preview](./tasks/task-09-multilang-preview.md) — Parallel per-language progress grid + per-result players in the studio
