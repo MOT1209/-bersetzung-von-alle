@@ -53,6 +53,25 @@
         <div class="stat-label">ترجمات الأسبوع</div>
       </div>
       <div class="stat-card">
+        <div class="stat-value" id="cost-tts">—</div>
+        <div class="stat-label">🎙️ مقاطع TTS</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cost-chars">—</div>
+        <div class="stat-label">✍️ أحرف الترجمة</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cost-ffmpeg">—</div>
+        <div class="stat-label">🎞️ ثواني المعالجة (ffmpeg)</div>
+      </div>
+      <div class="stat-card" style="grid-column: 1 / -1;">
+        <h3 style="margin: 0 0 8px; font-size: .95rem;">
+          التكاليف حسب النوع
+          <span id="cost-updated" style="font-weight: 400; color: var(--text-dim, #666); font-size: .8rem;"></span>
+        </h3>
+        <div id="cost-breakdown" style="overflow-x: auto; font-size: .9rem;">—</div>
+      </div>
+      <div class="stat-card">
         <h3 style="margin: 0 0 8px; font-size: .95rem;">الترجمات خلال 7 أيام</h3>
         <div class="chart-container"><canvas id="timeseries-chart"></canvas></div>
       </div>

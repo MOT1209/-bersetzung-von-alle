@@ -122,6 +122,65 @@ function renderQuality(data) {
   <p style="color:var(--text-dim,#666);font-size:.8rem;margin-top:8px">الدرجة = 1 − WER (1 = مطابق للترجمة المرجعية). ${data.refsetSize} جملة مرجعية.</p>`;
 }
 
+// Compact duration: "mm:ss" under an hour, else "Xس YYد" (matches dashboard style).
+function fmtCostDuration(secs) {
+  const total = Math.max(0, Math.floor(Number(secs) || 0));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    return `${h}س ${String(m % 60).padStart(2, '0')}د`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// Per-type labels for the cost breakdown (keys tracked by server/cost.js).
+const costTypeLabels = { dub: 'دبلجة', translate: 'ترجمة', tts: 'توليد الصوت' };
+
+function renderCost(data) {
+  const tts = document.getElementById('cost-tts');
+  const chars = document.getElementById('cost-chars');
+  const ffmpeg = document.getElementById('cost-ffmpeg');
+  if (!tts || !chars || !ffmpeg) return;
+
+  // Default every value to 0 so missing/older responses render cleanly.
+  const d = data || {};
+  tts.textContent = (d.ttsSegments || 0).toLocaleString('ar');
+  chars.textContent = new Intl.NumberFormat('ar', { notation: 'compact' }).format(d.translationChars || 0);
+  ffmpeg.textContent = fmtCostDuration(d.ffmpegSec);
+
+  const updated = document.getElementById('cost-updated');
+  if (updated && d.updatedAt) {
+    const date = new Date(d.updatedAt);
+    if (!Number.isNaN(date.getTime())) {
+      updated.textContent = '· آخر تحديث: ' + date.toLocaleString('ar');
+    }
+  }
+
+  const breakdown = document.getElementById('cost-breakdown');
+  if (!breakdown) return;
+  const entries = Object.entries(d.byType || {});
+  if (!entries.length) {
+    breakdown.innerHTML = '<p class="muted" style="margin:0">لا توجد بيانات بعد</p>';
+    return;
+  }
+  const rows = entries.map(([type, v]) => `<tr>
+      <td style="font-weight:700">${costTypeLabels[type] || type}</td>
+      <td style="text-align:center">${(v.ttsSegments || 0).toLocaleString('ar')}</td>
+      <td style="text-align:center">${new Intl.NumberFormat('ar', { notation: 'compact' }).format(v.translationChars || 0)}</td>
+      <td style="text-align:center">${fmtCostDuration(v.ffmpegSec)}</td>
+    </tr>`).join('');
+  breakdown.innerHTML = `<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="border-bottom:1px solid var(--border,#e5e7eb)">
+      <th style="text-align:right;padding:6px">النوع</th>
+      <th style="padding:6px">مقاطع TTS</th>
+      <th style="padding:6px">أحرف الترجمة</th>
+      <th style="padding:6px">ثواني ffmpeg</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 async function init() {
   document.getElementById('auth-btn').addEventListener('click', async () => {
     const val = document.getElementById('admin-token').value.trim();
@@ -151,6 +210,11 @@ async function init() {
     // جودة الترجمة — اختياري، لا يكسر اللوحة إن غاب التقرير
     try { renderQuality(await fetchStats('quality')); }
     catch { renderQuality(null); }
+
+    // Cost/quota cards (optional) — same defensive pattern as quality:
+    // a missing/failed cost response never breaks the rest of the dashboard.
+    try { renderCost(await fetchStats('cost')); }
+    catch { renderCost(null); }
 
     document.getElementById('auth-gate').hidden = true;
     document.getElementById('dashboard').hidden = false;

@@ -76,9 +76,28 @@ module.exports = {
   RATE_LIMIT_MAX_DUB: Number(process.env.RATE_LIMIT_MAX_DUB) || 60,
 
   // ===== التخزين والمشاريع (P3) =====
-  // مفاتيح لا مسارات: تغيير السائق إلى S3/R2 لاحقًا لا يمسّ أي مستدعٍ.
+  // مفاتيح لا مسارات: تغيير السائق إلى S3/R2 لا يمسّ أي مستدعٍ.
+  // STORAGE_DRIVER: 'local' (الافتراضي) أو 's3' — سائق S3 يُنشئ عند الطلب
+  // وب.vector env مفقود يسقط تلقائيًا للمحلي مع تحذير في السجل.
   STORAGE_DRIVER: process.env.STORAGE_DRIVER || 'local',
   STORAGE_DIR: process.env.STORAGE_DIR || path.join(__dirname, '..', 'cache', 'storage'),
+
+  // ===== S3 / R2 / MinIO (سائق تخزين اختياري) =====
+  // يُفعّل فقط عند STORAGE_DRIVER=s3. جميع المفاتيح اختيارية ما لم يكن
+  // السائق s3 — في ذلك الحالة، يسقط تلقائيًا للتخزين المحلي مع تحذير.
+  // S3_ENDPOINT: https://<acct>.r2.cloudflarestorage.com (R2)
+  //              أو https://s3.amazonaws.com (AWS) أو http://localhost:9000 (MinIO)
+  S3_ENDPOINT: process.env.S3_ENDPOINT || '',
+  S3_REGION: process.env.S3_REGION || 'auto',   // R2/MinIO: 'auto' — AWS: 'us-east-1' مثلاً
+  S3_BUCKET: process.env.S3_BUCKET || '',
+  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID || '',
+  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY || '',
+  // S3_FORCE_PATH_STYLE: true لـ MinIO الذي لا يدعم virtual-hosted style
+  S3_FORCE_PATH_STYLE: process.env.S3_FORCE_PATH_STYLE || 'false',
+  // S3_PREFIX: بادئة اختيارية لكل مفتاح في السطل (مثل 'aralink/prod')
+  S3_PREFIX: process.env.S3_PREFIX || '',
+  // S3_PUBLIC_URL: رابط عام اختياري للوصول المباشر (CDN أو R2 public bucket)
+  S3_PUBLIC_URL: process.env.S3_PUBLIC_URL || '',
   // قاعدة بيانات SQLite عبر node:sqlite المدمج (بلا تبعية ولا بناء أصلي —
   // وهو ما يهمّ هنا تحديدًا: الوحدات الأصلية سبق أن كسرت إقلاع صورة Docker).
   DB_FILE: process.env.DB_FILE || path.join(__dirname, '..', 'cache', 'aralink.db'),

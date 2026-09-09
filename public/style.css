@@ -1410,3 +1410,81 @@ body {
 .yt-seg-spk { color: var(--text-muted); font-size: .75rem; white-space: nowrap; }
 .yt-seg-txt { flex: 1; }
 .muted { color: var(--text-muted); }
+
+/* ===== محرر المقاطع (Segment Editor) ===== */
+.yt-seg-edit {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: .85rem;
+  cursor: pointer;
+  padding: 0;
+}
+.yt-seg-edit:hover { border-color: var(--primary); color: var(--primary); }
+.yt-seg[data-editing] {
+  flex-direction: column;
+  align-items: stretch;
+  cursor: default;
+}
+.yt-seg-ta {
+  width: 100%;
+  min-height: 2.8em;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.5;
+  background: var(--bg-input);
+  color: var(--text);
+  resize: vertical;
+  direction: rtl;
+}
+.yt-seg-ta:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.yt-seg-ta:disabled { opacity: .6; cursor: not-allowed; }
+.yt-seg-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.btn-sm {
+  font-size: .75rem;
+  padding: 3px 10px;
+}
+.yt-seg-ref {
+  font-size: .78rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+/* Toast feedback inside a segment row */
+.yt-seg-toast {
+  font-size: .78rem;
+  margin-top: 4px;
+  border-radius: 4px;
+  padding: 2px 8px;
+  animation: seg-fade 2s ease forwards;
+}
+.yt-seg-toast-ok { color: var(--success, #22c55e); }
+.yt-seg-toast-err { color: var(--danger, #ef4444); }
+@keyframes seg-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* Stale export notice beneath the timeline */
+.yt-stale-notice {
+  font-size: .8rem;
+  color: var(--warning, #eab308);
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(234, 179, 8, .08);
+}
