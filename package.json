@@ -9,10 +9,14 @@
     "start": "node server/server.js",
     "check": "node scripts/check.js",
     "test": "node --test \"tests/*.test.js\" \"tests/*.test.mjs\"",
+    "test:coverage": "c8 node --test \"tests/*.test.js\" \"tests/*.test.mjs\"",
+    "test:coverage:html": "c8 --reporter=html node --test \"tests/*.test.js\" \"tests/*.test.mjs\"",
+    "test:coverage:lcov": "c8 --reporter=lcov node --test \"tests/*.test.js\" \"tests/*.test.mjs\"",
     "lint": "eslint server/ tests/ public/js/ --max-warnings=0",
     "lint:mjs": "eslint public/js/*.mjs tests/*.test.mjs --max-warnings=0",
     "download:ocr": "node scripts/download-ocr-data.js",
     "bench:translate": "node scripts/bench-translate.js",
+    "perf:translate": "node scripts/perf-translate.js",
     "demo:media": "node scripts/demo-media.js"
   },
   "dependencies": {
@@ -39,6 +43,7 @@
     "youtube-dl-exec": "^3.1.9"
   },
   "devDependencies": {
+    "c8": "^12.0.0",
     "eslint": "^10.9.1"
   },
   "engines": {

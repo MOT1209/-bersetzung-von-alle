@@ -46,4 +46,31 @@ module.exports = [
       ALTER TABLE projects ADD COLUMN owner_hash TEXT;
     `,
   },
+  {
+    version: 3,
+    name: 'stats-entries-and-usage-counters',
+    // نقل إحصاءات لوحة التحكم وعدادات الاستخدام من ملفات JSON (stats-log.json
+    // و usage.json) إلى SQLite. السبب: ملفا JSON يعانيان من سباق قراءة-ثم-كتابة
+    // مع أي خادم ثانٍ (لا multi-instance)، وتجميع الإحصائيات يقرأ الملف كاملًا
+    // ويفلتر في الذاكرة لكل طلب. الجداول هنا تعطي استعلامات نطاق زمني فورية
+    // عبر الفهارس بدل فحص N صف في كل استدعاء.
+    up: `
+      CREATE TABLE stats_entries (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        type        TEXT NOT NULL,
+        source_lang TEXT,
+        target_lang TEXT,
+        provider    TEXT,
+        created_at  INTEGER NOT NULL
+      );
+
+      CREATE INDEX idx_stats_created ON stats_entries(created_at);
+      CREATE INDEX idx_stats_type ON stats_entries(type);
+
+      CREATE TABLE usage_counters (
+        key   TEXT PRIMARY KEY,
+        value INTEGER NOT NULL DEFAULT 0
+      );
+    `,
+  },
 ];

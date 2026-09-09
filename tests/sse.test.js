@@ -15,6 +15,8 @@ process.env.RATE_LIMIT_MAX_HEAVY = '1000';
 process.env.CACHE_FILE = path.join(os.tmpdir(), 'aralink-test-sse-' + Date.now() + '.json');
 process.env.USAGE_FILE = path.join(os.tmpdir(), 'aralink-test-sse-usage-' + Date.now() + '.json');
 process.env.STATS_LOG = path.join(os.tmpdir(), 'aralink-test-sse-stats-' + Date.now() + '.json');
+// يُبقي الإحصاءات سائق JSON المعزول بملفاته — لا يفتح قاعدة بيانات مشتركة في الاختبار
+process.env.STATS_DRIVER = 'json';
 
 const translate = require('../server/translate');
 const fetchContent = require('../server/fetchContent');

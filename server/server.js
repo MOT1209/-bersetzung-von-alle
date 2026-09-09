@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const path = require('path');
+const fs = require('fs');
 const config = require('./config');
 const { createStore, closeAll: closeStore } = require('./store');
 const translateRouter = require('./routes-translate');
@@ -142,6 +143,39 @@ app.use(compression());
 // ===== الملفات الثابتة (الواجهة فقط — لا يُنشر جذر المشروع) =====
 const publicDir = path.join(__dirname, '..', 'public');
 app.use(express.static(publicDir));
+
+// ===== توثيق API (OpenAPI + Swagger UI) — اختياري عبر SWAGGER_ENABLED=true =====
+// بلا تبعية جديدة: docs/openapi.json يُقرأ مرة واحدة عند الإقلاع، وواجهة Swagger
+// تُحمَّل من CDN (مسموح في CSP سلفًا للسكربتات). المعطّل افتراضيًا كي لا يفضح
+// خريطة المسارات كاملة على نشر عام دون طلب.
+if (process.env.SWAGGER_ENABLED === 'true') {
+  let swaggerSpec = null;
+  try {
+    swaggerSpec = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'docs', 'openapi.json'), 'utf8'));
+  } catch (e) {
+    console.warn('[docs] SWAGGER_ENABLED لكن docs/openapi.json غير مقروء:', e.message);
+  }
+  if (swaggerSpec) {
+    app.get('/api/docs/swagger.json', (req, res) => res.json(swaggerSpec));
+    app.get('/api/docs', (req, res) => {
+      res.type('html').send(`<!doctype html>
+<html lang=\"ar\" dir=\"rtl\">
+<head>
+  <meta charset=\"utf-8\">
+  <title>AraLink API — التوثيق</title>
+  <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">
+</head>
+<body>
+  <div id=\"swagger\"></div>
+  <script src=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js\"><\/script>
+  <script>
+    window.ui = SwaggerUIBundle({ url: '/api/docs/swagger.json', dom_id: '#swagger' });
+  <\/script>
+</body>
+</html>`);
+    });
+  }
+}
 
 // ===== فحص الصحة =====
 app.get('/api/health', (req, res) => {

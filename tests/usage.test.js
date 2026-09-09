@@ -11,6 +11,9 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aralink-usage-'));
 process.env.USAGE_FILE = path.join(tmpDir, 'usage.json');
 // STATS_LOG يعزل إحصاءات لوحة التحكم عن ملف cache/stats-log.json الحقيقي
 process.env.STATS_LOG = path.join(tmpDir, 'stats-log.json');
+// هذا الملف يختبر سائق JSON القديم عمدًا (سلوك التراجع): مسار SQLite الجديد
+// مغطّى في tests/usageSqlite.test.js بقاعدة معزولة.
+process.env.STATS_DRIVER = 'json';
 process.env.RATE_LIMIT_MAX = '1000';
 process.env.RATE_LIMIT_MAX_HEAVY = '1000';
 // /api/stats محمية بـ requireAdmin (ADMIN_TOKEN) — نضبط مفتاحًا للاختبار

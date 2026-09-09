@@ -102,6 +102,18 @@ npm run bench:translate -- --provider google --lang ar,fr
 درجة/WER لكل مزوّد ولغة عبر `GET /api/stats/quality` (محمي بـ `ADMIN_TOKEN`).
 الدرجة = `1 − WER` (1 = مطابق). ⚠️ القياس يستهلك حصص الترجمة — شغّله يدويًا.
 
+### 🏃 أداء محرك الترجمة (بلا شبكة)
+
+```bash
+npm run perf:translate   # cache/perf-report.json
+```
+
+`scripts/perf-translate.js` يقيس **الأداء المحلي** عبر مزوّد مزيّف (لا يستهلك حصصًا):
+تقسيم النص (قصير/طويل بـ ms لكل 1000 حرف)، كشف الأسطر غير القابلة للترجمة، الكاش
+(إخفاق مقابل إصابة وسرعة التخزين)، حمل سلسلة الاحتياط عند فشل مزوّد، منحنى الذاكرة
+على 1000 ترجمة، وإنتاجية 20 ترجمة متزامنة — وينتهي بحكم «الأداء مقبول / يحتاج تحسين».
+الدقة متأثرة بالجهاز؛ لا تستخدمه في CI بل لمقارنة النسخ يدويًا.
+
 ## 📖 القاموس المحلي + اتجاه النتيجة (RTL/LTR)
 
 ميزة العرض `feature/translation-improvements`:
@@ -123,6 +135,17 @@ npm run bench:translate -- --provider google --lang ar,fr
 الاختبارات: `tests/localEngine.test.mjs` (33 وحدة) و`tests/locales.test.js`
 (7 تكامل — تشمل حالة القبول `Hello, world!` → `مرحبا, عالم!`). راجع
 `TEST_CASES.md` للاختبارات اليدوية و`DEPLOY_NOTES.md` لملاحظات النشر.
+
+## 🧪 الاختبارات وقياس التغطية
+
+```bash
+npm test                # تشغيل كل الاختبارات (node --test)
+npm run test:coverage   # الاختبارات + تقرير تغطية c8 (نصي)
+npm run test:coverage:html  # تقرير HTML في coverage/index.html
+```
+
+الحدود الدنيا للتغطية (تُفرض تلقائيًا): خطوط 70% / فروع 60% / دوال 70% —
+الإعداد في `.c8rc.json`. تقرير HTML وLCOV يُكتبان في `coverage/` (مُتجاهَل في git).
 
 ## 🛡️ الأمان (تحصين 2026)
 

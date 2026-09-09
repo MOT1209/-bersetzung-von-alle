@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تقرير شامل - AraLink</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-card-alt: #222633;
+    --bg-hover: #2a2e3d;
+    --text: #e8e6e1;
+    --text-muted: #9ca3af;
+    --primary: #8fabe0;
+    --primary-dim: #6b8cc7;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-cyan: #22d3ee;
+    --accent-purple: #c084fc;
+    --border: #2e3348;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Cairo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    padding: 2rem;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .report-header {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: linear-gradient(135deg, #1a1d27 0%, #222633 100%);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .report-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--accent-cyan), var(--accent-purple));
+  }
+  .report-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+  }
+  .report-header .subtitle {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+  }
+  .report-header .date {
+    color: var(--accent-cyan);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+
+  /* Score Card */
+  .score-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.2rem;
+    margin-bottom: 2.5rem;
+  }
+  .score-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    transition: transform 0.15s ease;
+  }
+  .score-card:hover { transform: translateY(-2px); }
+  .score-card .score {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+  .score-card .label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-top: 0.3rem;
+  }
+  .score-green { color: var(--accent-green); }
+  .score-amber { color: var(--accent-amber); }
+  .score-red { color: var(--accent-red); }
+  .score-cyan { color: var(--accent-cyan); }
+  .score-purple { color: var(--accent-purple); }
+  .score-blue { color: var(--primary); }
+
+  /* Sections */
+  .section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+  }
+  .section h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .section h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    margin: 1.2rem 0 0.6rem;
+  }
+  .section h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent-purple);
+    margin: 0.8rem 0 0.4rem;
+  }
+  .section p, .section li {
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  .section ul {
+    list-style: none;
+    padding-right: 1.2rem;
+  }
+  .section ul li {
+    position: relative;
+    padding: 0.25rem 0;
+  }
+  .section ul li::before {
+    content: '▸';
+    color: var(--primary);
+    position: absolute;
+    right: -1.2rem;
+  }
+
+  /* Tables */
+  .table-wrapper {
+    overflow-x: auto;
+    margin: 1rem 0;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--bg-card-alt);
+    color: var(--accent-cyan);
+    font-weight: 700;
+    padding: 0.8rem 1rem;
+    text-align: right;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:hover td { background: var(--bg-hover); }
+
+  /* Code / Monospace */
+  code {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    background: var(--bg-card-alt);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--accent-cyan);
+    direction: ltr;
+    display: inline-block;
+  }
+  pre {
+    background: #0d0f15;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    direction: ltr;
+    text-align: left;
+    margin: 0.8rem 0;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin: 0.1rem 0.2rem;
+  }
+  .badge-green { background: rgba(74,222,128,0.15); color: var(--accent-green); }
+  .badge-amber { background: rgba(251,191,36,0.15); color: var(--accent-amber); }
+  .badge-red { background: rgba(248,113,113,0.15); color: var(--accent-red); }
+  .badge-blue { background: rgba(143,171,224,0.15); color: var(--primary); }
+  .badge-cyan { background: rgba(34,211,238,0.15); color: var(--accent-cyan); }
+  .badge-purple { background: rgba(192,132,252,0.15); color: var(--accent-purple); }
+
+  /* Status indicators */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+  }
+  .status-green { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+  .status-amber { background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber); }
+  .status-red { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+
+  /* Grid layouts */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+  }
+
+  /* Sub cards */
+  .sub-card {
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+  }
+  .sub-card h4 {
+    margin-top: 0;
+  }
+
+  /* Progress bars */
+  .progress-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  /* File tree */
+  .file-tree {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    direction: ltr;
+    text-align: left;
+    line-height: 2;
+    color: var(--text-muted);
+    background: #0d0f15;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+    overflow-x: auto;
+  }
+  .file-tree .dir { color: var(--primary); font-weight: 700; }
+  .file-tree .file { color: var(--text); }
+  .file-tree .key { color: var(--accent-green); }
+  .file-tree .note { color: var(--text-muted); font-style: italic; }
+
+  /* Collapsible */
+  details {
+    margin: 0.5rem 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  details summary {
+    padding: 0.8rem 1.2rem;
+    background: var(--bg-card-alt);
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    user-select: none;
+  }
+  details summary:hover { background: var(--bg-hover); }
+  details[open] summary { border-bottom: 1px solid var(--border); }
+  details .detail-content {
+    padding: 1rem 1.2rem;
+  }
+
+  /* Footer */
+  .report-footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    body { padding: 1rem; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .report-header h1 { font-size: 1.8rem; }
+    .score-section { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* Print */
+  @media print {
+    body { background: #fff; color: #000; }
+    .section { border-color: #ddd; box-shadow: none; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header class="report-header">
+    <h1>AraLink</h1>
+    <div class="subtitle">تقرير فحص شامل للمشروع — أداة ترجمة الروابط</div>
+    <div class="date">التاريخ: 9 سبتمبر 2026</div>
+  </header>
+
+  <!-- SCORE CARDS -->
+  <div class="score-section">
+    <div class="score-card">
+      <div class="score score-green">A</div>
+      <div class="label">بنية الكود overall</div>
+    </div>
+    <div class="score-card">
+      <div class="score score-cyan">57</div>
+      <div class="label">ملف اختبار</div>
+    </div>
+    <div class="score-card">
+      <div class="score score-amber">15</div>
+      <div class="label">ملف مسار (Router)</div>
+    </div>
+    <div class="score-card">
+      <div class="score score-blue">6</div>
+      <div class="label">محركات ترجمة</div>
+    </div>
+    <div class="score-card">
+      <div class="score score-purple">40+</div>
+      <div class="label">نقطة نهاية API</div>
+    </div>
+    <div class="score-card">
+      <div class="score score-green">14</div>
+      <div class="label">وحدة أمامية (ES Module)</div>
+    </div>
+  </div>
+
+  <!-- 1. نظرة عامة -->
+  <div class="section">
+    <h2>1. نظرة عامة على المشروع</h2>
+    <p><strong>AraLink</strong> هو أداة ترجمة ذكية تترجم أي محتوى من رابط — فيديوهات يوتيوب، مقالات، مواقع ويب، ملفات مستندات، نصوص عادية، حتى صور (OCR). الواجهة بالعربية (RTL) بالكامل.</p>
+
+    <h3>القدرات الرئيسية</h3>
+    <ul>
+      <li>ترجمة فيديوهات YouTube (استخراج النص المترجم → عرض الترجمة مع التوقيت)</li>
+      <li>ترجمة المقالات والمدونات (جلب الصفحة → استخراج النص → ترجمة)</li>
+      <li>ترجمة أي موقع إلكتروني (جلب → تنظيف → ترجمة → عرض جنباً إلى جنب)</li>
+      <li>ترجمة ملفات (txt, docx, xlsx, csv, srt, vtt, json, xml, epub, pptx)</li>
+      <li>تحويل النص إلى كلام (TTS) بأصوات طبيعية</li>
+      <li>تحويل الصور إلى نص (OCR)</li>
+      <li>تشبيك الفيديو بالعربية (Dubbing) مع مزج صوتي</li>
+      <li>ترجمة النصوص مباشرة بدون رابط</li>
+      <li>اكتمال ذكي للترجمة عبر SSE Streaming</li>
+      <li>امتداد Chrome للترجمة الفورية داخل المتصفح</li>
+      <li>لوحة تحكم للمدير مع إحصائيات و Charts</li>
+      <li>نظام مشاريع مع قاعدة بيانات SQLite</li>
+      <li>عمليات خلفية مع طابور مهام (Job Queue)</li>
+      <li>تعريب النص العربي (Tashkeel)</li>
+    </ul>
+  </div>
+
+  <!-- 2. بنية المشروع -->
+  <div class="section">
+    <h2>2. بنية المشروع</h2>
+    <div class="file-tree">
+<span class="dir">translischen Arbic/</span>
+├── <span class="dir">public/</span>                    <span class="note">← المجلد الوحيد المقدم عبر HTTP</span>
+│   ├── <span class="key">index.html</span>               <span class="note">← الواجهة الرئيسية (RTL عربي)</span>
+│   ├── <span class="key">style.css</span>                <span class="note">← نظام التصميم</span>
+│   ├── <span class="key">admin.html</span>               <span class="note">← لوحة تحكم المدير</span>
+│   ├── <span class="file">theme-init.js</span>            <span class="note">← تهيئة السمة قبل الرسم</span>
+│   ├── <span class="file">sw.js</span>                    <span class="note">← Service Worker (PWA)</span>
+│   ├── <span class="file">manifest.webmanifest</span>     <span class="note">← ملف PWA</span>
+│   ├── <span class="dir">js/</span>                      <span class="note">← 14 وحدة ES Module</span>
+│   │   ├── <span class="key">app.js</span>                <span class="note">← نقطة الدخول (200 سطر)</span>
+│   │   ├── <span class="file">ui.js</span>                 <span class="note">← مساعدات DOM + السمة</span>
+│   │   ├── <span class="key">translate.js</span>          <span class="note">← منطق الترجمة + Streaming (290 سطر)</span>
+│   │   ├── <span class="file">result.js</span>             <span class="note">← عرض النتائج</span>
+│   │   ├── <span class="file">media.js</span>              <span class="note">← SRT + TTS + فيديو محلي</span>
+│   │   ├── <span class="key">features.js</span>           <span class="note">← التاريخ + المعجم + الإعدادات (527 سطر)</span>
+│   │   ├── <span class="file">stream.js</span>             <span class="note">← عميل SSE (94 سطر)</span>
+│   │   ├── <span class="file">dub.js</span>                <span class="note">← الدبلجة من جهة العميل (232 سطر)</span>
+│   │   ├── <span class="file">dashboard.js</span>          <span class="note">← لوحة تحكم المدير (228 سطر)</span>
+│   │   ├── <span class="file">utils.js</span>              <span class="note">← أدوات مساعدة</span>
+│   │   ├── <span class="file">constants.js</span>          <span class="note">← ثوابت مشتركة</span>
+│   │   ├── <span class="file">localEngine.mjs</span>       <span class="note">← محرك ترجمة محلي ( offline )</span>
+│   │   ├── <span class="file">projectUpload.js</span>      <span class="note">← رفع الوسائط + أنابيب المعالجة</span>
+│   │   └── <span class="file">youtube-studio.js</span>     <span class="note">← واجهة استوديو اليوتيوب</span>
+│   ├── <span class="dir">icons/</span>                   <span class="note">← أيقونات التطبيق SVG</span>
+│   └── <span class="dir">locales/</span>                 <span class="note">← ملفات الترجمة</span>
+│
+├── <span class="dir">server/</span>                    <span class="note">← الخادم (51 ملف)</span>
+│   ├── <span class="key">server.js</span>                <span class="note">← تطبيق Express (259 سطر)</span>
+│   ├── <span class="key">config.js</span>                <span class="note">← تحميل الإعدادات (138 سطر)</span>
+│   ├── <span class="key">translate.js</span>             <span class="note">← محرك الترجمة الأساسي (309 سطر)</span>
+│   ├── <span class="key">fetchContent.js</span>          <span class="note">← استخراج المقالات (304 سطر)</span>
+│   ├── <span class="file">youtube.js</span>               <span class="note">← استخراج ترجمات YouTube</span>
+│   ├── <span class="file">youtubeApi.js</span>            <span class="note">← YouTube Data API v3</span>
+│   ├── <span class="file">geminiVideo.js</span>           <span class="note">← ترجمة فيديو Gemini</span>
+│   ├── <span class="file">files.js</span>                 <span class="note">← استيراد/تصدير الملفات</span>
+│   ├── <span class="file">ocr.js</span>                   <span class="note">← التعرف الضوئي على الحروف</span>
+│   ├── <span class="file">pdf.js</span>                   <span class="note">← محلل PDF</span>
+│   ├── <span class="file">tts.js</span>                   <span class="note">← تحويل النص إلى كلام</span>
+│   ├── <span class="file">audio.js</span>                 <span class="note">← STT (Speech-to-Text)</span>
+│   ├── <span class="file">ssrf.js</span>                  <span class="note">← حماية SSRF (237 سطر)</span>
+│   ├── <span class="file">store.js</span>                 <span class="note">← مستودع KV للحد من الطلبات (182 سطر)</span>
+│   ├── <span class="file">cache.js</span>                 <span class="note">← التخزين المؤقت المبني على الملفات (253 سطر)</span>
+│   ├── <span class="file">usage.js</span>                 <span class="note">← تتبع الاستخدام</span>
+│   ├── <span class="file">stats.js</span>                 <span class="note">← إحصائيات لوحة التحكم (139 سطر)</span>
+│   ├── <span class="file">cost.js</span>                  <span class="note">← تتبع التكاليف</span>
+│   ├── <span class="file">logger.js</span>                <span class="note">← تسجيل الأخطاء</span>
+│   ├── <span class="file">adminAuth.js</span>             <span class="note">← مصادقة المدير</span>
+│   ├── <span class="file">ownerToken.js</span>            <span class="note">← رموز ملكية المشاريع</span>
+│   ├── <span class="file">languages.js</span>             <span class="note">← ~130 لغة بأسماء عربية</span>
+│   ├── <span class="file">tashkeel.js</span>              <span class="note">← التعريب الصوتي للعربية</span>
+│   ├── <span class="file">quality.js</span>               <span class="note">← تقارير جودة الترجمة</span>
+│   ├── <span class="file">wer.js</span>                   <span class="note">← حساب نسبة الخطأ في الكلمات</span>
+│   ├── <span class="dir">db/</span>                     <span class="note">← طبقة قاعدة البيانات</span>
+│   │   ├── <span class="key">index.js</span>              <span class="note">← اتصال SQLite + الترحيل</span>
+│   │   ├── <span class="file">migrations.js</span>         <span class="note">← مخططات الترحيل</span>
+│   │   └── <span class="file">projects.js</span>           <span class="note">← مستودع المشاريع</span>
+│   ├── <span class="dir">jobs/</span>                    <span class="note">← طابور المهام</span>
+│   │   ├── <span class="key">queue.js</span>              <span class="note">← طابور داخل العملية (285 سطر)</span>
+│   │   ├── <span class="file">index.js</span>              <span class="note">← م举例 فردي مشترك</span>
+│   │   └── <span class="file">job-manager.js</span>        <span class="note">← مدير مهام الدبلجة (211 سطر)</span>
+│   ├── <span class="dir">providers/</span>               <span class="note">← تجريد المزودين</span>
+│   │   ├── <span class="dir">translation/</span>           <span class="note">← 6 مزودين للترجمة</span>
+│   │   ├── <span class="dir">tts/</span>                   <span class="note">← مزود TTS</span>
+│   │   ├── <span class="dir">stt/</span>                   <span class="note">← مزود STT (sherpa + transformers)</span>
+│   │   └── <span class="dir">storage/</span>               <span class="note">← محركات التخزين (محلي + S3)</span>
+│   └── <span class="dir">dubbing/</span>                 <span class="note">← أنبوب الدبلجة (11 ملفات)</span>
+│
+├── <span class="dir">extension/</span>                  <span class="note">← إضافة Chrome (Manifest V3)</span>
+├── <span class="dir">tests/</span>                     <span class="note">← 57 ملف اختبار</span>
+├── <span class="dir">specs/</span>                     <span class="note">← مواصفات الميزات</span>
+├── <span class="dir">scripts/</span>                   <span class="note">← سكريبتات الأدوات</span>
+├── <span class="dir">cache/</span>                     <span class="note">← بيانات التشغيل (gitignored)</span>
+├── <span class="dir">models/</span>                    <span class="note">← نماذج STT</span>
+└── <span class="dir">projects/</span>                  <span class="note">← ملفات مشاريع الدبلجة</span>
+    </div>
+  </div>
+
+  <!-- 3. البنية الخلفية -->
+  <div class="section">
+    <h2>3. البنية الخلفية (Backend)</h2>
+
+    <h3>نقطة الدخول — server/server.js (259 سطر)</h3>
+    <p>Express 4.x مع <code>CommonJS</code>. ترتيب Middleware حرج:</p>
+    <div class="grid-2" style="margin-top:1rem;">
+      <div class="sub-card">
+        <h4>تسلسل Middleware</h4>
+        <ul>
+          <li>1. CORS (قائمة أسماء مصادر مسموح بها)</li>
+          <li>2. Helmet (عناوين أمان CSP)</li>
+          <li>3. Rate Limiter الأساسي (/api)</li>
+          <li>4. Rate Limiter الثقيل + routes-file (قبل json — 15MB)</li>
+          <li>5. routes-local-video (قبل json — 60MB)</li>
+          <li>6. routes-ocr (قبل json — 15MB)</li>
+          <li>7. express.json({ limit: '2mb' })</li>
+          <li>8. routes-SSE (قبل compression!)</li>
+          <li>9. routes-youtube-dub SSE + routes-jobs SSE</li>
+          <li>10. compression() — gzip 60-80%</li>
+          <li>11. Static files من public/</li>
+          <li>12. باقي المعالجات: translate, tts, dub, projects...</li>
+          <li>13. معالج الأخطاء العام (413, JSON, 500)</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>ملاحظات مهمة</h4>
+        <ul>
+          <li>routes-SSE يجب أن يكون <strong>قبل</strong> compression لأن SSE نص قابل للضغط</li>
+          <li>routes-file و routes-local-video و routes-ocr تأتي قبل express.json لتحديد حجم الجسم</li>
+          <li>الكشف عن انقطاع العميل عبر <code>res.on('close')</code> وليس req.on('close')</li>
+          <li>الوصول للدوال عبر <code>translate.detectLanguage(...)</code> وليس استيراد مباشر</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>نقاط النهاية (API Endpoints)</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>الطريقة</th>
+            <th>المسار</th>
+            <th>الوصف</th>
+            <th>الحماية</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td>/api/health</td><td>فحص صحة الخادم</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/languages</td><td>اللغات المدعومة (~130)</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/translate</td><td>ترجمة رابط (يوتيوب/مقال)</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/translate-text</td><td>ترجمة نص خام</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/translate-smart</td><td>ترجمة ذكية (إعادة صياغة)</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/translate-stream</td><td>ترجمة SSE Streaming</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/srt</td><td>بناء ملف SRT من ترجمة</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/providers</td><td>قائمة مزودي الترجمة</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/tts</td><td>تحويل النص إلى كلام (MP3)</td><td><span class="badge badge-amber"> ثقيل</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/translate-file</td><td>ترجمة ملف مرفوع</td><td><span class="badge badge-amber"> ثقيل</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/export</td><td>تصدير ملف مترجم</td><td><span class="badge badge-amber"> ثقيل</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/ocr</td><td>التعرف الضوئي على الصور</td><td><span class="badge badge-amber"> ثقيل</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/tashkeel</td><td>التعريب الصوتي للعربية</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/video/:videoId</td><td>-stream فيديو يوتيوب</td><td><span class="badge badge-amber"> ثقيل</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/video-local</td><td>رفع فيديو/صوت محلي + STT</td><td><span class="badge badge-red"> 60MB</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/dub</td><td>توليد مقاطع دبلجة</td><td><span class="badge badge-purple"> دبلجة</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/youtube/metadata</td><td>بيانات فيديو يوتيوب</td><td><span class="badge badge-amber"> ثقيل</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/youtube/dub</td><td>بدء مهمة دبلجة كاملة</td><td><span class="badge badge-purple"> دبلجة</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/jobs</td><td>إحصائيات طابور المهام</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/jobs/:id</td><td>حالة مهمة</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/jobs/:id/stream</td><td>تprogress المهمة SSE</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td><code>DELETE</code></td><td>/api/jobs/:id</td><td>إلغاء مهمة</td><td><span class="badge badge-green"> عام</span></td></tr>
+          <tr><td colspan="4" style="background:var(--bg-card-alt);font-weight:700;color:var(--accent-purple)">نقاط نهاية المشاريع (CRUD — حماية برمز ملكية)</td></tr>
+          <tr><td><code>GET</code></td><td>/api/projects</td><td>قائمة المشاريع (مدير فقط)</td><td><span class="badge badge-red"> مدير</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/projects</td><td>إنشاء مشروع</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/projects/:id</td><td>تفاصيل المشروع + أصول</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td><code>PATCH</code></td><td>/api/projects/:id</td><td>تحديث مشروع</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td><code>DELETE</code></td><td>/api/projects/:id</td><td>حذف مشروع + ملفات</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/projects/:id/assets</td><td>رفع أصل</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/projects/:id/assets/:assetId/content</td><td>تنزيل أصل</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td><code>DELETE</code></td><td>/api/projects/:id/assets/:assetId</td><td>حذف أصل</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/projects/:id/process</td><td>بدء أنبوب المعالجة</td><td><span class="badge badge-blue"> رمز</span></td></tr>
+          <tr><td colspan="4" style="background:var(--bg-card-alt);font-weight:700;color:var(--accent-amber)">نقاط نهاية المدير (محمية بـ ADMIN_TOKEN)</td></tr>
+          <tr><td><code>POST</code></td><td>/api/admin/login</td><td>تسجيل دخول المدير</td><td><span class="badge badge-red"> مدير</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/admin/logout</td><td>تسجيل خروج</td><td><span class="badge badge-red"> مدير</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/settings</td><td>قراءة إعدادات .env</td><td><span class="badge badge-red"> مدير</span></td></tr>
+          <tr><td><code>POST</code></td><td>/api/settings</td><td>حفظ إعدادات .env</td><td><span class="badge badge-red"> مدير</span></td></tr>
+          <tr><td><code>GET</code></td><td>/api/stats/*</td><td>إحصائيات لوحة التحكم (7 نقاط نهاية)</td><td><span class="badge badge-red"> مدير</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>محرك الترجمة — server/translate.js (309 سطر)</h3>
+    <div class="grid-3">
+      <div class="sub-card">
+        <h4>📦 بنية المزودين</h4>
+        <p>واجهة واحدة: <code>{ id, label, requiresKey, isAvailable(), translate() }</code></p>
+        <p>تسجيل ذاتي في <code>providers/translation/index.js</code></p>
+        <p>إضافة مزود = ملف واحد + سطر واحد</p>
+      </div>
+      <div class="sub-card">
+        <h4>🔄 آليات التراجع (Fallback)</h4>
+        <p>الترتيب: Google → MyMemory → Libre → Gemini → DeepL → zen</p>
+        <p>300ms تهدئة بين المحاولات</p>
+        <p>3 أخطاء متتالية → تجميد 60 ثانية</p>
+        <p>جميع المزودين فشل = خطأ 502</p>
+      </div>
+      <div class="sub-card">
+        <h4>⚡ الأداء</h4>
+        <p>تقسيم النص إلى ~4500 حرف (على حدود الفقرات/الجمل)</p>
+        <p>تخزين مؤقت: SHA1 + ملف + 30 يوم TTL</p>
+        <p>حد أقصى 5000 إدخال</p>
+        <p>مهلة 120 ثانية لكل استدعاء</p>
+      </div>
+    </div>
+
+    <h3>مزودو الترجمة</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>المزود</th>
+            <th>المعرّف</th>
+            <th>مفتاح مطلوب</th>
+            <th>مجاني؟</th>
+            <th>الحد الأقصى للقطعة</th>
+            <th>ملاحظات</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Google Translate</td>
+            <td><code>google</code></td>
+            <td><span class="badge badge-green">لا</span></td>
+            <td><span class="badge badge-green">نعم</span></td>
+            <td>4500 حرف</td>
+            <td>نقطة نهاية غير رسمية، بدون مفتاح</td>
+          </tr>
+          <tr>
+            <td>MyMemory</td>
+            <td><code>mymemory</code></td>
+            <td><span class="badge badge-green">لا</span></td>
+            <td><span class="badge badge-green">نعم</span></td>
+            <td>500 حرف (تقسيم داخلي)</td>
+            <td>البريد الإلكتروني يرفع الحصة اليومية</td>
+          </tr>
+          <tr>
+            <td>LibreTranslate</td>
+            <td><code>libre</code></td>
+            <td><span class="badge badge-green">لا</span></td>
+            <td><span class="badge badge-green">نعم</span></td>
+            <td>4500 حرف</td>
+            <td>خادم قابل للتكوين</td>
+          </tr>
+          <tr>
+            <td>Gemini</td>
+            <td><code>gemini</code></td>
+            <td><span class="badge badge-amber">نعم</span></td>
+            <td><span class="badge badge-green">نعم (مجاني)</span></td>
+            <td>4500 حرف</td>
+            <td>Google AI Studio key</td>
+          </tr>
+          <tr>
+            <td>DeepL</td>
+            <td><code>deepl</code></td>
+            <td><span class="badge badge-amber">نعم</span></td>
+            <td><span class="badge badge-green">نعم (مجاني)</span></td>
+            <td>4500 حرف</td>
+            <td>api-free.deepl.com</td>
+          </tr>
+          <tr>
+            <td>zen (OpenAI-compatible)</td>
+            <td><code>zen</code></td>
+            <td><span class="badge badge-amber">نعم</span></td>
+            <td><span class="badge badge-amber">يعتمد</span></td>
+            <td>4500 حرف</td>
+            <td>Ollama, LM Studio, opencode</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>استخراج المحتوى — fetchContent.js (304 سطر)</h3>
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>AML_AML حماية SSRF (ssrf.js — 237 سطر)</h4>
+        <ul>
+          <li>حجب جميع نطاقات RFC 1918/loopback/link-local/multicast IPv4</li>
+          <li>حجب IPv6 loopback, ULA, link-local, 6to4, Teredo</li>
+          <li>التحقق من DNS مع حماية من DNS rebinding</li>
+          <li>_agents تثبيت المأخذ عبر undici Agent</li>
+          <li>إعادة التحقق عند كل توجيه (redirect)</li>
+          <li>حجب صيغ IP غير القياسية (octal, hex, عشري)</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>📋 استخراج HTML</h4>
+        <ul>
+          <li>Cheerio + خوارزمية Readability</li>
+          <li>إزالة: scripts, styles, nav, footer, ads</li>
+          <li>الحفاظ على: h1-h3, p, li, blockquote, img alt</li>
+          <li>User-Agent يحاكي متصفح Chrome</li>
+          <li>قواعد استخراج مخصصة لكل نطاق عبر extractionRules.js</li>
+          <li>حد الجسم: 10MB HTML، 25MB PDF</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>تكامل YouTube</h3>
+    <div class="grid-3">
+      <div class="sub-card">
+        <h4>🎬 youtube.js</h4>
+        <p>استخراج الترجمات عبر حزمة <code>youtube-transcript</code></p>
+        <p>الأولوية: مختار المستخدم → en → en.auto → أول متاح</p>
+        <p>شكل الإخراج: <code>[{ text, start, duration }]</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>📊 youtubeApi.js</h4>
+        <p>YouTube Data API v3 <code>videos.list</code></p>
+        <p>بيانات وصفية فقط (1 وحدة حصانية/يوم)</p>
+        <p><strong>لا يمكن جلب نص الترجمة</strong> (يتطلب OAuth كمالك الفيديو)</p>
+      </div>
+      <div class="sub-card">
+        <h4>🤖 geminiVideo.js</h4>
+        <p>Gemini يشاهد فيديو YouTube مباشرة</p>
+        <p>تجاوز حجب IPs السحابية</p>
+        <p>سلسلة التراجع: Gemini → YouTube captions → Whisper STT</p>
+      </div>
+    </div>
+
+    <h3>قاعدة البيانات — SQLite (node:sqlite)</h3>
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>🗄️ المخطط (Schema)</h4>
+        <p><strong>schema_migrations</strong>: version, name, applied_at</p>
+        <p><strong>projects</strong>: id, name, source_type, source_ref, target_langs, status, owner_hash, timestamps</p>
+        <p><strong>assets</strong>: id, project_id (FK CASCADE), kind, lang, storage_key, mime, bytes, meta, created_at</p>
+        <p>PRAGMA: <code>foreign_keys = ON</code>, <code>journal_mode = WAL</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>🔄 الترحيل (Migrations)</h4>
+        <p>النسخة 1: <code>projects-and-assets</code> — جداول المشاريع والأصول</p>
+        <p>النسخة 2: <code>project-owner-token</code> — إضافة owner_hash</p>
+        <p>نسخي، تransactional، متماثل</p>
+        <p>جميع SQL في <code>server/db/projects.js</code> فقط</p>
+      </div>
+    </div>
+
+    <h3>طابور المهام — jobs/queue.js (285 سطر)</h3>
+    <ul>
+      <li>حد التزامن: 2 (قابل للتكوين عبر JOB_CONCURRENCY)</li>
+      <li>حد الطابور: 50 (JOB_MAX_QUEUED)</li>
+      <li>تنظيف TTL: ساعة واحدة</li>
+      <li>إلغاء تعاوني عبر AbortController</li>
+      <li>الإبلاغ عن التقدم: stage text + percent (0-100)</li>
+      <li> EventEmitter للمشتركين SSE</li>
+      <li>ession تسجيل المعالجات حسب النوع (تجنب circular requires)</li>
+      <li>تجريد السائق: ذاكرة الآن → Redis/BullMQ لاحقاً</li>
+    </ul>
+  </div>
+
+  <!-- 4. الواجهة الأمامية -->
+  <div class="section">
+    <h2>4. الواجهة الأمامية (Frontend)</h2>
+
+    <h3>public/index.html (378 سطر)</h3>
+    <p>صفحة واحدة بالكامل (SPA) بتنسيق RTL عربي مع:</p>
+    <div class="grid-3">
+      <div class="sub-card">
+        <h4>🎨 الهيكل</h4>
+        <ul>
+          <li>الرأسية: العلامة التجارية + إعدادات + السمة</li>
+          <li>شريط عدم الاتصال (_offline banner_)</li>
+          <li>تبديل الوضع: رابط / نص / ملف</li>
+          <li>بطاقة الإدخال + حقل اللغة + زر الترجمة</li>
+          <li>وضع الدفع (batch mode)</li>
+          <li>شريط التقدم</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>📋 قسم النتائج</h4>
+        <ul>
+          <li>تضمين فيديو (يوتيوب/محلي)</li>
+          <li>.tabs: ترجمة / أصلي / مقارنة</li>
+          <li>إجراءات: استماع / دبلجة / SRT / مقارنة / تعريب / نسخ / مشاركة</li>
+          <li>تصدير: txt, md, docx, srt</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>🎛️ ميزات إضافية</h4>
+        <ul>
+          <li>استوديو يوتيوب: URL → لغة → وضع → MP4</li>
+          <li>لوحة تحكم المدير مع Chart.js</li>
+          <li>PWA مع Service Worker</li>
+          <li>وضع المظلم/الفاتح</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>الوحدات الأمامية (14 ES Module)</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>الوحدة</th>
+            <th>الأسطر</th>
+            <th>الوظيفة</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>app.js</code></td><td>200</td><td>نقطة الدخول: أحداث التبديل، فحص الخادم، تحميل اللغات، السمة، SW</td></tr>
+          <tr><td><code>ui.js</code></td><td>—</td><td>محددات DOM، ملء فلتر اللغة، تطبيق/تبديل السمة، تقدم ورسائل خطأ</td></tr>
+          <tr><td><code>translate.js</code></td><td>290</td><td>تنسيق الترجمة: كلاسيكي، SSE Streaming، ملف، ذكي، batch</td></tr>
+          <tr><td><code>result.js</code></td><td>—</td><td>عرض المحتوى المترجم/الأصلي، تبويبات، وضع المقارنة</td></tr>
+          <tr><td><code>media.js</code></td><td>—</td><td>تنزيل SRT، الاستماع TTS، فيديو محلي، مزامنة الترجمة، يوتيوب</td></tr>
+          <tr><td><code>features.js</code></td><td>527</td><td>التاريخ (localStorage)، المعجم، قواعد الاستخراج، الإعدادات، التشعيب، وضع الملف</td></tr>
+          <tr><td><code>stream.js</code></td><td>94</td><td>عميل SSE عبر fetch + ReadableStream (POST)</td></tr>
+          <tr><td><code>dub.js</code></td><td>232</td><td>الدبلجة من جهة العميل: prefetch batches، تشغيل متزامن مع الفيديو</td></tr>
+          <tr><td><code>dashboard.js</code></td><td>228</td><td>لوحة تحكم المدير: تسجيل دخول، Chart.js (timeseries, types, providers, languages)</td></tr>
+          <tr><td><code>utils.js</code></td><td>—</td><td>كائن الحالة، postJson(), safeGet/safeSet، mapError(), langName()</td></tr>
+          <tr><td><code>constants.js</code></td><td>—</td><td>ثوابت مشتركة</td></tr>
+          <tr><td><code>localEngine.mjs</code></td><td>—</td><td>محرك ترجمة محلي (قاموس) للاستيعاب بدون اتصال</td></tr>
+          <tr><td><code>projectUpload.js</code></td><td>—</td><td>رفع وسائط + تتبع أنابيب المعالجة</td></tr>
+          <tr><td><code>youtube-studio.js</code></td><td>—</td><td>واجهة استوديو يوتيوب للدبلجة</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>am ama عميل SSE — stream.js (94 سطر)</h3>
+    <p>بما أن EventSource يدعم GET فقط، يستخدم العميل <code>fetch()</code> مع POST + ReadableStream:</p>
+    <ul>
+      <li><code>init</code>: اللغة المصدر، إجمالي القطع</li>
+      <li><code>chunk</code>: النص المترجم مع الفهرس</li>
+      <li><code>done</code>: النتيجة الكاملة</li>
+      <li><code>error</code>: رسالة الخطأ</li>
+      <li>AbortController للإلغاء</li>
+    </ul>
+  </div>
+
+  <!-- 5. نظام التصميم -->
+  <div class="section">
+    <h2>5. نظام التصميم (DESIGN.md)</h2>
+
+    <h3>شخصية المنتج</h3>
+    <p>"أداة قراءة هادئة، ليست لوحة تحكم." المحتوى الفعلي هو النص العربي الطويل للقراءة. لون واحد مميز، التسلسل الهرمي بالتباعد/الحجم (وليس الحدود/الظلال).</p>
+
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>🎨 الألوان — الفاتح</h4>
+        <ul>
+          <li><code>--bg: #fbfaf8</code> — خلفية دافئة</li>
+          <li><code>--bg-card: #ffffff</code> — بطاقات بيضاء</li>
+          <li><code>--primary: #3d5a99</code> — أزرق هادئ</li>
+          <li>أخضر/كهرماني/أحمر فقط للحالة فقط</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>🌙 الألوان — الداكن</h4>
+        <ul>
+          <li><code>--bg: #161513</code> — خلفية داكنة</li>
+          <li><code>--text: #eceae6</code> — نص فاتح</li>
+          <li><code>--primary: #8fabe0</code> — أزرق أفتح للمبااعدة</li>
+          <li>لا تدرجات بنفسجية، لا توهج، لا backdrop-filter</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:1rem;">
+      <div class="sub-card">
+        <h4>📝 الطباعة</h4>
+        <p>خط Cairo (Google Fonts)</p>
+        <p>700 للعناوين، 400 للنص</p>
+        <p>الأساس: 16px</p>
+        <p>asure: 68ch (أقصى عرض للقراءة المريحة)</p>
+      </div>
+      <div class="sub-card">
+        <h4>📐 التخطيط</h4>
+        <p>RTL بالكامل (<code>dir="rtl"</code>)</p>
+        <p>عمود واحد، <code>max-width: 860px</code></p>
+        <p>نتيجة النص: line-height 2 (generous)</p>
+      </div>
+      <div class="sub-card">
+        <h4>🎭 المكونات</h4>
+        <p>الأزرار: أساسي (ممتلئ) / ثانوي (شفاف + حد)</p>
+        <p>التبويبات: حد سفلي على النشط</p>
+        <p>التحميل: 3 نقاط نابضة + تسمية الخطوة</p>
+        <p>الخطأ: بطاقة <code>role="alert"</code></p>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:1rem;">
+      <div class="sub-card">
+        <h4>🔄 الحركة</h4>
+        <p>150ms ease transitions</p>
+        <p>تلاشي + انزلاق لظهور النتيجة</p>
+        <p>لا رسوم متحركة زخرفية</p>
+      </div>
+      <div class="sub-card">
+        <h4>♿ إمكانية الوصول</h4>
+        <p>جميع العناصر التفاعلية可通过 لوحة المفاتيح مع <code>:focus-visible</code></p>
+        <p>تباين فوق AA في كلا السمتين</p>
+        <p>رسائل الخطأ عبر <code>role="alert"</code></p>
+        <p>محدد اللغة: ~135 لغة مسمّاة بالعربية</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. الأمان -->
+  <div class="section">
+    <h2>6. الأمان (Security)</h2>
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>🔒 CORS</h4>
+        <ul>
+          <li>قائمة أسماء مصادر مسموح بها عبر <code>CORS_ORIGIN</code></li>
+          <li>فارغ = نفس الأصل فقط (الوضع الآمن الافتراضي)</li>
+          <li>بدون ترويسة Origin = تمرير بدون عناوين CORS</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>🛡️ SSRF Protection</h4>
+        <ul>
+          <li>حجب جميع نطاقات خاصة (RFC 1918/loopback/link-local)</li>
+          <li>حماية DNS rebinding عبر undici Agent</li>
+          <li>إعادة التحقق عند كل توجيه (redirect)</li>
+          <li>237 سطر من كود الحماية المفصل</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>⏱️ Rate Limiting</h4>
+        <ul>
+          <li>أساسي: 20 طلب/دقيقة/عنوان IP</li>
+          <li>ثقيل: 10 طلبات/دقيقة/عنوان IP</li>
+          <li>دبلجة: 60 طلباً/دقيقة/عنوان IP</li>
+          <li>مضاعف 3x ل holders مفاتيح API</li>
+          <li>Retry-After header على 429</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>🔐 مصادقة المدير</h4>
+        <ul>
+          <li><code>crypto.timingSafeEqual</code> (constant-time)</li>
+          <li>كعكة httpOnly, SameSite=Strict (12 ساعة)</li>
+          <li>بدون ADMIN_TOKEN = جميع routes تُرجع 503</li>
+          <li>تحذير إذا الرمز < 16 حرف</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>حدود المحتوى</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr><th>النوع</th><th>الحد</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>طول الرابط</td><td>2000 حرف</td></tr>
+          <tr><td>طول النص</td><td>200,000 حرف</td></tr>
+          <tr><td>حجم ملف OCR</td><td>15MB</td></tr>
+          <tr><td>حجم ملف الاستيراد</td><td>15MB</td></tr>
+          <tr><td>فيديو محلي (base64)</td><td>40MB</td></tr>
+          <tr><td>مسار رفع الفيديو</td><td>60MB</td></tr>
+          <tr><td>مشاريع</td><td>80MB</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 7. الاختبار -->
+  <div class="section">
+    <h2>7. الاختبار وجودة الكود</h2>
+
+    <h3>إطار الاختبار</h3>
+    <p>Node.js test runner المدمج (<code>node --test</code>) — بدون Jest/Mocha. <strong>57 ملف اختبار</strong>.</p>
+
+    <h3>ال покрыти (Test Coverage)</h3>
+    <div class="grid-3">
+      <div class="sub-card">
+        <h4>🧪 اختبارات المسارات</h4>
+        <ul>
+          <li>API routes كاملة</li>
+          <li>CORS + Security headers</li>
+          <li>ترتيب Middleware</li>
+          <li>Rate Limiting</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>🔄 اختبارات الترجمة</h4>
+        <ul>
+          <li>مزودي الترجمة</li>
+          <li>_ALIGNMENT + المعجم</li>
+          <li>ترجمة ذكية + مقالات</li>
+          <li>Streaming SSE</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>📁 اختبارات الملفات</h4>
+        <ul>
+          <li>استيراد/تصدير (EPUB, SRT)</li>
+          <li>OCR + PDF + STT + TTS</li>
+          <li>الدبلجة + يوتيوب</li>
+          <li>قاعدة البيانات + المشاريع</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>اختبارات حاسمة</h3>
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>smoke.test.js</h4>
+        <p>يتحقق أن كل مسار تستدعيه الواجهة الأمامية له route مسجل — يحمي من routers غير مثبتة.</p>
+      </div>
+      <div class="sub-card">
+        <h4>sse.test.js</h4>
+        <p>يتأكد من عدم وجود <code>Content-Encoding</code> على تدفقات SSE — يحمي من أخطاء ضغط قبل SSE.</p>
+      </div>
+    </div>
+
+    <h3>أداة الكود — ESLint</h3>
+    <ul>
+      <li>CONFIG: <code>eslint.config.js</code> (94 سطر) — إعدادان: CommonJS للخادم، ES Modules للواجهة</li>
+      <li>قواعد صارمة: <code>eqeqeq</code>, <code>no-var</code>, <code>prefer-const</code>, <code>semi</code>, <code>quotes</code></li>
+      <li><code>--max-warnings=0</code> — لا تحذيرات مسموحة</li>
+      <li><code>npm run lint</code> + <code>npm run check</code></li>
+    </ul>
+  </div>
+
+  <!-- 8. الامتداد -->
+  <div class="section">
+    <h2>8. إضافة Chrome (Extension)</h2>
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>🧩 Manifest V3</h4>
+        <ul>
+          <li>إذن <code>activeTab</code> فقط (حد أدنى)</li>
+          <li>Popup: واجهة عربية RTL</li>
+          <li>زر "ترجمة الصفحة الحالية"</li>
+          <li>حقل إدخال رابط مخصص</li>
+          <li>خادم قابل للتكوين (localhost:3999)</li>
+          <li>يُفتح في علامة تبويب جديدة مع <code>?url=</code></li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>⚙️ background.js (19 سطر)</h4>
+        <ul>
+          <li>قائمة سياق: "ترجمة هذه الصفحة عبر AraLink"</li>
+          <li>سياقات: الصفحة + الرابط</li>
+          <li>service_worker (Manifest V3)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. النشر -->
+  <div class="section">
+    <h2>9. النشر والبيئة</h2>
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>🐳 Docker</h4>
+        <ul>
+          <li>الأساس: <code>node:22-slim</code></li>
+          <li>miteps النظام: ffmpeg, python3, yt-dlp</li>
+          <li>خادم مستمر: <code>/app/cache</code></li>
+          <li>فحص صحة: <code>GET /api/health</code></li>
+          <li><code>JOB_CONCURRENCY=1</code> للبيئات المحدودة</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>☁️ Render.com</h4>
+        <ul>
+          <li>بيئة Docker</li>
+          <li>Starter plan (~$7/شهر)</li>
+          <li>قرص مستمر 5GB (~$1.25/شهر)</li>
+          <li><code>JOB_CONCURRENCY=1</code> لـ 512MB RAM</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>المتغيرات البيئية (.env.example — 145 سطر)</h3>
+    <div class="grid-3">
+      <div class="sub-card">
+        <h4>⚙️ الخادم</h4>
+        <p><code>PORT</code>, <code>CORS_ORIGIN</code>, <code>ADMIN_TOKEN</code>, <code>ARALINK_API_KEY</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>🔄 الترجمة</h4>
+        <p><code>GEMINI_API_KEY</code>, <code>DEEPL_API_KEY</code>, <code>ZEN_API_KEY</code>, <code>PROVIDER_ORDER</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>🎬 يوتيوب</h4>
+        <p><code>YOUTUBE_API_KEY</code>, <code>GEMINI_VIDEO</code>, <code>MAX_VIDEO_MINUTES</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>🎙️ STT</h4>
+        <p><code>STT_ENGINE</code> (sherpa|transformers), <code>WHISPER_MODEL</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>🔊 TTS</h4>
+        <p><code>TTS_ENGINE</code> (edge|gtts)</p>
+      </div>
+      <div class="sub-card">
+        <h4>💾 التخزين</h4>
+        <p><code>STORAGE_DRIVER</code> (local|s3), <code>S3_*</code>, <code>DB_FILE</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>⏱️ الحد</h4>
+        <p><code>RATE_LIMIT_MAX</code>, <code>RATE_LIMIT_MAX_HEAVY</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>📋 المهام</h4>
+        <p><code>JOB_CONCURRENCY</code>, <code>JOB_MAX_QUEUED</code>, <code>JOB_TTL_MS</code></p>
+      </div>
+      <div class="sub-card">
+        <h4>⚡ Redis (اختياري)</h4>
+        <p><code>REDIS_URL</code> — عدّاد rate-limit مشترك عبر نسخ</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. التبعيات -->
+  <div class="section">
+    <h2>10. التبعيات (Dependencies)</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>الحزمة</th>
+            <th>الإصدار</th>
+            <th>الدور</th>
+            <th>النوع</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>express</code></td><td>^4.21.2</td><td>إطار الويب</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>cors</code></td><td>^2.8.5</td><td>وسيط CORS</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>helmet</code></td><td>^8.3.0</td><td>عناوين الأمان</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>compression</code></td><td>^1.8.1</td><td>ضغط gzip</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>dotenv</code></td><td>^16.4.5</td><td>تحميل .env</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>cheerio</code></td><td>^1.0.0</td><td>تحليل HTML/استخراج</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>undici</code></td><td>^7.29.0</td><td>عميل HTTP مع حماية SSRF</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>youtube-transcript</code></td><td>^1.2.1</td><td>استخراج ترجمات YouTube</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>@xenova/transformers</code></td><td>^2.17.2</td><td>STT Whisper (Xenova port)</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>tesseract.js</code></td><td>^7.0.0</td><td>محرك OCR</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>docx</code></td><td>^9.7.1</td><td>تصدير DOCX</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>exceljs</code></td><td>^4.4.0</td><td>استيراد/تصدير XLSX</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>mammoth</code></td><td>^1.12.1</td><td>استيراد DOCX</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>jszip</code></td><td>^3.10.1</td><td>معالجة ZIP (EPUB/PPTX)</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>fast-xml-parser</code></td><td>^5.10.1</td><td>استيراد/تصدير XML</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td><code>sherpa-onnx</code></td><td>^1.13.4</td><td>محرك STT سريع</td><td><span class="badge badge-green">أساسي</span></td></tr>
+          <tr><td colspan="2"><code>msedge-tts</code></td><td>^2.0.7</td><td>TTS طبيعي (أصوات Edge Neural)</td><td><span class="badge badge-amber">اختياري</span></td></tr>
+          <tr><td colspan="2"><code>redis</code></td><td>^4.7.1</td><td>عدّاد rate-limit مشترك</td><td><span class="badge badge-amber">اختياري</span></td></tr>
+          <tr><td colspan="2"><code>youtube-dl-exec</code></td><td>^3.1.9</td><td>تنزيل الفيديو</td><td><span class="badge badge-amber">اختياري</span></td></tr>
+          <tr><td colspan="2"><code>eslint</code></td><td>^10.9.1</td><td>فحص الكود</td><td><span class="badge badge-purple">تطوير</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:0.8rem;"><strong>متطلبات المحرك:</strong> <code>Node >= 22</code> (يستخدم <code>node:sqlite</code> التجريبي)</p>
+  </div>
+
+  <!-- 11. ملاحظات -->
+  <div class="section">
+    <h2>11. ملاحظات وتوصيات</h2>
+
+    <div class="grid-2">
+      <div class="sub-card">
+        <h4>✅ نقاط القوة</h4>
+        <ul>
+          <li>بنية معمارية ناضجة ومحددة</li>
+          <li>57 ملف اختبار — تغطية شاملة</li>
+          <li>حماية أمان مفصلة (SSRF, Rate Limit, CSP, httpOnly cookies)</li>
+          <li>6 مزودين ترجمة مع آلية تراجع ذكية</li>
+          <li>تخزين مؤقت فعال (ذاكرة + ملف)</li>
+          <li>انهيار رحيم — كل ميزة اختيارية لها بديل تلقائي</li>
+          <li>واجهة عربية RTL كاملة مع نظام تصميم موثق</li>
+          <li>عمليات خلفية مع طابور مهام و-SSE</li>
+          <li>حماية SSRF مفصلة (237 سطر) مع DNS rebinding</li>
+          <li>بنية المزودات — إضافة مزود = ملف واحد</li>
+        </ul>
+      </div>
+      <div class="sub-card">
+        <h4>⚠️ ملاحظات</h4>
+        <ul>
+          <li>لا يوجد أداة قياس التغطية (coverage) متكاملة</li>
+          <li><code>node:sqlite</code> لا يزال تجريبياً في Node 22</li>
+          <li>لا يوجد TypeScript — ESLint يعوّض的部分</li>
+          <li>الملفات الثابتة (stats-log.json, usage.json) — مناسبة لنسخة واحدة فقط</li>
+          <li>بعض الارتباطات الثقيلة (@xenova/transformers, tesseract.js) — Docker يتعامل معها</li>
+          <li>الrequire() في try/catch في أجزاء — مقصود للتهيئة الكسولة واختبارات</li>
+          <li>نظام الأنواع المزدوج: CommonJS للخادم + ES Modules للواجهة (مقصود لتوافق Node 22)</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>التوصيات</h3>
+    <ul>
+      <li><span class="badge badge-amber">متوسط</span> إضافة أداة قياس تغطية الاختبارات (c8 أو v8-coverage)</li>
+      <li><span class="badge badge-amber">متوسط</span> التفكير في نقل stats/usage إلى SQLite بدلاً من JSON (للتوافق مع multi-instance)</li>
+      <li><span class="badge badge-blue">منخفض</span> إضافة اختبارات أداء (benchmarks) للمترجم</li>
+      <li><span class="badge badge-blue">منخفض</span> توثيق API باستخدام OpenAPI/Swagger</li>
+      <li><span class="badge badge-green">مكتمل</span> بنية Docker و Render جاهزة للنشر</li>
+    </ul>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="report-footer">
+    <p>تقرير AraLink الشامل — تم إنشاؤه في 9 سبتمبر 2026</p>
+    <p>تم الفحص بواسطة OpenCode AI Agent</p>
+  </footer>
+
+</div>
+</body>
+</html>

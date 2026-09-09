@@ -8,4 +8,20 @@ skills
 .git
 *.zip
 *.log
+
+# ===== إضافات الموجة الاختيارية (الميزة 5) =====
+# لا شيء منها يخدم وقت التشغيل داخل الحاوية — تقليل حجم الصورة وسرعة بناء
+tests
+docs
+specs
+samples
+extension
+coverage
+scripts
 test-results
+reports
+*.out.txt
+*.err.txt
+*.md
+.idea
+.vscode

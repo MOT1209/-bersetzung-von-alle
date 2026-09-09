@@ -102,6 +102,11 @@ module.exports = {
   // وهو ما يهمّ هنا تحديدًا: الوحدات الأصلية سبق أن كسرت إقلاع صورة Docker).
   DB_FILE: process.env.DB_FILE || path.join(__dirname, '..', 'cache', 'aralink.db'),
 
+  // ===== تخزين الإحصائيات: 'sqlite' (الافتراضي) أو 'json' =====
+  // sqlite: جداول stats_entries و usage_counters في قاعدة البيانات العليا
+  // (node:sqlite). json: الملفات القديمة stats-log.json و usage.json للتوافق.
+  STATS_DRIVER: process.env.STATS_DRIVER || 'sqlite',
+
   // ===== محرك الوظائف (server/jobs) =====
   // سقف التزامن هو الحماية الحقيقية: العمل الثقيل مقيّد بالمعالج، وعشرة طلبات
   // متزامنة بلا سقف تستهلك الجهاز بالكامل. 2 افتراض محافظ يناسب نسخة واحدة.

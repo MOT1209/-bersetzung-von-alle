@@ -1,0 +1,897 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AraLink API",
+    "version": "1.0.0",
+    "description": "AraLink Translation API — ترجم أي رابط (يوتيوب، مقالات، مواقع) إلى أي لغة.\n\nجميع نقاط النهاية سلمت تحت `/api`. نقاط الإدارة تتطلب ترويسة `x-admin-token` (انظر ADMIN_TOKEN في .env.example)."
+  },
+  "servers": [
+    { "url": "http://localhost:3000", "description": "Development" }
+  ],
+  "tags": [
+    { "name": "public", "description": "نقاط عامة — ترجمة ولغات ومزوّدون" },
+    { "name": "media", "description": "فيديو ودبلجة وOCR ونطق" },
+    { "name": "jobs", "description": "طابور الوظائف الثقيلة" },
+    { "name": "projects", "description": "مشاريع الدبلجة وأصولها" },
+    { "name": "admin", "description": "نقاط محمية بـ x-admin-token" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "AdminToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-admin-token",
+        "description": "رمز الإدارة ADMIN_TOKEN — يفتح مسارات /api/settings و /api/stats فقط"
+      }
+    },
+    "schemas": {
+      "TranslationRequest": {
+        "type": "object",
+        "required": ["url", "targetLang"],
+        "properties": {
+          "url": { "type": "string", "format": "uri", "description": "رابط يوتيوب أو مقال أو موقع" },
+          "targetLang": { "type": "string", "examples": ["ar"], "description": "رمز اللغة الهدف (مثل ar أو en أو de)" },
+          "sourceLang": { "type": "string", "description": "رمز اللغة المصدر — يُكتشف تلقائيًا عند الإهمال" },
+          "provider": { "type": "string", "description": "فرض مزوّد واحد (مثل google). عند فشله لا يوجد احتياط" },
+          "providers": { "type": "array", "items": { "type": "string" }, "description": "سلسلة مزوّدين مرتبة تُجرَّب بالترتيب" }
+        }
+      },
+      "TextTranslationRequest": {
+        "type": "object",
+        "required": ["text", "targetLang"],
+        "properties": {
+          "text": { "type": "string", "maxLength": 100000 },
+          "targetLang": { "type": "string", "examples": ["ar"] },
+          "sourceLang": { "type": "string" }
+        }
+      },
+      "TranslationResponse": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "examples": ["youtube", "article", "text"] },
+          "sourceLang": { "type": "string", "description": "اللغة المكتشفة أو الممرَّرة" },
+          "translated": { "type": "string", "description": "النص المترجم — الأسطر تطابق الأصل سطرًا بسطر" },
+          "original": { "type": "string" },
+          "meta": { "type": "object", "additionalProperties": true, "description": "عنوان/مدة/مزوّد... حسب النوع" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "description": "رمز خطأ قصير (مثل video-not-found)" },
+          "message": { "type": "string", "description": "وصف عربي قابل للعرض" },
+          "code": { "type": "string" }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "examples": ["ok"] },
+          "version": { "type": "string" },
+          "uptime": { "type": "number", "description": "ثمنى التشغيل بالثواني" }
+        }
+      },
+      "Language": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "examples": ["ar"] },
+          "name": { "type": "string", "examples": ["العربية"] }
+        }
+      },
+      "Provider": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "examples": ["google"] },
+          "label": { "type": "string" },
+          "requiresKey": { "type": "boolean" },
+          "isAvailable": { "type": "boolean" }
+        }
+      },
+      "JobStatus": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "done", "failed", "cancelled"] },
+          "progress": { "type": "number", "minimum": 0, "maximum": 100 },
+          "result": { "type": "object", "additionalProperties": true },
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "parameters": {
+      "AdminHeader": {
+        "name": "x-admin-token",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      }
+    }
+  },
+  "paths": {
+    "/api/admin/login": {
+      "post": {
+        "tags": ["admin"],
+        "summary": "تبديل رمز الإدارة بكوكي httpOnly",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": { "token": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "تم الدخول — كوكي httpOnly" },
+          "401": { "description": "رمز خاطئ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "503": { "description": "ADMIN_TOKEN غير مضبوط", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/admin/logout": {
+      "post": {
+        "tags": ["admin"],
+        "summary": "حذف كوكي الإدارة",
+        "responses": { "200": { "description": "تم الخروج" } }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": ["public"],
+        "summary": "فحص صحة الخادم",
+        "responses": {
+          "200": {
+            "description": "الخادم يعمل",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/languages": {
+      "get": {
+        "tags": ["public"],
+        "summary": "كل اللغات المدعومة في الواجهة",
+        "responses": {
+          "200": {
+            "description": "قائمة اللغات",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "languages": { "type": "array", "items": { "$ref": "#/components/schemas/Language" } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "tags": ["public"],
+        "summary": "مزوّدو الترجمة وتوفرهم",
+        "responses": {
+          "200": {
+            "description": "قائمة المزوّدين",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "providers": { "type": "array", "items": { "$ref": "#/components/schemas/Provider" } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/translate": {
+      "post": {
+        "tags": ["public"],
+        "summary": "ترجمة رابط (يوتيوب/مقال/موقع)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TranslationRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "الترجمة نجحت",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TranslationResponse" } } }
+          },
+          "400": { "description": "طلب ناقص أو رابط غير صالح", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "الفيديو أو الصفحة غير موجودة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "تجاوز حد الطلبات", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "502": { "description": "فشل جلب المحتوى من المصدر", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/translate-text": {
+      "post": {
+        "tags": ["public"],
+        "summary": "ترجمة نص مباشر",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TextTranslationRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "الترجمة نجحت", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TranslationResponse" } } } },
+          "400": { "description": "نص أو لغة ناقصة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/translate-smart": {
+      "post": {
+        "tags": ["public"],
+        "summary": "ترجمة ذكية: نص أو رابط — يكتشف النوع تلقائيًا",
+        "description": "يقبل نصًا حرًا أو رابطًا في حقل واحد ويوجه للمسار المناسب داخليًا.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["input"],
+                "properties": {
+                  "input": { "type": "string", "description": "نص حر أو رابط" },
+                  "targetLang": { "type": "string" },
+                  "sourceLang": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "الترجمة نجحت", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TranslationResponse" } } } },
+          "400": { "description": "مدخل ناقص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/translate-stream": {
+      "post": {
+        "tags": ["public"],
+        "summary": "ترجمة مع بث تقدّم مباشر (SSE)",
+        "description": "يعيد `text/event-stream`: أحداث stage وprogress ثم result نهائي. يبقى مفتوحًا حتى انتهاء الترجمة أو انقطاع العميل.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TranslationRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "تدفق أحداث SSE", "content": { "text/event-stream": { "schema": { "type": "string" } } } },
+          "400": { "description": "طلب ناقص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/srt": {
+      "post": {
+        "tags": ["public"],
+        "summary": "ترجمة ملف ترجمات SRT مع الحفاظ على التوقيتات",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content", "targetLang"],
+                "properties": {
+                  "content": { "type": "string", "description": "محتوى SRT كامل" },
+                  "targetLang": { "type": "string" },
+                  "sourceLang": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "SRT مترجم", "content": { "application/json": { "schema": { "type": "object", "properties": { "translated": { "type": "string" } } } } } },
+          "400": { "description": "محتوى غير صالح", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/translate-file": {
+      "post": {
+        "tags": ["public"],
+        "summary": "ترجمة ملف (docx/pdf/epub/srt/md/txt...) وإرجاعه بصيغة قابلة للتنزيل",
+        "description": "حد الجسم 15MB. الصيغ المدعومة تديرها server/files.js.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content", "format", "targetLang"],
+                "properties": {
+                  "content": { "type": "string", "description": "محتوى الملف (نصي أو base64 حسب الصيغة)" },
+                  "format": { "type": "string", "examples": ["txt", "srt", "md"] },
+                  "targetLang": { "type": "string" },
+                  "sourceLang": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "الملف المترجم", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+          "400": { "description": "صيغة غير مدعومة أو طلب ناقص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/export": {
+      "post": {
+        "tags": ["public"],
+        "summary": "تصدير نص مترجم إلى docx/pdf/xlsx/md/txt",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content", "format"],
+                "properties": {
+                  "content": { "type": "string" },
+                  "format": { "type": "string", "examples": ["docx", "pdf", "xlsx", "md", "txt"] },
+                  "filename": { "type": "string", "description": "اسم مقترح للتنزيل — يُستبدل باسم آمن دائمًا" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "ملف التصدير", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+          "400": { "description": "صيغة غير مدعومة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/ocr": {
+      "post": {
+        "tags": ["media"],
+        "summary": "استخراج نص من صورة عبر OCR (Tesseract)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": { "type": "string", "format": "byte", "description": "الصورة base64" },
+                  "lang": { "type": "string", "examples": ["ara", "eng"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "النص المستخرج", "content": { "application/json": { "schema": { "type": "object", "properties": { "text": { "type": "string" } } } } } },
+          "400": { "description": "صورة غير صالحة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/tts": {
+      "post": {
+        "tags": ["media"],
+        "summary": "تحويل نص إلى صوت (Edge voices أو gTTS احتياطيًا)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text", "lang"],
+                "properties": {
+                  "text": { "type": "string", "maxLength": 5000 },
+                  "lang": { "type": "string", "examples": ["ar"] },
+                  "voice": { "type": "string", "description": "اسم صوت Edge اختياري" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "ملف صوتي", "content": { "audio/mpeg": { "schema": { "type": "string", "format": "binary" } } } },
+          "400": { "description": "نص أو لغة ناقصة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/tashkeel": {
+      "post": {
+        "tags": ["public"],
+        "summary": "إضافة التشكيل للنص العربي",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["text"],
+                "properties": { "text": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "النص مشكّلًا", "content": { "application/json": { "schema": { "type": "object", "properties": { "text": { "type": "string" } } } } } },
+          "400": { "description": "نص ناقص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/video-local": {
+      "post": {
+        "tags": ["media"],
+        "summary": "ترجمة فيديو مرفوع محليًا (تفريغ ثم ترجمة)",
+        "description": "حد الجسم 60MB ومدة أقصى افتراضية 5 دقائق (LOCAL_VIDEO_MAX_MIN). يعيد كائن مهمة — تابع التقدم عبر /api/jobs/{id}.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["video"],
+                "properties": {
+                  "video": { "type": "string", "format": "byte", "description": "ملف الفيديو base64" },
+                  "targetLang": { "type": "string" },
+                  "sourceLang": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "مهمة بدأت", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobStatus" } } } },
+          "400": { "description": "ملف غير صالح أو تجاوز الحد", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "413": { "description": "الملف أكبر من الحد", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/video/{videoId}": {
+      "get": {
+        "tags": ["media"],
+        "summary": "ترجمة فيديو يوتيوب (مسار Gemini للفيديو)",
+        "description": "يتطلب GEMINI_API_KEY. يُحدد بـ MAX_VIDEO_MINUTES (افتراضي 20 دقيقة).",
+        "parameters": [
+          { "name": "videoId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "targetLang", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "الترجمة نجحت", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TranslationResponse" } } } },
+          "404": { "description": "الفيديو غير موجود أو خاص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "503": { "description": "المسار معطّل — لا GEMINI_API_KEY", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/youtube/metadata": {
+      "get": {
+        "tags": ["media"],
+        "summary": "بيانات وصفية لفيديو يوتيوب (المسار المتوافق عبر Data API v3)",
+        "description": "يتطلب YOUTUBE_API_KEY. يعطي العنوان والمدة فقط — لا نص الترجمات (captions.download محجوب رسميًا لأي طرف ثالث).",
+        "parameters": [
+          { "name": "url", "in": "query", "required": true, "schema": { "type": "string", "format": "uri" } }
+        ],
+        "responses": {
+          "200": { "description": "البيانات الوصفية", "content": { "application/json": { "schema": { "type": "object", "properties": { "title": { "type": "string" }, "duration": { "type": "string" }, "captionsAvailable": { "type": "boolean", "description": "false دائمًا — لا تدّعِ توفّر ترجمات" } } } } } },
+          "400": { "description": "url ناقص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "الفيديو غير موجود", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/youtube/dub": {
+      "post": {
+        "tags": ["media"],
+        "summary": "دبلجة فيديو يوتيوب: تنزيل ثم تفريغ ثم ترجمة ثم إعادة نطق",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url", "targetLang"],
+                "properties": {
+                  "url": { "type": "string", "format": "uri" },
+                  "targetLang": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "مهمة دبلجة بدأت", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobStatus" } } } },
+          "400": { "description": "طلب ناقص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "429": { "description": "تجاوز حد الدبلجة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/dub": {
+      "post": {
+        "tags": ["media"],
+        "summary": "دبلجة مقاطع جاهزة (دفعات TTS)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "segments": { "type": "array", "maxItems": 40, "items": { "type": "object", "additionalProperties": true } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "المقاطع الصوتية", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+          "400": { "description": "دُفعة غير صالحة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/dub/jobs/{id}": {
+      "get": {
+        "tags": ["media"],
+        "summary": "حالة مهمة دبلجة",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "حالة المهمة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobStatus" } } } },
+          "403": { "description": "لست مالك المهمة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "المهمة غير موجودة أو انتهت صلاحيتها", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/dub/jobs/{id}/stream": {
+      "get": {
+        "tags": ["media"],
+        "summary": "بث تقدم مهمة دبلجة (SSE)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "تدفق أحداث SSE", "content": { "text/event-stream": { "schema": { "type": "string" } } } },
+          "403": { "description": "لست مالك المهمة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/dub/projects/{projectId}/jobs": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "مهام دبلجة مشروع",
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "قائمة المهام", "content": { "application/json": { "schema": { "type": "object", "properties": { "jobs": { "type": "array", "items": { "$ref": "#/components/schemas/JobStatus" } } } } } } },
+          "403": { "description": "لست مالك المشروع", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/dub/projects/{projectId}/segments/{index}": {
+      "patch": {
+        "tags": ["projects"],
+        "summary": "تعديل مقطع مترجم في مشروع دبلجة",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "index", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 0 } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "text": { "type": "string", "description": "النص المترجم الجديد للمقطع" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "تم التعديل", "content": { "application/json": { "schema": { "type": "object" } } } },
+          "400": { "description": "فهرس غير صالح", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/dub/projects/{projectId}": {
+      "delete": {
+        "tags": ["projects"],
+        "summary": "حذف مشروع دبلجة وكل ملفاته",
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "تم الحذف" },
+          "403": { "description": "لست مالك المشروع", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "المشروع غير موجود", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "سرد كل المشاريع (إدارة فقط)",
+        "security": [{ "AdminToken": [] }],
+        "responses": {
+          "200": { "description": "قائمة المشاريع", "content": { "application/json": { "schema": { "type": "object", "properties": { "projects": { "type": "array", "items": { "type": "object" } } } } } } },
+          "401": { "description": "بلا x-admin-token", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "post": {
+        "tags": ["projects"],
+        "summary": "إنشاء مشروع دبلجة جديد",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "sourceType": { "type": "string", "examples": ["youtube", "upload"] },
+                  "sourceRef": { "type": "string" },
+                  "targetLangs": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "المشروع أُنشئ (يُعاد id وownerToken لاحقًا في الترويسات/الجسم حسب التنفيذ)" },
+          "400": { "description": "اسم ناقص", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/projects/{id}": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "تفاصيل مشروع",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "المشروع" },
+          "403": { "description": "لست المالك", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "غير موجود", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "patch": {
+        "tags": ["projects"],
+        "summary": "تحديث مشروع (اسم/حالة/لغات)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+        "responses": {
+          "200": { "description": "تم التحديث" },
+          "403": { "description": "لست المالك", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["projects"],
+        "summary": "حذف مشروع",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "تم الحذف" },
+          "403": { "description": "لست المالك", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/projects/{id}/assets": {
+      "post": {
+        "tags": ["projects"],
+        "summary": "إضافة أصل (صوت/فيديو/ترجمة) إلى مشروع",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["kind", "content"],
+                "properties": {
+                  "kind": { "type": "string", "examples": ["audio", "video", "subtitles"] },
+                  "lang": { "type": "string" },
+                  "content": { "type": "string", "format": "byte", "description": "base64" },
+                  "meta": { "type": "object", "additionalProperties": true, "description": "اسم الملف الأصلي يُخزَّن هنا — لا يشكّل مفتاح التخزين أبدًا" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "الأصل أُضيف (يُعاد assetId)" },
+          "403": { "description": "لست المالك", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/projects/{id}/assets/{assetId}/content": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "تنزيل محتوى أصل",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "محتوى الأصل", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+          "404": { "description": "الأصل غير موجود", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/projects/{id}/assets/{assetId}": {
+      "delete": {
+        "tags": ["projects"],
+        "summary": "حذف أصل من مشروع",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "تم الحذف" },
+          "404": { "description": "الأصل غير موجود", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/projects/{id}/process": {
+      "post": {
+        "tags": ["projects"],
+        "summary": "تشغيل خط معالجة المشروع",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "المعالجة بدأت", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobStatus" } } } },
+          "403": { "description": "لست المالك", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "tags": ["jobs"],
+        "summary": "قائمة الوظائف النشطة/الحديثة",
+        "responses": {
+          "200": { "description": "قائمة الوظائف", "content": { "application/json": { "schema": { "type": "object", "properties": { "jobs": { "type": "array", "items": { "$ref": "#/components/schemas/JobStatus" } } } } } } }
+        }
+      }
+    },
+    "/api/jobs/{id}": {
+      "get": {
+        "tags": ["jobs"],
+        "summary": "حالة وظيفة",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "الحالة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobStatus" } } } },
+          "404": { "description": "غير موجودة أو انتهت صلاحيتها", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["jobs"],
+        "summary": "إلغاء وظيفة قيد التنفيذ",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "أُلغيت أو كانت منتهية أصلًا" },
+          "404": { "description": "غير موجودة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/jobs/{id}/stream": {
+      "get": {
+        "tags": ["jobs"],
+        "summary": "بث تقدم وظيفة (SSE)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "تدفق أحداث SSE", "content": { "text/event-stream": { "schema": { "type": "string" } } } },
+          "404": { "description": "غير موجودة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "قراءة الإعدادات الحالية (مفاتيح مقنّعة)",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "responses": {
+          "200": { "description": "الإعدادات الحالية" },
+          "401": { "description": "رمز إدارة خاطئ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "503": { "description": "ADMIN_TOKEN غير مضبوط — المسار معطّل", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "post": {
+        "tags": ["admin"],
+        "summary": "كتابة قيم .env (مفاتيح المزوّدين)",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { "type": "string" },
+                "description": "خريطة مفتاح→قيمة مثل { GEMINI_API_KEY: '...' }"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "تمت الكتابة" },
+          "401": { "description": "رمز إدارة خاطئ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/stats/summary": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "ملخص الإحصائيات: الإجمالي واليوم والأسبوع وحسب النوع",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "responses": {
+          "200": { "description": "الملخص", "content": { "application/json": { "schema": { "type": "object", "properties": { "total": { "type": "integer" }, "todayCount": { "type": "integer" }, "weekCount": { "type": "integer" }, "byType": { "type": "object", "additionalProperties": { "type": "integer" } } } } } } },
+          "401": { "description": "بلا رمز إدارة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/stats/timeseries": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "سلسلة زمنية يومية (أقصى 30 يومًا)",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/AdminHeader" },
+          { "name": "days", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 30, "default": 7 } }
+        ],
+        "responses": {
+          "200": { "description": "{ days: [{ date, count }] }" },
+          "401": { "description": "بلا رمز إدارة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/stats/providers": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "توزيع الترجمات على المزوّدين",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "responses": {
+          "200": { "description": "{ byProvider: {...} }" },
+          "401": { "description": "بلا رمز إدارة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/stats/languages": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "توزيع اللغات المصدر والهدف",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "responses": {
+          "200": { "description": "{ bySource, byTarget }" },
+          "401": { "description": "بلا رمز إدارة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/stats/hourly": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "توزيع الترجمات على ساعات اليوم (0-23)",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "responses": {
+          "200": { "description": "{ hours: [24 عددًا] }" },
+          "401": { "description": "بلا رمز إدارة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/stats/cost": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "سجل التكاليف: مقاطع TTS وأحرف الترجمة وثواني ffmpeg",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "responses": {
+          "200": { "description": "السجل" },
+          "401": { "description": "بلا رمز إدارة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/stats/quality": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "آخر تقرير جودة ترجمة (WER) من bench:translate",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
+        "responses": {
+          "200": { "description": "{ available: false } إن لم يُشغَّل القياس بعد" },
+          "401": { "description": "بلا رمز إدارة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  }
+}

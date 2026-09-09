@@ -15,12 +15,15 @@ function tmpEnv(files = {}) {
     CACHE_FILE: process.env.CACHE_FILE,
     USAGE_FILE: process.env.USAGE_FILE,
     RULES_FILE: process.env.RULES_FILE,
+    DB_FILE: process.env.DB_FILE,
   };
 
   process.env.ENV_FILE = path.join(dir, '.env');
   process.env.CACHE_FILE = path.join(dir, 'cache.json');
   process.env.USAGE_FILE = path.join(dir, 'usage.json');
   process.env.RULES_FILE = path.join(dir, 'rules.json');
+  // STATS_DRIVER الافتراضي صار sqlite — يعزل قاعدة البيانات كي لا تُلمس base الإنتاج
+  process.env.DB_FILE = path.join(dir, 'stats.db');
 
   // Write any provided files: keys can be ENV_FILE/CACHE_FILE... or filenames relative to dir
   for (const [key, value] of Object.entries(files)) {
