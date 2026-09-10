@@ -112,17 +112,39 @@ modeBtns.forEach((btn) => {
 });
 
 /* ===== أحداث التبويبات ===== */
+// إمكانية الوصول: tablist تُدار بالأسهم (WAI-ARIA) — Enter/Space يُفعّل بالنقر
+// أصلاً (أزرار)، والسهمان ينقلان التركيز والتفعيل معًا، وHome/End يقفزان
+// للأول/الأخير. الترتيب منطقي (translated → original) فيعمل صح في RTL وLTR معًا:
+// في RTL السهم يمين يتحرك بصريًا لليسار والعكس — لكن التنقّل الدائري يبقى صحيحًا.
+function activateTab(tab) {
+  tabs.forEach((t) => {
+    const active = t === tab;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', String(active));
+    t.setAttribute('tabindex', active ? '0' : '-1');
+  });
+  state.activeTab = tab.dataset.tab; // يحدَّث وإلا تُحتجز العودة لتبويب «الترجمة» عند إعادة النقر
+  renderTab(tab.dataset.tab);
+}
+
+// NodeList لا تملك indexOf — نحوّلها لمصفوفة مرة واحدة لتنقّل الأسهم الدائري
+const tabList = Array.from(tabs);
+const tabKeyHandler = (e, tab) => {
+  const idx = tabList.indexOf(tab);
+  const next =
+    e.key === 'ArrowRight' ? tabList[(idx + 1) % tabList.length] :
+    e.key === 'ArrowLeft'  ? tabList[(idx - 1 + tabList.length) % tabList.length] :
+    e.key === 'Home'       ? tabList[0] :
+    e.key === 'End'        ? tabList[tabList.length - 1] : null;
+  if (next) { e.preventDefault(); next.focus(); activateTab(next); }
+};
+
 tabs.forEach((tab) => {
   tab.addEventListener('click', () => {
     if (tab.dataset.tab === state.activeTab) return;
-    tabs.forEach((t) => {
-      const active = t === tab;
-      t.classList.toggle('active', active);
-      t.setAttribute('aria-selected', String(active));
-    });
-    state.activeTab = tab.dataset.tab; // يحدَّث وإلا تُحتجز العودة لتبويب «الترجمة» عند إعادة النقر
-    renderTab(tab.dataset.tab);
+    activateTab(tab);
   });
+  tab.addEventListener('keydown', (e) => tabKeyHandler(e, tab));
 });
 
 /* ===== أحداث الأزرار ===== */

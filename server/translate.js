@@ -78,6 +78,8 @@ function isCodeLine(t) {
 }
 
 // ===== كشف اللغة =====
+// مهلة 3 ثوانٍ تكفي للكشف (نص ≤500 حرف على endpoint مجاني) — كانت 15 ثانية
+// فكانت تُعلّق بداية كل ترجمة عند بطء الشبكة أو حجب مؤقت.
 async function detectLanguage(text) {
   if (!text || !text.trim()) return 'en';
   try {
@@ -86,7 +88,7 @@ async function detectLanguage(text) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();

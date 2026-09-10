@@ -142,8 +142,9 @@
 
       <div class="result-header">
         <div class="tabs" role="tablist" aria-label="عرض النتيجة">
-          <button type="button" class="tab active" data-tab="translated" role="tab" aria-selected="true">الترجمة</button>
-          <button type="button" class="tab" data-tab="original" role="tab" aria-selected="false">النص الأصلي</button>
+          <!-- roving tabindex: التبويب النشط فقط يدخل ترتيب Tab — الباقي يُبلغ بالأسهم -->
+          <button type="button" class="tab active" data-tab="translated" role="tab" aria-selected="true" tabindex="0">الترجمة</button>
+          <button type="button" class="tab" data-tab="original" role="tab" aria-selected="false" tabindex="-1">النص الأصلي</button>
         </div>
         <!-- الإجراءات في حاوية واحدة: بدونها يوزّع space-between الأزرارَ نفسها،
              فتتباعد الفجوات عشوائيًا عند اللفّ. مجموعات دلالية: صوت، فيديو، نص. -->
