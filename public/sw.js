@@ -1,4 +1,4 @@
-/* sw.js — Service Worker لأرا لينك (PWA)
+/* sw.js — Service Worker لترجِم (PWA)
    استراتيجية: شبكة-أوّل مع تحديث خلفي (stale-while-revalidate) للملفات الثابتة
    لضمان ظهور النسخ المحدّثة بعد النشر. الكاش يبقى كاحتياطي أوفلاين فقط. */
 const CACHE = 'aralink-v7';

@@ -1,5 +1,6 @@
 // public/js/youtube-studio.js — استوديو دبلجة يوتيوب: URL → job → progress حي → فيديو نهائي
-import { $, safeGet, safeSet } from './utils.js';
+import { $ } from './ui.js';
+import { safeGet, safeSet } from './utils.js';
 
 /* ===== توكن ملكية المشروع (CURRENT_STATE.md §20) =====
    يُعاد مرة واحدة من POST /api/youtube/dub ولا يُعاد أبدًا بعدها. بدونه لا وصول

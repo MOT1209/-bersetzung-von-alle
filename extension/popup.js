@@ -1,5 +1,5 @@
-// popup.js — إضافة أرا لينك: ترجم الصفحة الحالية أو رابطًا مخصصًا
-// يفتح أرا لينك في تبويب جديد مع ?url=<الرابط> — الواجهة تلتقطه وتبدأ الترجمة تلقائيًا
+// popup.js — إضافة ترجِم: ترجم الصفحة الحالية أو رابطًا مخصصًا
+// يفتح ترجِم في تبويب جديد مع ?url=<الرابط> — الواجهة تلتقطه وتبدأ الترجمة تلقائيًا
 
 const HOST_KEY = 'aralinkHost';
 let host = 'http://localhost:3999';
@@ -51,7 +51,7 @@ hostInput.addEventListener('change', () => {
   }
 });
 
-// فتح أرا لينك مباشرة
+// فتح ترجِم مباشرة
 document.getElementById('open-link').addEventListener('click', () => {
   chrome.tabs.create({ url: host + '/' });
 });

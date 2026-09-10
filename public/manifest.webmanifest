@@ -1,6 +1,6 @@
 {
-  "name": "أرا لينك — مترجم الروابط",
-  "short_name": "أرا لينك",
+  "name": "ترجِم — مترجم الروابط",
+  "short_name": "ترجِم",
   "description": "الصق أي رابط (فيديو يوتيوب، مقال، موقع) واحصل عليه مترجمًا إلى أي لغة",
   "start_url": "/",
   "scope": "/",
@@ -8,20 +8,20 @@
   "orientation": "portrait",
   "dir": "rtl",
   "lang": "ar",
-  "background_color": "#0b1220",
-  "theme_color": "#0b1220",
+  "background_color": "#161513",
+  "theme_color": "#161513",
   "categories": ["productivity", "utilities", "education"],
   "icons": [
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ],
   "shortcuts": [
     {
       "name": "ترجمة نص",
       "short_name": "نص",
-      "description": "افتح أرا لينك لترجمة نص مباشر",
+      "description": "افتح ترجِم لترجمة نص مباشر",
       "url": "/?mode=text",
       "icons": [{ "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }

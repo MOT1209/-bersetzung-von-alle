@@ -1,12 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#818cf8"/>
-      <stop offset="1" stop-color="#6366f1"/>
-    </linearGradient>
-  </defs>
-  <rect width="128" height="128" rx="28" fill="#0f1117"/>
-  <rect x="8" y="8" width="112" height="112" rx="22" fill="url(#g)"/>
-  <text x="64" y="82" font-size="52" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" fill="#ffffff">أ</text>
-  <text x="64" y="112" font-size="18" text-anchor="middle" font-family="Arial, sans-serif" fill="#e0e7ff">AraLink</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ترجِم">
+  <title>ترجِم</title>
+  <!--
+    علامة ترجِم — ألف (الساق) تمرّ من فتحة حلقة الوصلة (نسج سلسلة):
+    الحلقة تعبر الساق من الأعلى (مرسومة فوقها)، وأسفلًا تفتح الحلقة فجوة 90°
+    تعبرها الساق بانفراد — عرض الفتحة (64) = عرض الساق (64) تمامًا.
+    الفجوة 90° بدل 60°: عند 16–48px (فافيكون/شريط الإضافة) كانت الفتحة الضيقة
+    تلتقط أطراف الحلقة والساق معًا فتلتحم العلامة إلى كتلة واحدة.
+    ألوان مسطّحة من DESIGN.md: اللوح #1c1a17 · الساق #fbfaf8 · الحلقة #8fabe0.
+    بلا تدرّجات ولا نصوص حيّة — هندسة صرفة تصلح لأي مقاس.
+  -->
+  <rect width="512" height="512" rx="112" fill="#1c1a17"/>
+  <!-- الألف: ساق عمودية بأطراف دائرية، تنخرج قليلًا فوق الحلقة وأسفلها (24px لكل جهة) -->
+  <line x1="256" y1="104" x2="256" y2="408" stroke="#fbfaf8" stroke-width="64" stroke-linecap="round"/>
+  <!-- حلقة الوصلة: قوس r=128 بفجوة 90° في الأسفل (أطراف الفجوة تلاصق حواف الساق) -->
+  <path d="M 346.51 346.51 A 128 128 0 1 0 165.49 346.51" fill="none" stroke="#8fabe0" stroke-width="64"/>
 </svg>
