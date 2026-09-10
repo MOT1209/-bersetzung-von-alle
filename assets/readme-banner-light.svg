@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300" role="img" aria-label="ترجِم — Tarjim">
   <title>ترجِم — Tarjim</title>
   <!--
-    README banner (light mode). GitHub strips <style> from SVG, so theme switching
-    is done via <picture> + this file's dark twin (readme-banner-dark.svg).
+    README banner (light mode). GitHub strips CSS style blocks from SVG, so
+    theme switching is done via <picture> + this file's dark twin
+    (readme-banner-dark.svg).
     Brand mark: alif stem passing through a link ring — same geometry as
     public/icons/icon.svg scaled 0.3125 (512 → 160 plate).
     Flat colors from DESIGN.md light palette: bg #ffffff, border #e4e0d9,
