@@ -4,30 +4,16 @@
 const express = require('express');
 const translate = require('./translate'); // وصول وقت التنفيذ — يسمح بتزييف translateText في الاختبارات
 const { translateFileContent, buildExport, sanitizeFilename, SUPPORTED_IMPORT, SUPPORTED_EXPORT } = require('./files');
+const { sendError: _sendError } = require('./errorHelpers');
 
 const router = express.Router();
 
 // حد الجسم 15mb خاص بمسارات الملفات فقط (يُركَّب كوسيط على المسار نفسه لا على الراوتر)،
 // لأن router.use كان يطبّق الحد على كل طلبات /api العابرة، متجاوزًا حد 2mb العام.
 
-// ===== خريطة رمز الخطأ → حالة HTTP (قالب موحد بسيط مثل routes-translate.js) =====
-const ERROR_STATUS = {
-  'invalid-format': 400,
-  'invalid-file': 400,
-  'invalid-export': 400,
-  'translate-failed': 502,
-  'server-error': 500,
-};
-
-// ===== استجابة خطأ موحدة =====
+// ===== استجابة خطأ موحدة (izu errorHelpers) =====
 function sendError(res, e) {
-  // رمز الخطأ يجب أن يكون سلسلة معروفة. عمليات execFile الفاشلة تحمل code
-  // رقميًا (رمز الخروج)، فكان يتسرّب للواجهة كـ {"error":1} — بلا معنى.
-  const raw = e && e.code;
-  const code = typeof raw === 'string' && ERROR_STATUS[raw] ? raw : 'server-error';
-  const status = ERROR_STATUS[code] || 500;
-  console.error('[files] error:', code, '→', e && e.message);
-  return res.status(status).json({ error: code });
+  return _sendError(res, e, { label: 'files', detail: false });
 }
 
 // ===== POST /api/translate-file — ترجمة ملف كامل =====

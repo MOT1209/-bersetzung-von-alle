@@ -1,6 +1,7 @@
 /* ---------- عرض النتائج + التصدير ---------- */
 import { EXPORT_FORMATS } from './constants.js';
-import { state } from './utils.js';
+import { state, langName, getContentTypeLabel, renderParagraphs } from './utils.js';
+import { isRtlText } from './localEngine.mjs'; // عرض المقارنة: اتجاه أعمدة المصدر/الترجمة
 import {
   result, resultEmbed, resultBody, metaTitle, metaLine, sourceNotice, cacheBadge,
   copyBtn, shareBtn, shareView, shareLink, exportRow,
@@ -9,10 +10,9 @@ import {
 } from './ui.js';
 import {
   setupYtPlayer, buildCaptionPanel,
-  startCaptionSync,
+  startCaptionSync, teardownPlayers,
 } from './media.js';
 import { stopDubbing } from './dub.js';
-import { isRtlText } from './localEngine.mjs';
 
 /* ---------- عرض النتيجة حسب النوع ---------- */
 export function renderResult(data) {
@@ -39,7 +39,7 @@ export function renderResult(data) {
 function renderLocalVideo(data) {
   renderYouTubeResult(data);
   resultEmbed.hidden = true;
-  resultEmbed.innerHTML = '';
+  teardownPlayers();
 }
 
 function renderYouTubeResult(data) {
@@ -64,7 +64,7 @@ function renderYouTubeResult(data) {
   tashkeelBtn.hidden = false;
 
   resultEmbed.hidden = false;
-  resultEmbed.innerHTML = '';
+  teardownPlayers();
   if (data.videoId) setupYtPlayer(data.videoId);
   buildCaptionPanel();
   startCaptionSync();
@@ -93,7 +93,7 @@ function renderArticleResult(data) {
   tashkeelBtn.hidden = false;
 
   resultEmbed.hidden = true;
-  resultEmbed.innerHTML = '';
+  teardownPlayers();
   state.activeTab = 'translated';
   resultBody.innerHTML = '';
   if (state.compare) renderCompareView(data);
@@ -121,7 +121,7 @@ function renderTextResult(data) {
   tashkeelBtn.hidden = false;
 
   resultEmbed.hidden = true;
-  resultEmbed.innerHTML = '';
+  teardownPlayers();
   state.activeTab = 'translated';
   renderTab('translated');
   resultBody.innerHTML = '';
@@ -144,37 +144,17 @@ function revealResult() {
 export function renderTab(tab) {
   const data = state.current;
   if (!data) return;
-  if (tab === 'original') {
-    const text = data.type === 'youtube'
-      ? (data.captions || []).map((c) => c.original || '').join('\n')
-      : (data.originalBlocks || []).map((b) => (b && b.content) || '').join('\n\n');
-    renderParagraphs(text);
-  } else {
-    const text = data.type === 'youtube'
-      ? (data.captions || []).map((c) => c.translated || c.original || '').join('\n')
-      : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n');
-    renderParagraphs(text);
-  }
-  resultBody.innerHTML = '';
-  const t = tab === 'original'
-    ? (data.type === 'youtube'
+  const isYt = data.type === 'youtube';
+  // الملفات النصية تحمل original/translated كسلسلة لا ككتل — نسقط إليها
+  // عند غياب الكتل (text / نص سريع / ترجمة ذكية).
+  const text = tab === 'original'
+    ? (isYt
         ? (data.captions || []).map((c) => c.original || '').join('\n')
-        : (data.originalBlocks || []).map((b) => (b && b.content) || '').join('\n\n'))
-    : (data.type === 'youtube'
+        : (data.originalBlocks || []).map((b) => (b && b.content) || '').join('\n\n') || data.original || '')
+    : (isYt
         ? (data.captions || []).map((c) => c.translated || c.original || '').join('\n')
-        : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n'));
-  renderParagraphs(t);
-}
-
-function renderParagraphs(text) {
-  resultBody.innerHTML = '';
-  String(text || '').split(/\n{2,}/).forEach((p) => {
-    const el = document.createElement('p');
-    el.className = 'blk';
-    el.dir = isRtlText(p) ? 'rtl' : 'ltr'; // اتجاه كل فقرة حسب أول حرف قوي
-    el.textContent = p;
-    resultBody.appendChild(el);
-  });
+        : (data.translatedBlocks || []).map((b) => (b && b.content) || '').join('\n\n') || data.translated || '');
+  renderParagraphs(text);
 }
 
 function renderCompareView(data) {
@@ -316,13 +296,7 @@ export async function shareResult() {
 }
 
 /* ---------- helpers ---------- */
-function langName(code) {
-  if (!code) return '';
-  const langs = { ar:'العربية', en:'English', fr:'Français', es:'Español', de:'Deutsch', tr:'Türkçe', ur:'اردو', 'fr-FR':'Français (France)', 'fr-CA':'Français (Canada)' };
-  if (langs[code]) return langs[code];
-  const short = code.split('-')[0];
-  return langs[short] || code;
-}
+// langName() and getContentTypeLabel() are imported from utils.js (single source of truth)
 
 /* ---------- Context Badge ---------- */
 export function renderContextBadge(context) {
@@ -335,9 +309,4 @@ export function renderContextBadge(context) {
   badge.title = `نوع المحتوى: ${context.contentType} (ثقة: ${Math.round(context.confidence * 100)}%)`;
   const metaLineEl = document.getElementById('meta-line');
   if (metaLineEl) metaLineEl.appendChild(badge);
-}
-
-function getContentTypeLabel(type) {
-  const labels = { technical: '📝 تقني', code: '💻 كود', medical: '🏥 طبي', legal: '⚖️ قانوني', news: '📰 إخباري', academic: '🎓 أكاديمي', general: '📄 عام' };
-  return labels[type] || '📄 عام';
 }

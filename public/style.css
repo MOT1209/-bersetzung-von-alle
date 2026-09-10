@@ -345,8 +345,13 @@ body {
   /* السهم صورة data: فلا تصلح فيه var() — لذلك نسخة لكل وضع */
   background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b655c' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
+  /* الخصائص المنطقية ترسم السهم والحشوة على inline-end (= اليسار في RTL،
+     اليمين في LTR) بدل تثبيتهما باليسار الفيزيائي؛ الأسطر الفيزيائية أعلاه
+     احتياط للمتصفحات القديمة التي لا تعرف keywords المنطقية في background-position */
   background-position: left 14px center;
   padding-left: 40px;
+  background-position: inline-end 14px center;
+  padding-inline-end: 40px;
 }
 
 :root[data-theme='dark'] .select {
@@ -889,6 +894,9 @@ body {
 
 .history-badge.badge-youtube { background: var(--danger); }
 .history-badge.badge-article { background: var(--success); color: #064e3b; }
+/* في الوضع الداكن #064e3b (كستنائي داكن) يغرق في خلفية --success الفاتحة —
+   لون نص هادئ على نفس العائلة */
+:root[data-theme='dark'] .history-badge.badge-article { color: #e9f7f0; }
 
 .history-preview {
   flex: 1 1 220px;
@@ -962,8 +970,8 @@ body {
   justify-content: center;
   padding: 16px;
   background: rgba(5, 10, 22, .55);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  /* بلا backdrop-filter: DESIGN.md يمنعه (تكلفة أداء + تناقض مع الفصل بالحدود
+     والمسافات) — الخلفية شبه الشفافة وحدها تكفي */
   animation: fadeIn .18s ease;
 }
 
@@ -1042,10 +1050,6 @@ body {
 .modal-actions .btn-primary { flex: none; }
 
 /* ===== إمكانية الوصول ===== */
-:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
 
 ::selection { background: var(--primary-soft); }
 

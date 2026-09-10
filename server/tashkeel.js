@@ -14,9 +14,9 @@ async function diacritizeViaGemini(text) {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY غير مضبوط');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL}:generateContent`;
   const prompt = 'أضِف حركات التشكيل الكاملة (فَتْحَة، ضَمَّة، كَسْرَة، سُكُون، شَدَّة) إلى النص العربي التالي. لا تُغيّر أي حرف أو كلمة، وأَعِد النص مشكولًا فقط بدون شرح:\n\n' + text;
-  const res = await fetch(url + `?key=${encodeURIComponent(config.GEMINI_API_KEY)}`, {
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     }),

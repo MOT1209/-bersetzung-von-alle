@@ -7,58 +7,56 @@ const translate = require('./translate'); // وصول وقت التنفيذ — 
 const { transcribeVideoAudio } = require('./audio');
 const { trackUsage } = require('./usage'); // عدّاد استخدام بسيط
 const { logInfo } = require('./logger');
+const { sendError: _sendError, scrubSecrets } = require('./errorHelpers');
+const { isSupportedLang } = require('./languages');
 
 const router = express.Router();
 
-// ===== خريطة رمز الخطأ → حالة HTTP (العقد الموحد في task-06) =====
-const ERROR_STATUS = {
-  'invalid-url': 400,
-  'fetch-failed': 422,
-  'no-transcript': 422,
-  'audio-empty': 422,
-  'content-empty': 422,
-  'pdf-unsupported': 422,
-  'invalid-settings': 400,
-  'blocked-url': 400,
-  'rate-limited': 429,
-  'translate-failed': 502,
-  'server-error': 500,
-  'invalid-text': 400,
-  'smart-unavailable': 503,
-  'input-too-large': 413,
-  'alignment-failed': 502,
-  'gemini-video-failed': 502,
-  'gemini-model-unavailable': 502,
-  'gemini-rate-limited': 429,
-  'gemini-video-disabled': 503,
-  'video-too-long': 422,
-  'download-failed': 502,
-  'youtube-blocked': 422,
-  'ytdlp-missing': 500,
-};
-
-// إزالة أي مفتاح API من نص الخطأ قبل إرساله للعميل (احتياط لا غنى عنه)
-function scrubSecrets(t) {
-  return String(t || '')
-    .replace(/AIza[0-9A-Za-z_-]{10,}/g, '[مفتاح محجوب]')
-    .replace(/key=[^&\s"]+/gi, 'key=[محجوب]');
+// ===== استجابة خطأ موحدة (izu errorHelpers — scrubSecrets + detail for Gemini) =====
+function sendError(res, e) {
+  return _sendError(res, e, { label: 'translate' });
 }
 
-// ===== استجابة خطأ موحدة =====
-function sendError(res, e) {
-  // رمز الخطأ يجب أن يكون سلسلة معروفة. عمليات execFile الفاشلة تحمل code
-  // رقميًا (رمز الخروج)، فكان يتسرّب للواجهة كـ {"error":1} — بلا معنى.
-  const raw = e && e.code;
-  const code = typeof raw === 'string' && ERROR_STATUS[raw] ? raw : 'server-error';
-  const status = ERROR_STATUS[code] || 500;
-  console.error('[translate] error:', code, '→', e && e.message);
-  const payload = { error: code };
-  // أخطاء Gemini وحدها تحمل تفصيلًا: سجلّ الخادم غير متاح على الاستضافة
-  // المدارة، وبلا هذا التفصيل يستحيل تشخيص سبب الفشل من الخارج.
-  if (code.startsWith('gemini-') && e && e.message) {
-    payload.detail = scrubSecrets(e.message).slice(0, 300);
-  }
-  return res.status(status).json(payload);
+// ===== التحقق من المدخلات =====
+
+// صيغة رمز اللغة: ISO 639-1 مع منطقة اختيارية (مثل 'ar', 'zh-CN', 'pt-BR')
+const LANG_CODE_RE = /^[a-z]{2,3}(-[a-zA-Z]{2,})?$/i;
+
+/**
+ * تحقق من صلاحية targetLang.
+ * يقبل: رمز لغة بسيط أو مع منطقة (≤ 10 حرف)، أو اسم في قاموس languages.js.
+ * يُعيد true/strings-safe أو false.
+ */
+function isValidTargetLang(code) {
+  if (typeof code !== 'string') return false;
+  const trimmed = code.trim();
+  if (trimmed.length === 0 || trimmed.length > 10) return false;
+  return LANG_CODE_RE.test(trimmed) || isSupportedLang(trimmed);
+}
+
+/**
+ * تنقية المسرد: يُزيل الإدخالات غير الصالحة ويُبقي فقط {from,to} صالحتين.
+ * @param {any} raw
+ * @returns {Array<{from:string,to:string}>}
+ */
+function sanitizeGlossary(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((g) => g && typeof g.from === 'string' && typeof g.to === 'string')
+    .map((g) => ({ from: g.from.trim().slice(0, 200), to: g.to.trim().slice(0, 200) }))
+    .filter((g) => g.from.length > 0 && g.to.length > 0)
+    .slice(0, 100); // سقف 100 مصطلح
+}
+
+/**
+ * التحقق من المزوّد: يقبل فقط أسماء مزوّدين معروفين (من translate.js).
+ * @param {string|undefined} id
+ * @returns {string|undefined} — المعرّف الأصلي إن كان صالحًا، وإلا undefined
+ */
+function sanitizeProvider(id) {
+  if (typeof id !== 'string' || !id.trim()) return undefined;
+  const KNOWN_IDS = new Set(['google', 'mymemory', 'libre', 'deepl', 'gemini', 'zen']);
+  return KNOWN_IDS.has(id.trim()) ? id.trim() : undefined;
 }
 
 // ===== GET /api/providers — قائمة المزوّدين وحالتهم (للواجهة) =====
@@ -80,15 +78,22 @@ router.post('/translate', async (req, res) => {
   if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) {
     return res.status(400).json({ error: 'invalid-url' });
   }
+  // التحقق من لغة الهدف
+  if (!isValidTargetLang(targetLang)) {
+    return res.status(400).json({ error: 'invalid-lang' });
+  }
   const cleanUrl = url.trim();
   // حد طول الرابط — يمنع مدخلات ضخمة عبر URL
   if (cleanUrl.length > 2000) {
     return res.status(413).json({ error: 'input-too-large' });
   }
-  // مسرد اختياري: مصفوفة {from,to} — تُطبَّق بعد الترجمة على النص النهائي فقط
-  const g = Array.isArray(glossary) ? glossary : [];
+  // مسرد اختياري: مصفوفة {from,to} — تُنظَّف وتُقصّ إلى 100 إدخال
+  const g = sanitizeGlossary(glossary);
   // فرض المزوّد/الترتيب اختياريًا (مُمرَّر كـ opts إلى سلسلة المزوّدين)
-  const tOpts = { provider, providers };
+  const tOpts = {
+    provider: sanitizeProvider(provider),
+    providers: Array.isArray(providers) ? providers.map(sanitizeProvider).filter(Boolean) : undefined,
+  };
 
   try {
     // 1) يوتيوب؟
@@ -111,14 +116,21 @@ router.post('/translate-text', async (req, res) => {
   if (!text || !String(text).trim()) {
     return res.status(400).json({ error: 'invalid-text' });
   }
+  // التحقق من لغة الهدف
+  if (!isValidTargetLang(targetLang)) {
+    return res.status(400).json({ error: 'invalid-lang' });
+  }
   // حد حجم النص (حوالي 200 ألف حرف) — يمنع استهلاك الذاكرة/تعليق الخادم
   if (String(text).length > 200000) {
     return res.status(413).json({ error: 'input-too-large' });
   }
   try {
     const sourceLang = await detectLanguage(text);
-    const raw = await translateText(String(text), targetLang, sourceLang, { provider, providers });
-    const translated = applyGlossary(raw, Array.isArray(glossary) ? glossary : []);
+    const raw = await translateText(String(text), targetLang, sourceLang, {
+      provider: sanitizeProvider(provider),
+      providers: Array.isArray(providers) ? providers.map(sanitizeProvider).filter(Boolean) : undefined,
+    });
+    const translated = applyGlossary(raw, sanitizeGlossary(glossary));
     trackUsage({ type: 'text', sourceLang, targetLang }); // لا يُنتظر — احتياطي
     res.json({ type: 'text', sourceLang, translated, original: String(text) });
   } catch (e) {
@@ -140,9 +152,9 @@ router.post('/translate-smart', async (req, res) => {
     }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL}:generateContent`;
     const prompt = `أعد صياغة النص التالي إلى ${targetLang === 'ar' ? 'العربية' : targetLang} بأسلوب طبيعي موجز يحافظ على المعنى. لا تشرح، أعد النص المترجم فقط:\n\n${String(text).slice(0, 8000)}`;
-    const geminiRes = await fetch(url + `?key=${encodeURIComponent(config.GEMINI_API_KEY)}`, {
+    const geminiRes = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
       body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }),
       signal: AbortSignal.timeout(30000),
     });
@@ -383,5 +395,6 @@ async function handleArticle(res, url, targetLang, glossary, opts) {
 }
 
 module.exports = router;
+module.exports.scrubSecrets = scrubSecrets; // إعادة استخدام في أجزاء أخرى عند الحاجة
 module.exports.translateBatch = translateBatch; // اختبارات المحاذاة
 module.exports.translateLines = translateLines; // فيديو محلي — تُستدعى وقت التنفيذ

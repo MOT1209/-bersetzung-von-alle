@@ -2,11 +2,29 @@
 // Uses EdgeTTS (natural voice) with gTTS fallback for long text or Edge failures.
 const express = require('express');
 const { textToMp3BufferWithVoice } = require('./tts');
+const { sendError: _sendError } = require('./errorHelpers');
 
 const router = express.Router();
 
+const TTS_MAX_TEXT = 10000;
+
+// ===== استجابة خطأ موحدة (izu errorHelpers) =====
+function sendError(res, e) {
+  return _sendError(res, e, { label: 'tts', detail: false });
+}
+
 router.post('/tts', async (req, res) => {
   const { text, lang, voice, gender, rate } = req.body || {};
+
+  // ── التحقق من المدخلات قبل أي عمل ──
+  const rawText = typeof text === 'string' ? text : '';
+  if (!rawText.trim()) {
+    return res.status(422).json({ error: 'invalid-text' });
+  }
+  if (rawText.length > TTS_MAX_TEXT) {
+    return res.status(413).json({ error: 'text-too-long' });
+  }
+
   try {
     // Build voice option: string voice name, { gender } object, or null (default by lang)
     const voiceOption = voice
@@ -19,9 +37,7 @@ router.post('/tts', async (req, res) => {
     res.setHeader('Content-Length', String(buffer.length));
     res.send(buffer);
   } catch (err) {
-    const code = err && err.code ? err.code : 'tts-failed';
-    const status = code === 'invalid-text' || code === 'text-too-long' ? 422 : 502;
-    res.status(status).json({ error: code });
+    return sendError(res, err);
   }
 });
 

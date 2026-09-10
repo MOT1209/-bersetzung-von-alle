@@ -22,6 +22,7 @@ const { storage } = require('./providers/storage');
 const { requireAdmin, isAdmin } = require('./adminAuth');
 
 const router = express.Router();
+const { sendError: _sendError } = require('./errorHelpers');
 
 const PROJECT_TOKEN_HEADER = 'x-project-token';
 
@@ -42,21 +43,9 @@ function requireProjectOwner(req, res, next) {
 
 const MAX_ASSET_BASE64 = 60 * 1024 * 1024; // ~45MB فعلية بعد فكّ base64
 
-const ERROR_STATUS = {
-  'invalid-project': 400,
-  'invalid-asset': 400,
-  'invalid-storage-key': 400,
-  'project-not-found': 404,
-  'asset-not-found': 404,
-  'queue-full': 503,
-  'server-error': 500,
-};
-
+// ===== استجابة خطأ موحدة (izu errorHelpers) =====
 function sendError(res, e) {
-  const code = (e && e.code) || 'server-error';
-  const status = ERROR_STATUS[code] || 500;
-  console.error('[projects] error:', code, '→', e && e.message);
-  return res.status(status).json({ error: code });
+  return _sendError(res, e, { label: 'projects', detail: false });
 }
 
 router.use(express.json({ limit: '80mb' })); // الأصول تصل base64

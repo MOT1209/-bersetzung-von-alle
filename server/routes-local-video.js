@@ -27,16 +27,8 @@ const MAX_BASE64 = 40 * 1024 * 1024; // ~40MB فيديو (base64) — يحمي �
 
 const JOB_TYPE = 'video-local';
 
-// ===== خريطة رمز الخطأ → حالة HTTP =====
-const ERROR_STATUS = {
-  'invalid-format': 400,
-  'invalid-file': 400,
-  'video-too-long': 422,
-  'audio-empty': 422,
-  'translate-failed': 502,
-  'queue-full': 503,
-  'server-error': 500,
-};
+// ===== خريطة رمز الخطأ → حالة HTTP (izzyd errorHelpers) =====
+const { sendError: _sendError, ERROR_STATUS } = require('./errorHelpers');
 
 function codeError(code) {
   const e = new Error(code);
@@ -45,12 +37,13 @@ function codeError(code) {
 }
 
 function sendError(res, e) {
-  const code = (e && e.code) || 'server-error';
+  const raw = e && e.code;
+  const code = typeof raw === 'string' && ERROR_STATUS[raw] ? raw : 'server-error';
+  // نحافظ على تفصيل العقد الخاص: الواجهة تعرض الحد للمستخدم
+  const body = { error: code };
+  if (code === 'video-too-long') body.maxMinutes = config.LOCAL_VIDEO_MAX_MIN;
   const status = ERROR_STATUS[code] || 500;
   console.error('[local-video] error:', code, '→', e && e.message);
-  const body = { error: code };
-  // نحافظ على تفصيل العقد: الواجهة تعرض الحد للمستخدم
-  if (code === 'video-too-long') body.maxMinutes = config.LOCAL_VIDEO_MAX_MIN;
   return res.status(status).json(body);
 }
 

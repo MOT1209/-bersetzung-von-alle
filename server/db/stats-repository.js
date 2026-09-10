@@ -7,6 +7,9 @@
 const { getDb } = require('./index');
 
 // ===== إدخالات الإحصائيات (stats_entries) =====
+// عدّاد لتأخير عملية التنظيف: لا تُنفَّذ prune אלא كل 100 إدراج لتوفير استعلامات
+let _insertCount = 0;
+const PRUNE_EVERY = 100;
 
 // إدراج إدخال زمني — كل ترجمة ناجحة تسجَّل هنا (يُ invoked من usage.trackUsage)
 function insertEntry({ type, sourceLang = null, targetLang = null, provider = null } = {}) {
@@ -14,7 +17,8 @@ function insertEntry({ type, sourceLang = null, targetLang = null, provider = nu
     'INSERT INTO stats_entries (type, source_lang, target_lang, provider, created_at) VALUES (?, ?, ?, ?, ?)'
   ).run(String(type || 'unknown'), sourceLang, targetLang, provider, Date.now());
   // نفس سقف سائق JSON القديم (آخر 10,000 إدخال) — يمنع نموّ الجدول بلا حدود
-  pruneEntries(10000);
+  // يُنفَّذ مرة كل 100 إدراج بدل كل إدراج لتوفير استعلامتين على الأقل
+  if (++_insertCount % PRUNE_EVERY === 0) pruneEntries(10000);
 }
 
 // ملخص سريع: الإجمالي، اليوم، الأسبوع، والتوزيع حسب النوع
@@ -45,17 +49,32 @@ function getSummary() {
 // سلسلة زمنية: عدد الترجمة لكل يوم من آخر N يومًا (أقصى 30)
 // الحدود والتسمية كلاهما UTC — متسقة مع بعضها ومع سائق JSON القديم
 // (الذي كان يجمّع بـ toISOString). خلط التوقيت المحلي مع UTC يزيح الصفوف يومًا كاملًا.
+// بدلاً من n استعلام SELECT COUNT، استعلام واحد مع GROUP BY على DATE()
 function getTimeseries(days = 7) {
   const n = Math.max(1, Math.min(30, Number(days) || 7));
   const db = getDb();
-  const result = [];
   const dayMs = 24 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  const startMs = nowMs - (n - 1) * dayMs;
+
+  // استعلام واحد: تجميع بعدد اليوم بصيغة YYYY-MM-DD
+  const rows = db.prepare(
+    `SELECT DATE(created_at / 1000, 'unixepoch') AS day, COUNT(*) AS n
+     FROM stats_entries
+     WHERE created_at >= ?
+     GROUP BY day`
+  ).all(startMs);
+
+  // تحويل النتائج إلى خريطة { 'YYYY-MM-DD': count }
+  const countsByDay = {};
+  for (const r of rows) countsByDay[r.day] = r.n;
+
+  // إعادة بناء كاملة: ملء الأيام المفقودة بـ 0
+  const result = [];
   for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * dayMs);
-    const startMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-    const endMs = startMs + dayMs;
-    const row = db.prepare('SELECT COUNT(*) AS n FROM stats_entries WHERE created_at >= ? AND created_at < ?').get(startMs, endMs);
-    result.push({ date: new Date(startMs).toISOString().slice(0, 10), count: row.n });
+    const d = new Date(nowMs - i * dayMs);
+    const dateStr = d.toISOString().slice(0, 10);
+    result.push({ date: dateStr, count: countsByDay[dateStr] || 0 });
   }
   return { days: result };
 }

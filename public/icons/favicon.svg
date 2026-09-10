@@ -1,8 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 40 320 320" width="80" height="80" role="img" aria-label="ترجِم">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="80" height="80" role="img" aria-label="ترجِم">
   <title>ترجِم — favicon</title>
-  <!-- العلامة وحدها بلون واحد (نيلي #1c1a17) على خلفية شفافة — آمنة على فاتح وداكن.
-       نسبة الحبر: نصف قطر الحبر 144 من مركز اللوح الافتراضي < 160 (0.5 × 320)
-       فتنجو من قناع الفافيكون الدائري. نفس هندسة icon.svg مصغّرة (r=100، ساق 50، فجوة 90°). -->
-  <line x1="100" y1="81.25" x2="100" y2="318.75" stroke="#1c1a17" stroke-width="50" stroke-linecap="round"/>
-  <path d="M 170.71 270.71 A 100 100 0 1 0 29.29 270.71" fill="none" stroke="#1c1a17" stroke-width="50"/>
+  <!-- العلامة وحدها بلون واحد (#1c1a17) على شفاف — آمنة على فاتح وداكن.
+       نسبة الحبر: أبعد نقطة (قوس r=118 + سماكة 24 = 130 من المركز 160) < 160
+       فتنجو من قناع الفافيكون الدائري. ع ⇄ A بدون ألوان للوضوح في 16px. -->
+  <circle cx="160" cy="160" r="160" fill="#1c1a17"/>
+  <g transform="translate(160 160) scale(0.72) translate(-256 -256)">
+    <text x="196" y="252" text-anchor="middle" font-size="148" font-weight="700" font-family="Tahoma, 'Segoe UI', sans-serif" fill="#fbfaf8">ع</text>
+    <text x="330" y="262" text-anchor="middle" font-size="118" font-weight="700" font-family="Tahoma, 'Segoe UI', sans-serif" fill="#8fabe0">A</text>
+    <path d="M 138 340 A 132 132 0 0 0 374 340" fill="none" stroke="#8fabe0" stroke-width="34" stroke-linecap="round"/>
+    <path d="M 374 340 l -36 -9 M 374 340 l -9 36" fill="none" stroke="#8fabe0" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 374 172 A 132 132 0 0 0 138 172" fill="none" stroke="#fbfaf8" stroke-width="34" stroke-linecap="round"/>
+    <path d="M 138 172 l 36 -9 M 138 172 l 9 36" fill="none" stroke="#fbfaf8" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>

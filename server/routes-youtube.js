@@ -5,25 +5,13 @@
 // (captions.download يتطلب OAuth بحساب المالك) — انظر server/youtubeApi.js.
 const express = require('express');
 const youtubeApi = require('./youtubeApi'); // وصول وقت التنفيذ — يسمح بالتزييف في الاختبارات
+const { sendError: _sendError } = require('./errorHelpers');
 
 const router = express.Router();
 
-// ===== خريطة رمز الخطأ → حالة HTTP (نفس قالب بقية المسارات) =====
-const ERROR_STATUS = {
-  'invalid-url': 400,
-  'video-not-found': 404,
-  'youtube-quota': 429,
-  'youtube-api-disabled': 503,
-  'youtube-api-failed': 502,
-  'server-error': 500,
-};
-
+// ===== استجابة خطأ موحدة (izu errorHelpers) =====
 function sendError(res, e) {
-  const raw = e && e.code;
-  const code = typeof raw === 'string' && ERROR_STATUS[raw] ? raw : 'server-error';
-  const status = ERROR_STATUS[code] || 500;
-  console.error('[youtube] error:', code, '→', e && e.message);
-  return res.status(status).json({ error: code });
+  return _sendError(res, e, { label: 'youtube', detail: false });
 }
 
 // ===== GET /api/youtube/metadata =====

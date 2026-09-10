@@ -156,13 +156,21 @@ export function showError(code, status) {
 }
 export function hideError() { errorEl.hidden = true; }
 
+/* إعادة استخدام عنصر #toast الوحيد في index.html بدل إنشاء div جديد كل نداء —
+   كانت النداءات المتتالية السريعة تُراكم نسخًا متداخلة من الإشعارات. */
+let toastTimer = null;
 export function showToast(msg, ms) {
-  const t = document.createElement('div');
-  t.className = 'toast';
+  const t = document.getElementById('toast');
+  if (!t) return;
   t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.classList.add('show'), 10);
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, ms || 2800);
+  t.hidden = false;
+  void t.offsetWidth; // إعادة تدفّق: يعيد تشغيل انتقال opacity عند كل نداء
+  t.classList.add('show');
+  clearTimeout(toastTimer); // نداء جديد يلغي إخفاء النداء السابق
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show');
+    toastTimer = setTimeout(() => { t.hidden = true; }, 300);
+  }, ms || 2800);
 }
 
 function mapErrorLocal(code, status) {

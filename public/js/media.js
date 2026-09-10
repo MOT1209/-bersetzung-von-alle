@@ -74,12 +74,20 @@ let localVideoUrl = null;
 // الدبلجة تحتاج المشغّل نفسه (الوقت الحالي + كتم الصوت الأصلي)، وهو محلّي هنا.
 export function getYtPlayer() { return ytPlayer; }
 
+// تنظيف منطقة المشغّل دون تدمير العقد الثابتة (#player-embed, #cap-bar,
+// #local-player). مسح resultEmbed بالكامل (innerHTML='') كان يُفقد هذه
+// العناصر إلى الأبد، فتنكسر منطقة المشغّل وتُسقط زرّ «الملفات» عند أول
+// وضع تبديل بعد أي نتيجة ترجمة (app.js: `$('cap-bar').hidden` → null).
 export function teardownPlayers() {
-  try { resultEmbed.innerHTML = ''; } catch {}
-  capPanel.hidden     = true;
+  const wrap = document.getElementById('player-embed');
+  if (wrap) wrap.innerHTML = '';
+  ytPlayer = null;
+  capPanel.hidden       = true;
   capPanelList.innerHTML = '';
   if (localPlayer.src) { localPlayer.pause(); localPlayer.removeAttribute('src'); localPlayer.load(); }
-  localPlayer.hidden  = true;
+  localPlayer.hidden    = true;
+  capBar.hidden         = true;
+  capBar.textContent    = '';
 }
 
 export function loadYouTubeApi() {

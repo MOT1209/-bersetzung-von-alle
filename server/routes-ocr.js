@@ -1,6 +1,7 @@
 // server/routes-ocr.js — نقطة التعرف الضوئي OCR
 // POST /api/ocr → { text, confidence }
 const express = require('express');
+const { sendError: _sendError } = require('./errorHelpers');
 
 const router = express.Router();
 
@@ -10,21 +11,9 @@ router.use(express.json({ limit: '15mb' }));
 // ===== الصيغ المدعومة =====
 const SUPPORTED_EXT = ['png', 'jpg', 'jpeg', 'webp', 'bmp'];
 
-// ===== خريطة رمز الخطأ → حالة HTTP (قالب موحد مثل routes-file.js) =====
-const ERROR_STATUS = {
-  'invalid-format': 400,
-  'invalid-file': 400,
-  'ocr-not-ready': 503,
-  'ocr-empty': 422,
-  'server-error': 500,
-};
-
-// ===== استجابة خطأ موحدة =====
+// ===== استجابة خطأ موحدة (izu errorHelpers) =====
 function sendError(res, e) {
-  const code = (e && e.code) || 'server-error';
-  const status = ERROR_STATUS[code] || 500;
-  console.error('[ocr] error:', code, '→', e && e.message);
-  return res.status(status).json({ error: code });
+  return _sendError(res, e, { label: 'ocr', detail: false });
 }
 
 // ===== POST /api/ocr — صورة base64 → نص =====

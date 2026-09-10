@@ -1,5 +1,6 @@
 /* ---------- دوال مساعدة ---------- */
 import { MESSAGES, LANGUAGES } from './constants.js';
+import { isRtlText } from './localEngine.mjs';
 
 export function safeGet(k)         { try { return localStorage.getItem(k); } catch { return null; } }
 export function safeSet(k, v)      { try { localStorage.setItem(k, v); } catch {} }
@@ -25,6 +26,7 @@ export async function postJson(url, body, headers) {
   return { status: r.status, data: d };
 }
 
+/* --- اسم اللغة بالعربي — المصدر الوحيد للحقيقة (يُغطّي أكواد الإقليم) --- */
 export function langName(code) {
   if (!code) return '';
   if (LANGUAGES[code]) return LANGUAGES[code];
@@ -32,8 +34,28 @@ export function langName(code) {
   return LANGUAGES[short] || code;
 }
 
+/* --- تسمية نوع المحتوى مع إيموجي (مُوحّدة ل improves UX) --- */
+export function getContentTypeLabel(type) {
+  const labels = { technical: '📝 تقني', code: '💻 كود', medical: '🏥 طبي', legal: '⚖️ قانوني', news: '📰 إخباري', academic: '🎓 أكاديمي', general: '📄 عام' };
+  return labels[type] || '📄 عام';
+}
+
 export function detectArabic(text) {
   return /[\u0600-\u06FF\u0750-\u077F]/.test(String(text).slice(0, 500));
+}
+
+/* --- عرض الفقرات في result-body --- */
+export function renderParagraphs(text) {
+  const body = document.getElementById('result-body');
+  if (!body) return;
+  body.innerHTML = '';
+  String(text || '').split(/\n{2,}/).forEach((p) => {
+    const el = document.createElement('p');
+    el.className = 'blk';
+    el.dir = isRtlText(p) ? 'rtl' : 'ltr';
+    el.textContent = p;
+    body.appendChild(el);
+  });
 }
 
 export function buildTranslationState(defaults) {

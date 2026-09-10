@@ -1,10 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 130" width="130" height="130" role="img" aria-label="ترجِم">
   <title>ترجِم — أيقونة الإضافة</title>
   <!-- لوح دائري ممتلئ (كروم يقصّ أيقونات الإضافة دائرة أحيانًا):
-       نصف قطر الحبر 49.7 ≤ 0.42 × 130 = 54.6 — نفس علامة icon.svg بمقياس 0.27 (فجوة 90°) -->
+       أبعد نقطة حبر من المركز ≈ 65 — نفس علامة icon.svg (ع ⇄ A) بمقياس 0.32 -->
   <circle cx="65" cy="65" r="65" fill="#1c1a17"/>
-  <g transform="translate(65 65) scale(0.27) translate(-256 -256)">
-    <line x1="256" y1="104" x2="256" y2="408" stroke="#fbfaf8" stroke-width="64" stroke-linecap="round"/>
-    <path d="M 346.51 346.51 A 128 128 0 1 0 165.49 346.51" fill="none" stroke="#8fabe0" stroke-width="64"/>
+  <g transform="translate(65 65) scale(0.32) translate(-256 -256)">
+    <text x="196" y="252" text-anchor="middle" font-size="148" font-weight="700" font-family="Tahoma, 'Segoe UI', sans-serif" fill="#fbfaf8">ع</text>
+    <text x="330" y="262" text-anchor="middle" font-size="118" font-weight="700" font-family="Tahoma, 'Segoe UI', sans-serif" fill="#8fabe0">A</text>
+    <path d="M 138 340 A 132 132 0 0 0 374 340" fill="none" stroke="#8fabe0" stroke-width="34" stroke-linecap="round"/>
+    <path d="M 374 340 l -36 -9 M 374 340 l -9 36" fill="none" stroke="#8fabe0" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 374 172 A 132 132 0 0 0 138 172" fill="none" stroke="#fbfaf8" stroke-width="34" stroke-linecap="round"/>
+    <path d="M 138 172 l 36 -9 M 138 172 l 9 36" fill="none" stroke="#fbfaf8" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>

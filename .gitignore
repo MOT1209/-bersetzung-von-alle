@@ -56,3 +56,9 @@ projects/
 # Crash dumps (local only)
 /tmp/
 *.stackdump
+
+# Browser automation artifacts (local only)
+.playwright-mcp/
+
+# Brand generation job artifacts (local only)
+/brandkit/**

@@ -62,6 +62,16 @@ function createJob({ type, projectId, params }) {
   };
   jobs.set(id, job);
   evictOldestTerminal();
+  // Guard: if map grows beyond MAX_JOBS with no terminal jobs to evict,
+  // reject the new job rather than allow unbounded memory growth.
+  if (jobs.size > MAX_JOBS) {
+    jobs.delete(id);
+    lastPersistedProgress.delete(id);
+    sseClients.delete(id);
+    const err = new Error('job-queue-full');
+    err.code = 'job-queue-full';
+    throw err;
+  }
   persistJob(job);
   return job;
 }
@@ -83,6 +93,7 @@ function evictOldestTerminal() {
   if (!terminal) return;
   jobs.delete(terminal.id);
   lastPersistedProgress.delete(terminal.id);
+  sseClients.delete(terminal.id);
 }
 
 function getJob(id) { return jobs.get(String(id || '')) || null; }

@@ -61,7 +61,9 @@ function isApiKeyValid(req) {
     console.warn('[api-key] request used disallowed ?api_key= query param — header x-api-key only.');
   }
   const k = req.headers['x-api-key'];
-  return typeof k === 'string' && k === ARALINK_API_KEY;
+  // مقارنة ثابتة الزمن (timing-safe) — التقييم المباشر بـ === يكشف طول/حروف المفتاح
+  // عبر زمن الاستجابة ويسمح لهجمات القياس الزمني. tokenMatches تستخدم timingSafeEqual.
+  return tokenMatches(k, ARALINK_API_KEY);
 }
 
 // ===== حد الطلبات =====
@@ -77,8 +79,13 @@ function createRateLimiter({ windowMs, max, keyedMultiplier = 3 }) {
     const limit = isApiKeyValid(req) ? max * keyedMultiplier : max;
     try {
       const { count, resetAt } = await store.incr(ip, windowMs);
+      // ترويسات X-RateLimit — تُرسَل دائمًا قبل فحص الحد حتى يعرف العميل وضعه
+      const resetSec = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+      res.setHeader('X-RateLimit-Limit', String(limit));
+      res.setHeader('X-RateLimit-Remaining', String(Math.max(0, limit - count)));
+      res.setHeader('X-RateLimit-Reset', String(resetSec));
       if (count > limit) {
-        res.setHeader('Retry-After', Math.max(1, Math.ceil((resetAt - Date.now()) / 1000)));
+        res.setHeader('Retry-After', resetSec);
         return res.status(429).json({ error: 'rate-limited' });
       }
     } catch (e) {
@@ -191,13 +198,68 @@ app.get('/api/languages', (req, res) => {
 // كانت اللوحة تحفظ التوكن في localStorage، فأي XSS يقرأه ويسرّبه (دين §8.6).
 // الآن يُبادَل التوكن مرة واحدة بكوكي httpOnly لا يراه جافاسكربت إطلاقًا.
 // المنطق نفسه في adminAuth.js يخدم الرأس والكوكي معًا.
-app.post('/api/admin/login', heavyLimiter, (req, res) => {
+//
+// ===== قفل محاولات الفشل المتتالية (فوق heavyLimiter) =====
+// heavyLimiter يحد إجمالي الطلبات (افتراضيًا 10/دقيقة) لكنه لا يمنع تخمين
+// ADMIN_TOKEN الموزَّع ببطء. هذا العدّاد يراقب الفشل المتتالي لكل IP:
+//   - 5 محاولات فاشلة  → 429 مع Retry-After: 60  (قفل قصير)
+//   - 10 محاولات فاشلة → 429 مع Retry-After: 900 (قفل 15 دقيقة)
+// والنجاح يصفّر العدّاد. نافذتان مستقلتان لأن store.incr(key, windowMs) لا يمدّد
+// الانتهاء عند الزيادة — فلا يمكن تبديل نافذة نفس المفتاح بعد بدء العد.
+const loginFailStore = createStore();
+const LOGIN_SOFT_MS = 60000;      // نافذة القفل القصير (60 ثانية)
+const LOGIN_HARD_MS = 15 * 60000; // نافذة القفل الشديد (15 دقيقة)
+const LOGIN_SOFT_LIMIT = 5;
+const LOGIN_HARD_LIMIT = 10;
+
+// يزيد عدّادي الفشل ويقرر القفل. يُعيد { retryAfter } للقفل أو null للمتابعة.
+// أي خطأ في المتجر → fail-open (نفس سياسة حدود الطلبات في المشروع).
+// ملاحظة: مفتاحا النافذتين مستقلّان — لو اشتركا في مفتاح واحد، كان incr الثاني
+// يزيد نفس مدخلة الأول فيحسب كل محاولة مرتين ويحمل resetAt النافذة القصيرة.
+async function checkLoginLock(req) {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const softKey = `login-fail:s:${ip}`; // عدّاد النافذة القصيرة (60 ثانية)
+  const hardKey = `login-fail:h:${ip}`; // عدّاد النافذة الشديدة (15 دقيقة)
+  let soft, hard;
+  try {
+    [soft, hard] = await Promise.all([
+      loginFailStore.incr(softKey, LOGIN_SOFT_MS),
+      loginFailStore.incr(hardKey, LOGIN_HARD_MS),
+    ]);
+  } catch (e) {
+    console.error('[admin-login] lockout store failed — allowing attempt:', e && e.message);
+    return null;
+  }
+  if (hard.count >= LOGIN_HARD_LIMIT) {
+    return { retryAfter: Math.max(1, Math.ceil((hard.resetAt - Date.now()) / 1000)) };
+  }
+  if (soft.count >= LOGIN_SOFT_LIMIT) {
+    return { retryAfter: Math.max(1, Math.ceil((soft.resetAt - Date.now()) / 1000)) };
+  }
+  return null;
+}
+
+app.post('/api/admin/login', heavyLimiter, async (req, res) => {
   const expected = process.env.ADMIN_TOKEN;
   if (!expected) return res.status(503).json({ error: 'settings-disabled' });
-  const given = (req.body && req.body.token) || req.get('x-admin-token') || '';
-  if (!tokenMatches(given, expected)) return res.status(401).json({ error: 'unauthorized' });
-  res.setHeader('Set-Cookie', adminCookieHeader(given));
-  res.json({ ok: true });
+  try {
+    const lock = await checkLoginLock(req);
+    if (lock) {
+      res.setHeader('Retry-After', String(lock.retryAfter));
+      return res.status(429).json({ error: 'rate-limited' });
+    }
+    const given = (req.body && req.body.token) || req.get('x-admin-token') || '';
+    if (!tokenMatches(given, expected)) return res.status(401).json({ error: 'unauthorized' });
+    // نجاح: تصفير عدّادي الفشل (النافذتان معًا) — لا قفل لمن دخل بنجاح
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    loginFailStore.reset(`login-fail:s:${ip}`).catch(() => {});
+    loginFailStore.reset(`login-fail:h:${ip}`).catch(() => {});
+    res.setHeader('Set-Cookie', adminCookieHeader(given));
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[admin-login] unexpected:', e);
+    res.status(500).json({ error: 'server-error' });
+  }
 });
 
 app.post('/api/admin/logout', (req, res) => {

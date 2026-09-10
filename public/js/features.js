@@ -1,5 +1,5 @@
 /* ---------- ميزات إضافية: سجل + مسرد + إعدادات + قواعد + تشكيل + ملف ---------- */
-import { state, safeGet, safeSet, postJson, detectArabic } from './utils.js';
+import { state, safeGet, safeSet, postJson, detectArabic, renderParagraphs } from './utils.js';
 import {
   tashkeelBtn,
   glossaryFrom, glossaryTo, glossaryAddBtn, glossaryListEl,
@@ -11,7 +11,7 @@ import {
   showToast, showError, hideProgress, showProgress,
 } from './ui.js';
 import {
-  normalizeDictionary, translateWithDictionary, isRtlText,
+  normalizeDictionary, translateWithDictionary,
 } from './localEngine.mjs';
 
 /* ========== سجل الترجمات ========== */
@@ -195,17 +195,7 @@ function applyLocalDictToCurrentResult(dict) {
   if (data.type === 'youtube') {
     (data.captions || []).forEach((c) => { c.translated = c.original || ''; });
   }
-  const body = document.getElementById('result-body');
-  if (body) {
-    body.innerHTML = '';
-    String(out).split(/\n{2,}/).forEach((p) => {
-      const el = document.createElement('p');
-      el.className = 'blk';
-      el.dir = isRtlText(p) ? 'rtl' : 'ltr';
-      el.textContent = p;
-      body.appendChild(el);
-    });
-  }
+  renderParagraphs(out);
 }
 
 async function loadSampleDictionary(which) {
@@ -365,24 +355,11 @@ export function setupTashkeelButton() {
       if (data && data.diacritized) {
         if (state.current) state.current.translated = data.diacritized;
         state.activeTab = 'translated';
-        document.getElementById('result-body').innerHTML = '';
-        renderParagraphsLocal(data.diacritized);
+        renderParagraphs(data.diacritized);
         showToast(data.engine === 'gemini' ? 'تم التشكيل (Gemini) ✓' : 'تم التشكيل (قواعدي — سكون/شدة) ✓');
       }
     } catch { hideProgress(); showError('server-error', 500); }
     finally { state.running = false; tashkeelBtn.disabled = false; }
-  });
-}
-
-function renderParagraphsLocal(text) {
-  const body = document.getElementById('result-body');
-  body.innerHTML = '';
-  String(text || '').split(/\n{2,}/).forEach((p) => {
-    const el = document.createElement('p');
-    el.className = 'blk';
-    el.dir = isRtlText(p) ? 'rtl' : 'ltr';
-    el.textContent = p;
-    body.appendChild(el);
   });
 }
 
@@ -463,6 +440,15 @@ export function setupFileMode() {
       if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
     });
     dropZone.addEventListener('click', () => fileInput?.click());
+    // إمكانية الوصول: المنطقة قابل للتركيز (tabindex="0" + role="button" في
+    // index.html) — فأزرار Enter/Mسافة تفتح منتقي الملفات مثل النقر.
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        fileInput?.click();
+      }
+    });
   }
 
   fileInput?.addEventListener('change', (e) => {

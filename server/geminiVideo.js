@@ -142,7 +142,7 @@ function buildPrompt(targetLang) {
 
 async function callGemini(videoId, targetLang, maxSeconds, modelOverride) {
   const model = modelOverride || config.GEMINI_VIDEO_MODEL || config.GEMINI_MODEL;
-  const url = `${API_BASE}/${model}:generateContent?key=${encodeURIComponent(config.GEMINI_API_KEY)}`;
+  const url = `${API_BASE}/${model}:generateContent`;
 
   const videoPart = {
     fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}` },
@@ -155,7 +155,7 @@ async function callGemini(videoId, targetLang, maxSeconds, modelOverride) {
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     signal: AbortSignal.timeout(TIMEOUT_MS),
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: buildPrompt(targetLang) }, videoPart] }],

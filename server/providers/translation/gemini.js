@@ -4,9 +4,9 @@ const config = require('../../config');
 async function translateViaGemini(text, targetLang) {
   if (!config.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY غير مضبوط');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_MODEL}:generateContent`;
-  const res = await fetch(url + `?key=${encodeURIComponent(config.GEMINI_API_KEY)}`, {
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: `Translate the following text to ${targetLang}. Return only the translation, no explanations:\n\n${text}` }] }],
     }),

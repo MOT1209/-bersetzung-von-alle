@@ -2,25 +2,16 @@
 // POST /api/tashkeel → { diacritized, engine: 'gemini'|'basic' }
 const express = require('express');
 const { diacritize } = require('./tashkeel'); // وصول وقت التنفيذ — يسمح بتزييف الدوال في الاختبارات
+const { sendError: _sendError } = require('./errorHelpers');
 
 const router = express.Router();
 
 // راوتر خاص بحد جسم أكبر (2mb) — يُركَّب قبل express.json العام في server.js
 router.use(express.json({ limit: '2mb' }));
 
-// ===== خريطة رمز الخطأ → حالة HTTP (قالب موحد مثل routes-translate.js) =====
-const ERROR_STATUS = {
-  'invalid-text': 400,
-  'input-too-large': 413,
-  'server-error': 500,
-};
-
-// ===== استجابة خطأ موحدة =====
+// ===== استجابة خطأ موحدة (izu errorHelpers) =====
 function sendError(res, e) {
-  const code = (e && e.code) || 'server-error';
-  const status = ERROR_STATUS[code] || 500;
-  console.error('[tashkeel] error:', code, '→', e && e.message);
-  return res.status(status).json({ error: code });
+  return _sendError(res, e, { label: 'tashkeel', detail: false });
 }
 
 // ===== POST /api/tashkeel — تشكيل نص عربي =====

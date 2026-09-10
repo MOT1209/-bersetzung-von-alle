@@ -1,5 +1,5 @@
 /* ---------- منطق الترجمة الأساسي ---------- */
-import { state, postJson, mapError, langName } from './utils.js';
+import { state, postJson, mapError, langName, getContentTypeLabel } from './utils.js';
 import {
   urlInput, textInput, targetLang, translateBtn, retryBtn,
   result, cacheBadge, sourceNotice,
@@ -103,6 +103,7 @@ export async function runTranslate() {
       resultBody.innerHTML = '';
       result.hidden = false;
       const chunks = [];
+      const chunkMeta = []; // يوازي chunks: يحفظ {blockType, original} لإعادة بناء النتيجة
 
       const abort = streamTranslate({
         url: state.mode === 'url' ? url : undefined,
@@ -121,6 +122,7 @@ export async function runTranslate() {
         },
         onChunk: (data) => {
           chunks[data.index] = data.text;
+          chunkMeta[data.index] = data;
           resultBody.innerHTML = '';
           chunks.filter(Boolean).forEach(t => {
             const p = document.createElement('p');
@@ -137,6 +139,16 @@ export async function runTranslate() {
         },
         onDone: (data) => {
           hideProgress();
+          // حدث done لا يحمل النص الكامل (خادم يرسل العدد والوصف فقط) — نعيد
+          // بناء المحتوى من الشُعب المُجمَّعة أثناء البثّ، وإلا تُمسح النتيجة
+          // المعروضة وتُستبدل بجسم فارغ عند اكتمال الترجمة.
+          const fullText = chunks.filter(Boolean).join('\n\n');
+          if (data.type === 'text' && !data.translated && fullText) {
+            data.translated = fullText;
+            data.original = chunkMeta.filter(Boolean).map((c) => c.original || '').join('\n\n') || data.original || '';
+          } else if (data.type === 'article' && !data.translatedBlocks && chunkMeta.some(Boolean)) {
+            data.translatedBlocks = chunkMeta.filter(Boolean).map((c) => ({ type: c.blockType || 'paragraph', content: c.text }));
+          }
           state.current = data;
           state.activeTab = 'translated';
           teardownPlayers();
@@ -216,11 +228,6 @@ export async function runSmartTranslate() {
     smartBtn.disabled = false;
     showError('server-error', 500);
   }
-}
-
-function getContentTypeLabel(type) {
-  const labels = { technical: 'تقني', code: 'كود', medical: 'طبي', legal: 'قانوني', news: 'إخباري', academic: 'أكاديمي', general: 'عام' };
-  return labels[type] || 'عام';
 }
 
 /* ========== ترجمة الدفعات ========== */

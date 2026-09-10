@@ -120,6 +120,7 @@ tabs.forEach((tab) => {
       t.classList.toggle('active', active);
       t.setAttribute('aria-selected', String(active));
     });
+    state.activeTab = tab.dataset.tab; // يحدَّث وإلا تُحتجز العودة لتبويب «الترجمة» عند إعادة النقر
     renderTab(tab.dataset.tab);
   });
 });

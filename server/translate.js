@@ -192,7 +192,7 @@ async function translateTextWithMeta(text, targetLang, sourceLang, opts) {
         // سجّل الفشل (غير متزامن — لا يؤخر الاستجابة)
         logError('engine:' + engine.id, e.message || e);
         // فاصل قصير بين المزوّدين لتجنّب حجب سريع
-        await new Promise((r) => setTimeout(r, 300));
+        await new Promise((r) => setTimeout(r, 100));
       }
     }
     if (!out) {
@@ -215,7 +215,8 @@ async function translateTextWithMeta(text, targetLang, sourceLang, opts) {
 
     // تأخير صغير بين القطع الشبكية لتجنّب انفجار الطلبات
     // (يحمي من حجب Google المجاني وحصص Gemini في الدقيقة)
-    if (results.length + fromCacheCount < chunks.length) {
+    // لا تأخير إذا جاءت القطعة بالكامل من الكاش — لا حاجة لحماية الحصة
+    if (fromCacheCount < results.length && results.length + fromCacheCount < chunks.length) {
       await new Promise((r) => setTimeout(r, 250));
     }
   }
