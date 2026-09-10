@@ -217,6 +217,7 @@ npm run perf:translate      # معيار أداء → cache/perf-report.json
 │   └── config.js        ← تحميل الإعدادات
 ├── extension/           ← إضافة كروم (Manifest V3)
 ├── tests/               ← 60 ملف اختبار
+├── agents/              ← نظام الوكلاء المتعدد (12 رئيسي × 2 فرعي)
 ├── docs/openapi.json    ← OpenAPI 3.1 (~42 نقطة نهاية)
 ├── assets/              ← لافتة README (فاتح/داكن)
 ├── specs/               ← مواصفات الميزات
@@ -244,6 +245,17 @@ npm run perf:translate      # معيار أداء → cache/perf-report.json
 ### لوحة الإدارة
 
 `/admin.html` — محمية بـ `ADMIN_TOKEN` (ترويسة `x-admin-token`). تعرض إحصاءات الاستخدام + جودة الترجمة + تكاليف العمليات.
+
+### 🤖 نظام الوكلاء المتعدد
+
+نظام عمل متعدد الوكلاء يغطي كل جوانب المشروع (ترجمة، استخراج، واجهة، خادم، وسائط، أمان، نشر…) — 12 وكيلًا رئيسيًا × 2 فرعي، مع حرس متجوّل (أمان/جودة/مقاييس) وسير عمل جاهز يعمل موجة-بموجة. التفاصيل الكاملة في `SPEC-multi-agent-architecture.md`.
+
+```bash
+node agents/index.js list              # هيكل الوكلاء الكامل
+node agents/index.js run <workflow>    # تشغيل سير عمل (translate-youtube، security-audit…)
+node agents/index.js agent A1.1        # معلومات وكيل محدد
+node agents/index.js guardians         # الحرس المتجوّلون
+```
 
 ---
 
