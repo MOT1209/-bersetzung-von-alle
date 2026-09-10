@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300" role="img" aria-label="ترجِم — Tarjim">
+  <title>ترجِم — Tarjim</title>
+  <!--
+    README banner (light mode). GitHub strips <style> from SVG, so theme switching
+    is done via <picture> + this file's dark twin (readme-banner-dark.svg).
+    Brand mark: alif stem passing through a link ring — same geometry as
+    public/icons/icon.svg scaled 0.3125 (512 → 160 plate).
+    Flat colors from DESIGN.md light palette: bg #ffffff, border #e4e0d9,
+    text #1c1a17, muted #6b655c, primary #3d5a99. Plate ink #1c1a17,
+    stem #fbfaf8, ring #8fabe0. No gradients, no glow — calm by design.
+  -->
+  <rect width="800" height="300" rx="16" fill="#ffffff"/>
+  <rect x="1" y="1" width="798" height="298" rx="15" fill="none" stroke="#e4e0d9" stroke-width="2"/>
+
+  <!-- brand plate -->
+  <rect x="80" y="80" width="160" height="160" rx="36" fill="#1c1a17"/>
+  <line x1="160" y1="112.5" x2="160" y2="207.5" stroke="#fbfaf8" stroke-width="20" stroke-linecap="round"/>
+  <path d="M 188.28 188.28 A 40 40 0 1 0 131.72 188.28" fill="none" stroke="#8fabe0" stroke-width="20"/>
+
+  <!-- title -->
+  <text x="280" y="140" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="60" font-weight="700" fill="#1c1a17">ترجِم</text>
+  <text x="283" y="184" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="20" font-weight="600" letter-spacing="10" fill="#3d5a99">TARJIM</text>
+
+  <line x1="283" y1="212" x2="600" y2="212" stroke="#e4e0d9" stroke-width="2"/>
+
+  <!-- tagline -->
+  <text x="283" y="246" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="17" font-weight="600" fill="#6b655c">الصق أي رابط — ترجِم بأي لغة</text>
+  <text x="283" y="272" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="13" fill="#6b655c">Paste any URL — translate into any language</text>
+</svg>

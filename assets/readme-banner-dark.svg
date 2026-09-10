@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300" role="img" aria-label="ترجِم — Tarjim">
+  <title>ترجِم — Tarjim (dark)</title>
+  <!--
+    README banner (dark mode), served via <picture> in README.md.
+    Colors lifted from DESIGN.md dark palette: bg #161513, card #1e1d1a,
+    border #322f2b, text #eceae6, muted #a09a90, primary #8fabe0.
+    Plate ink #1c1a17, stem #fbfaf8, ring #8fabe0 — same geometry as the
+    light banner (public/icons/icon.svg scaled 0.3125).
+  -->
+  <rect width="800" height="300" rx="16" fill="#161513"/>
+  <rect x="1" y="1" width="798" height="298" rx="15" fill="none" stroke="#322f2b" stroke-width="2"/>
+
+  <!-- brand plate -->
+  <rect x="80" y="80" width="160" height="160" rx="36" fill="#1c1a17"/>
+  <line x1="160" y1="112.5" x2="160" y2="207.5" stroke="#fbfaf8" stroke-width="20" stroke-linecap="round"/>
+  <path d="M 188.28 188.28 A 40 40 0 1 0 131.72 188.28" fill="none" stroke="#8fabe0" stroke-width="20"/>
+
+  <!-- title -->
+  <text x="280" y="140" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="60" font-weight="700" fill="#eceae6">ترجِم</text>
+  <text x="283" y="184" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="20" font-weight="600" letter-spacing="10" fill="#8fabe0">TARJIM</text>
+
+  <line x1="283" y1="212" x2="600" y2="212" stroke="#322f2b" stroke-width="2"/>
+
+  <!-- tagline -->
+  <text x="283" y="246" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="17" font-weight="600" fill="#a09a90">الصق أي رابط — ترجِم بأي لغة</text>
+  <text x="283" y="272" font-family="Tahoma, 'Segoe UI', sans-serif" font-size="13" fill="#a09a90">Paste any URL — translate into any language</text>
+</svg>
