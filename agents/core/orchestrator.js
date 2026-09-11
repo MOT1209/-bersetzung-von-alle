@@ -1,177 +1,153 @@
-// agents/core/orchestrator.js — الوكيل المنسّق الرئيسي
-// يوزّع المهام على الوكلاوات ويتابع التقدم ويكشف التعارضات
-
-const { AGENTS, GUARDIANS, WORKFLOWS } = require('./registry');
+// agents/core/orchestrator.js — المنسّق الرئيسي للـ 300 وكيل
+//
+// يشغّل:
+//   • وكيلاً واحدًا (بمعرّفه الجديد S1:T3 أو القديم A1.1 — الحل يعمل)
+//   • فرقة كاملة: 5 قادة × (الرئيس + فرعيان) بالتوازي
+//   • سير عمل موجات: القديمة (A1.1…) تُحوَّل تلقائيًا للمعرّفات الجديدة
+// كل شيء يمر عبر ناقل الرسائل، والتقارير تُكتب في specs/agents/<runId>/.
+const { AGENTS, SQUADS, WORKFLOWS, GUARDIANS, resolveAgentId, countAgents } = require('./registry');
+const { executeAgent, executeWithSubs } = require('./engine');
+const bus = require('./bus');
 
 class Orchestrator {
   constructor() {
-    this.activeTasks = new Map();
-    this.completedTasks = [];
-    this.failedTasks = [];
-    this.results = new Map();
+    this.runCounter = 0;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // تشغيل workflow كامل
-  // ═══════════════════════════════════════════════════════════
-  async runWorkflow(workflowId, context = {}) {
-    const workflow = WORKFLOWS[workflowId];
-    if (!workflow) throw new Error(`Workflow not found: ${workflowId}`);
+  _runId(prefix = 'run') {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    return `${stamp}_${prefix}_${++this.runCounter}`;
+  }
+
+  // ── تشغيل وكيل واحد (+ فرعيه) ──
+  async runAgent(idOrLegacy, context = {}) {
+    const id = resolveAgentId(idOrLegacy);
+    const agent = AGENTS[id];
+    if (!agent) throw new Error(`وكيل غير معروف: ${idOrLegacy}`);
+
+    const runId = this._runId(`agent_${id.replace(/[:.]/g, '_')}`);
+    const subs = (agent.subagents || []).map((sid) => AGENTS[sid]).filter(Boolean);
+
+    console.log(`\n🔧 ${agent.icon} ${agent.nameAr} (${agent.id}) — فرقة ${agent.squad}`);
+    const result = await executeWithSubs(agent, subs, { runId, context });
+
+    const allOk = result.main.ok && result.subs.every((s) => s.ok);
+    console.log(`${allOk ? '✅' : '⚠️'} اكتمل: التقرير في ${result.main.file || '(فشل قبل الكتابة)'}`);
+    return { runId, agent: agent.id, ...result };
+  }
+
+  // ── تشغيل فرقة كاملة (5 قادة × 3 = 15 وكيلًا بالتوازي) ──
+  async runSquad(squadId, context = {}) {
+    const squad = SQUADS[squadId];
+    if (!squad) throw new Error(`فرقة غير معروفة: ${squadId}`);
+
+    const runId = this._runId(`squad_${squadId}`);
+    const leaders = squad.leaders.map((id) => AGENTS[id]).filter(Boolean);
 
     console.log(`\n${'═'.repeat(60)}`);
-    console.log(`🚀 بدء سير العمل: ${workflow.name}`);
-    console.log(`${'═'.repeat(60)}\n`);
+    console.log(`${squad.icon} فرقة ${squad.name} (${squadId}) — ${leaders.length} قادة × 3 = ${leaders.length * 3} وكلاء`);
+    console.log(`📌 المهمة: ${squad.mission}`);
+    console.log(`${'═'.repeat(60)}`);
 
-    const startTime = Date.now();
+    bus.publish(`squad:${squadId}`, { from: 'orchestrator', type: 'squad-start', body: { runId, mission: squad.mission } });
+
+    const started = Date.now();
+    const results = await Promise.all(
+      leaders.map((leader) => {
+        const subs = (leader.subagents || []).map((sid) => AGENTS[sid]).filter(Boolean);
+        return executeWithSubs(leader, subs, { runId, context });
+      })
+    );
+
+    const agents = results.length * 3;
+    const okCount = results.filter((r) => r.main.ok && r.subs.every((s) => s.ok)).length;
+    const sec = ((Date.now() - started) / 1000).toFixed(1);
+
+    bus.publish(`squad:${squadId}`, { from: 'orchestrator', type: 'squad-done', body: { runId, ok: okCount, total: results.length } });
+
+    console.log(`\n🏁 الفرقة اكتملت في ${sec}s — وكلاء ناجحون: ${okCount * 3}/${agents}`);
+    console.log(`📁 التقارير: specs/agents/${runId}/`);
+    return { runId, squad: squadId, leaders: results.length, agents, okLeaders: okCount, results };
+  }
+
+  // ── تشغيل سير عمل موجات ──
+  async runWorkflow(workflowId, context = {}) {
+    const workflow = WORKFLOWS[workflowId];
+    if (!workflow) throw new Error(`سير عمل غير معروف: ${workflowId}`);
+
+    const runId = this._runId(`wf_${workflowId}`);
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`🚀 سير العمل: ${workflow.name} (${workflowId})`);
+    console.log(`${'═'.repeat(60)}`);
+
+    const started = Date.now();
+    const waveResults = [];
 
     for (let i = 0; i < workflow.waves.length; i++) {
       const wave = workflow.waves[i];
       console.log(`\n🌊 الموجة ${i + 1}/${workflow.waves.length}: ${wave.name}`);
-      console.log(`   الوكلاء: ${wave.agents.join(', ')}`);
-      console.log(`   الوضع: ${wave.mode === 'parallel' ? 'متوازي' : 'تسلسلي'}`);
 
-      const waveStart = Date.now();
-
-      if (wave.mode === 'parallel') {
-        await this.runWaveParallel(wave.agents, context);
+      let waveResult;
+      if (wave.squads) {
+        // موجة فرق: تُشغَّل بالتوازي أو تسلسليًا حسب mode
+        const runner = (sid) => (wave.mode === 'parallel' ? this.runSquad(sid, context) : this.runSquad(sid, context).then((r) => (console.log('—'), r)));
+        waveResult = wave.mode === 'parallel'
+          ? await Promise.allSettled(wave.agents.map(runner))
+          : (await wave.agents.reduce(async (acc, sid) => [...await acc, await this.runSquad(sid, context)], []));
       } else {
-        await this.runWaveSequential(wave.agents, context);
+        // موجة وكلاء (معرّفات قديمة أو جديدة) — تُحوَّل تلقائيًا
+        const ids = wave.agents.map((a) => resolveAgentId(a)).filter(Boolean);
+        waveResult = wave.mode === 'parallel'
+          ? await Promise.allSettled(ids.map((id) => this.runAgent(id, context)))
+          : (await ids.reduce(async (acc, id) => [...await acc, await this.runAgent(id, context)], []));
       }
-
-      const waveTime = ((Date.now() - waveStart) / 1000).toFixed(1);
-      console.log(`   ✅ اكتملت الموجة في ${waveTime} ثانية`);
+      waveResults.push(waveResult);
     }
 
-    const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+    const sec = ((Date.now() - started) / 1000).toFixed(1);
     console.log(`\n${'═'.repeat(60)}`);
-    console.log(`🎉 اكتمل سير العمل في ${totalTime} ثانية`);
-    console.log(`   مهام ناجحة: ${this.completedTasks.length}`);
-    console.log(`   مهام فاشلة: ${this.failedTasks.length}`);
+    console.log(`🎉 اكتمل سير العمل في ${sec}s — التقارير في specs/agents/${runId}/`);
     console.log(`${'═'.repeat(60)}\n`);
-
-    return {
-      workflow: workflow.name,
-      totalTime: `${totalTime}s`,
-      completed: this.completedTasks.length,
-      failed: this.failedTasks.length,
-      results: Object.fromEntries(this.results),
-    };
+    return { runId, workflow: workflowId, waves: waveResults.length, sec };
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // تشغيل موجة بالموازاة
-  // ═══════════════════════════════════════════════════════════
-  async runWaveParallel(agentIds, context) {
-    const promises = agentIds.map(id => this.runAgent(id, context));
-    await Promise.allSettled(promises);
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // تشغيل موجة تسلسلياً
-  // ═══════════════════════════════════════════════════════════
-  async runWaveSequential(agentIds, context) {
-    for (const id of agentIds) {
-      await this.runAgent(id, context);
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // تشغيل وكيل واحد
-  // ═══════════════════════════════════════════════════════════
-  async runAgent(agentId, context) {
-    const agent = AGENTS[agentId];
-    if (!agent) {
-      console.log(`   ⚠️ وكيل غير معروف: ${agentId}`);
-      return;
-    }
-
-    const startTime = Date.now();
-    console.log(`   🔧 ${agent.icon} ${agent.nameAr || agent.name}...`);
-
-    try {
-      // محاكاة عمل الوكيل (في التطبيق الحقيقي، يُستخدم Task tool)
-      const result = await this.executeAgentTasks(agent, context);
-      
-      this.completedTasks.push(agentId);
-      this.results.set(agentId, result);
-      
-      const time = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log(`   ✅ ${agent.icon} ${agent.nameAr || agent.name} (${time}s)`);
-      
-      return result;
-    } catch (error) {
-      this.failedTasks.push(agentId);
-      console.log(`   ❌ ${agent.icon} ${agent.nameAr || agent.name} - خطأ: ${error.message}`);
-      
-      return { error: error.message };
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // تنفيذ مهام الوكيل
-  // ═══════════════════════════════════════════════════════════
-  async executeAgentTasks(agent, context) {
-    // هذا_MOULD_يتم استبداله بتنفيذ حقيقي باستخدام Task tool
-    // حالياً يُرجع معلومات عن المهام
-    return {
-      agentId: agent.id,
-      name: agent.name,
-      nameAr: agent.nameAr,
-      tasks: agent.tasks || [],
-      context: context,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // جلب معلومات وكيل
-  // ═══════════════════════════════════════════════════════════
-  getAgent(agentId) {
-    return AGENTS[agentId] || null;
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // جلب جميع الوكلاء الرئيسيين
-  // ═══════════════════════════════════════════════════════════
-  getMainAgents() {
-    return Object.values(AGENTS).filter(a => !a.id.includes('.'));
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // جلب وكلاء فرعي لوكيل معين
-  // ═══════════════════════════════════════════════════════════
-  getSubAgents(parentId) {
-    return Object.values(AGENTS).filter(a => a.parent === parentId);
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // طباعة الهيكل الكامل
-  // ═══════════════════════════════════════════════════════════
+  // ── عرض البنية ──
   printStructure() {
+    const c = countAgents();
     console.log('\n' + '═'.repeat(60));
-    console.log('🧠 هيكل نظام الوكلاوات — AraLink');
-    console.log('═'.repeat(60) + '\n');
+    console.log(`🧠 نظام الوكلاء — 100 رئيسي × 2 فرعي = ${c.total} وكيلًا في ${c.squads} فرقة`);
+    console.log('═'.repeat(60));
 
-    const mainAgents = this.getMainAgents();
-    for (const agent of mainAgents) {
-      console.log(`${agent.icon} ${agent.id}: ${agent.nameAr || agent.name}`);
-      console.log(`   ${agent.description}`);
-      
-      const subs = this.getSubAgents(agent.id);
-      for (const sub of subs) {
-        console.log(`   ├── ${sub.icon} ${sub.id}: ${sub.nameAr || sub.name}`);
+    for (const squad of Object.values(SQUADS)) {
+      console.log(`\n${squad.icon} ${squad.id}: ${squad.name}`);
+      console.log(`   📌 ${squad.mission}`);
+      console.log(`   🛠️  مهارات الفرقة: ${(squad.skills || []).join('، ') || '—'}`);
+      for (const lid of squad.leaders) {
+        const L = AGENTS[lid];
+        const legacy = L.oldId ? ` (سابقًا ${L.oldId})` : '';
+        console.log(`   ├── ${lid} — ${L.nameAr}${legacy}`);
+        console.log(`   │     الأدوات: ${[...L.realTools, ...L.tools].slice(0, 5).join('، ')}`);
+        for (const sid of L.subagents) console.log(`   │   ├── 🔹 ${AGENTS[sid].nameAr}`);
       }
-      console.log('');
     }
 
     console.log('\n🛡️ الحرس المتجوّلون:');
-    for (const [id, guardian] of Object.entries(GUARDIANS)) {
-      console.log(`   ${guardian.icon} ${id}: ${guardian.nameAr || guardian.name}`);
-    }
+    for (const g of Object.values(GUARDIANS)) console.log(`   ${g.icon} ${g.id}: ${g.nameAr} — يراقب ${g.monitors.join('، ')}`);
+  }
 
-    console.log('\n📋 سير العمل المتاح:');
-    for (const [id, workflow] of Object.entries(WORKFLOWS)) {
-      console.log(`   • ${workflow.name} (${workflow.waves.length} موجات)`);
+  printSquad(squadId) {
+    const squad = SQUADS[squadId];
+    if (!squad) return console.log(`❌ فرقة غير معروفة: ${squadId}`);
+    console.log(`\n${squad.icon} ${squad.id}: ${squad.name}`);
+    console.log(`📌 ${squad.mission}`);
+    console.log(`🎯 المهارات: ${(squad.skills || []).join('، ')}`);
+    for (const lid of squad.leaders) {
+      const L = AGENTS[lid];
+      console.log(`\n  ${lid} — ${L.nameAr}${L.oldId ? ` (سابقًا ${L.oldId})` : ''}`);
+      console.log(`    أدوات حقيقية: ${L.realTools.join('، ') || '—'}`);
+      console.log(`    قدرات: ${L.tools.join('، ') || '—'}`);
+      console.log(`    مهارات: ${L.skills.join('، ') || '—'}`);
+      for (const sid of L.subagents) console.log(`      🔹 ${sid} — ${AGENTS[sid].nameAr}`);
     }
   }
 }

@@ -12,7 +12,7 @@
     "test:coverage": "c8 node --test \"tests/*.test.js\" \"tests/*.test.mjs\"",
     "test:coverage:html": "c8 --reporter=html node --test \"tests/*.test.js\" \"tests/*.test.mjs\"",
     "test:coverage:lcov": "c8 --reporter=lcov node --test \"tests/*.test.js\" \"tests/*.test.mjs\"",
-    "lint": "eslint server/ tests/ public/js/ --max-warnings=0",
+    "lint": "eslint server/ tests/ public/js/ agents/ --max-warnings=0",
     "lint:mjs": "eslint public/js/*.mjs tests/*.test.mjs --max-warnings=0",
     "download:ocr": "node scripts/download-ocr-data.js",
     "bench:translate": "node scripts/bench-translate.js",
