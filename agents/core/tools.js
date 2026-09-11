@@ -86,9 +86,50 @@ const TOOLS = {
   }),
 
   'search_code': async ({ pattern = 'translate', dir = 'server' }) => new Promise((resolve) => {
-    // grep متاح في Git Bash على كل الأنظمة (بيئة هذا المشروع) — نمط افتراضي
-    // هادئ حتى يعمل الفرعي الثاني حتى بلا args مخصصة
-    execFile('grep', ['-rn', '--include=*.{js,mjs,json,md}', pattern, dir], { timeout: 60000, shell: true, maxBuffer: 5 * 1024 * 1024 }, (err, stdout) => {
+    // grep متاح في Git Bash — لكنه غائب على Windows الخام، فيسقط الاختبار
+    // search_code بصمت (0 نتائج). عند غياب الثنائية نسقط لمسح Node خالص
+    // بنفس الشكل (matches + أسطر file:line:content) بدل كسر الأداة.
+    const fallbackSearch = () => {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const root = path.resolve(String(dir || 'server'));
+        let re = null;
+        try { re = new RegExp(String(pattern)); } catch { re = null; }
+        const lines = [];
+        const walk = (d) => {
+          let entries = [];
+          try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+          for (const e of entries) {
+            if (lines.length >= 200) return;
+            const p = path.join(d, e.name);
+            if (e.isDirectory()) {
+              if (e.name === 'node_modules' || e.name === '.git' || e.name === 'coverage') continue;
+              walk(p);
+            } else if (/\.(js|mjs|json|md)$/.test(e.name)) {
+              let content = '';
+              try { content = fs.readFileSync(p, 'utf8'); } catch { continue; }
+              const rel = path.relative(process.cwd(), p) || p;
+              content.split('\n').forEach((text, i) => {
+                if (lines.length >= 200) return;
+                const hit = re ? re.test(text) : text.includes(String(pattern));
+                if (hit) lines.push(`${rel}:${i + 1}:${text.slice(0, 300)}`);
+              });
+            }
+          }
+        };
+        walk(root);
+        resolve({ ok: true, result: { matches: lines.length, lines } });
+      } catch (e) {
+        resolve({ ok: true, result: { matches: 0, lines: [], note: 'fallback failed: ' + (e && e.message) } });
+      }
+    };
+    execFile('grep', ['-rn', '--include=*.{js,mjs,json,md}', pattern, dir], { timeout: 60000, shell: true, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
+      // grep الغائب على Windows يخرج بخطأ وstdout فارغ — تمامًا كبصمة «لا نتائج».
+      // نميّزهما بنص الخطأ: «not recognized» تعني الثنائية مفقودة → fallback.
+      if (!String(stdout || '').trim() && /not recognized|not found|ENOENT|command not found/i.test(String((err && err.message) || '') + String(stderr || ''))) {
+        return fallbackSearch();
+      }
       const lines = String(stdout || '').split('\n').filter(Boolean).slice(0, 200);
       resolve({ ok: true, result: { matches: lines.length, lines } });
     });

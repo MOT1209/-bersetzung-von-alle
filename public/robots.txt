@@ -1,0 +1,8 @@
+# AraLink — robots.txt
+# امنع فهرسة لوحة الإدارة وواجهات API (بيانات تشغيلية لا محتوى).
+User-agent: *
+Disallow: /admin.html
+Disallow: /api/
+
+# عدّل النطاق إلى نطاق النشر الفعلي (الافتراضي أدناه لخدمة Render باسم aralink).
+Sitemap: https://aralink.onrender.com/sitemap.xml

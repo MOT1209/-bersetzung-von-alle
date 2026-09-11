@@ -9,16 +9,25 @@
 // (نفس الدرس الموثّق في AGENTS.md وroutes-sse.js.)
 const express = require('express');
 const jobs = require('./jobs');
+const { requireAdmin, isAdmin } = require('./adminAuth');
+const repo = require('./db/projects');
 
 const router = express.Router();
 
-// ===== إحصاءات الطابور =====
-router.get('/jobs', (req, res) => {
+const PROJECT_TOKEN_HEADER = 'x-project-token';
+
+// ===== إحصاءات الطابور — للأدمن وحده =====
+// كانت مكشوفة للجميع. هي عدّادات إجمالية لا معرّفات، لكنها بيانات تشغيلية
+// لا يحتاجها أي مستخدم (الواجهة لا تنادي هذا المسار أصلًا) — نفس قاعدة
+// GET /api/projects في routes-projects.js.
+router.get('/jobs', requireAdmin, (req, res) => {
   res.json(jobs.stats());
 });
 
 // ===== بثّ التقدّم عبر SSE =====
 // يسبق '/jobs/:id' في الترتيب لأن Express يطابق أول مسار موافق.
+// بلا مصادقة برأس عمدًا (رابط قدرة — انظر تعليق GET /jobs/:id أعلاه):
+// EventSource لا يرسل ترويسات مخصّصة.
 router.get('/jobs/:id/stream', (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: 'job-not-found' });
@@ -61,6 +70,9 @@ router.get('/jobs/:id/stream', (req, res) => {
 });
 
 // ===== حالة وظيفة =====
+// رابط قدرة (capability URL) عمدًا لا مصادقة برأس: متابعة التقدّم تتم عبر
+// EventSource في المتصفح وهو لا يرسل ترويسات مخصّصة (CURRENT_STATE.md §19).
+// المعرّف UUID عشوائي 128-بت غير قابل للتخمين، ولا يكشف إلا تقدّم وظيفة واحدة.
 router.get('/jobs/:id', (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: 'job-not-found' });
@@ -68,10 +80,23 @@ router.get('/jobs/:id', (req, res) => {
 });
 
 // ===== إلغاء =====
+// وظيفة مرتبطة بمشروع (project-video عبر POST /api/projects/:id/process)
+// تتطلّب توكن مالك المشروع أو الأدمن — وإلا 404 (لا نؤكّد الوجود لغير المالك،
+// نفس قاعدة requireProjectOwner). الوظائف المجهولة المالك (video-local العام)
+// تبقى على نموذج رابط القدرة: منشئها العام لا يملك توكنًا أصلًا.
 router.delete('/jobs/:id', (req, res) => {
-  const job = jobs.cancel(req.params.id);
+  const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ error: 'job-not-found' });
-  res.json(job);
+  const projectId = jobs.ownerProject(req.params.id);
+  if (projectId) {
+    const project = repo.getProject(projectId);
+    if (!project || (!isAdmin(req) && !repo.verifyProjectOwner(project.id, req.get(PROJECT_TOKEN_HEADER)))) {
+      return res.status(404).json({ error: 'job-not-found' });
+    }
+  }
+  const cancelled = jobs.cancel(req.params.id);
+  if (!cancelled) return res.status(404).json({ error: 'job-not-found' });
+  res.json(cancelled);
 });
 
 module.exports = router;

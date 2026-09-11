@@ -83,6 +83,14 @@ test('الصفحة الرئيسية وملفات الواجهة تُخدَم', a
   }
 });
 
+test('ملفات الاكتشاف تُخدَم (robots/sitemap/llms)', async () => {
+  const robots = await fetch(`${baseUrl}/robots.txt`);
+  assert.equal(robots.status, 200);
+  assert.match(await robots.text(), /Disallow: \/admin\.html/);
+  assert.equal((await fetch(`${baseUrl}/sitemap.xml`)).status, 200);
+  assert.equal((await fetch(`${baseUrl}/llms.txt`)).status, 200);
+});
+
 // ===== الحارس الآلي =====
 // يقارن المسارات التي تناديها الواجهة بالمسارات المسجَّلة فعلاً في تطبيق
 // Express. التأمّل هنا أدقّ من استقصاء HTTP: يميّز «الراوتر غير مركَّب» عن

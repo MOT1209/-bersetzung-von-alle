@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-624%20passing-2f6b4f?style=flat-square" alt="Tests: 624 passing" />&#x200B;
+  <img src="https://img.shields.io/badge/tests-661%20passing-2f6b4f?style=flat-square" alt="Tests: 661 passing" />&#x200B;
   <img src="https://img.shields.io/badge/coverage-~78%25%20lines-3d5a99?style=flat-square" alt="Coverage ~78%" />&#x200B;
   <img src="https://img.shields.io/badge/node-%E2%89%A522-339933?logo=node.js&logoColor=white&style=flat-square" alt="Node >= 22" />&#x200B;
   <img src="https://img.shields.io/badge/providers-6%20free-8a6116?style=flat-square" alt="6 free providers" />&#x200B;
@@ -139,9 +139,9 @@ npm run dev        # http://localhost:3000
 ## 🧪 الجودة والاختبار
 
 ```bash
-npm test                    # 624 اختبارًا (node --test)
+npm test                    # 661 اختبارًا (node --test)
 npm run lint                # ESLint — 0 تحذيرات
-npm run check               # فحص صياغة 105 ملفات
+npm run check               # فحص صياغة 106 ملفات
 npm run test:coverage       # c8 coverage (نصّي)
 npm run test:coverage:html  # تقرير HTML في coverage/
 npm run bench:translate     # معيار WER → cache/quality-report.json  ⚠️ يستهلك حصة الترجمة المجانية
@@ -150,12 +150,12 @@ npm run perf:translate      # معيار أداء → cache/perf-report.json
 
 | المقياس | القيمة | الحدّ الأدنى |
 |---------|--------|--------------|
-| الاختبارات الناجحة | **624** | — |
+| الاختبارات الناجحة | **661** | — |
 | تغطية الأسطر | **~77.9%** | 70% (`.c8rc.json`) |
 | تغطية الفروع | **~73.1%** | 60% |
 | تغطية الدوال | **~80.6%** | 70% |
 | تحذيرات Lint | **0** | `--max-warnings=0` |
-| فحص الصياغة | **105 ملفات** | نظيف |
+| فحص الصياغة | **106 ملفات** | نظيف |
 
 > ⚠️ `bench:translate` يستهلك حصة الترجمة المجانية — شغّله يدويًا فقط، وليس في CI.
 
@@ -216,9 +216,9 @@ npm run perf:translate      # معيار أداء → cache/perf-report.json
 │   ├── db/              ← migrations + queries
 │   └── config.js        ← تحميل الإعدادات
 ├── extension/           ← إضافة كروم (Manifest V3)
-├── tests/               ← 60 ملف اختبار
-├── agents/              ← نظام الوكلاء المتعدد (12 رئيسي × 2 فرعي)
-├── docs/openapi.json    ← OpenAPI 3.1 (~42 نقطة نهاية)
+├── tests/               ← 62 ملف اختبار
+├── agents/              ← نظام الوكلاء (100 رئيسي × 2 فرعي = 300، في 20 فرقة)
+├── docs/openapi.json    ← OpenAPI 3.1 (42 نقطة نهاية)
 ├── assets/              ← لافتة README (فاتح/داكن)
 ├── specs/               ← مواصفات الميزات
 └── scripts/build-icons.js ← مولّد الأيقونات من SVG
@@ -248,7 +248,7 @@ npm run perf:translate      # معيار أداء → cache/perf-report.json
 
 ### 🤖 نظام الوكلاء المتعدد
 
-نظام عمل متعدد الوكلاء يغطي كل جوانب المشروع (ترجمة، استخراج، واجهة، خادم، وسائط، أمان، نشر…) — 12 وكيلًا رئيسيًا × 2 فرعي، مع حرس متجوّل (أمان/جودة/مقاييس) وسير عمل جاهز يعمل موجة-بموجة. التفاصيل الكاملة في `SPEC-multi-agent-architecture.md`.
+نظام عمل متعدد الوكلاء يغطي كل جوانب المشروع (ترجمة، استخراج، واجهة، خادم، وسائط، أمان، نشر…) — 100 وكيل رئيسي × 2 فرعي = 300 وكيل في 20 فرقة، مع حرس متجوّل (أمان/جودة/مقاييس) وسير عمل جاهز يعمل موجة-بموجة. كان التصميم الأولي 12×2 (محفوظ تاريخيًا في `SPEC-multi-agent-architecture.md`) ثم نما إلى 300 — انظر `node agents/index.js stats`.
 
 ```bash
 node agents/index.js list              # هيكل الوكلاء الكامل

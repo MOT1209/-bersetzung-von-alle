@@ -21,7 +21,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "x-admin-token",
-        "description": "رمز الإدارة ADMIN_TOKEN — يفتح مسارات /api/settings و /api/stats فقط"
+        "description": "رمز الإدارة ADMIN_TOKEN — يفتح مسارات /api/settings و /api/stats وإحصاءات /api/jobs"
       }
     },
     "schemas": {
@@ -99,12 +99,23 @@
       }
     },
     "parameters": {
-      "AdminHeader": {
-        "name": "x-admin-token",
-        "in": "header",
-        "required": true,
-        "schema": { "type": "string" }
-      }
+ "AdminHeader": {
+   "name": "x-admin-token",
+   "in": "header",
+   "required": true,
+   "schema": {
+    "type": "string"
+   }
+  },
+  "ProjectHeader": {
+   "name": "x-project-token",
+   "in": "header",
+   "required": false,
+   "description": "توكن مالك المشروع (يُعاد مرة واحدة عند POST /api/projects) — مطلوب لحذف وظيفة مرتبطة بمشروع",
+   "schema": {
+    "type": "string"
+   }
+  }
     }
   },
   "paths": {
@@ -734,16 +745,20 @@
     "/api/jobs": {
       "get": {
         "tags": ["jobs"],
-        "summary": "قائمة الوظائف النشطة/الحديثة",
+        "summary": "إحصاءات الطابور (عدّادات إجمالية — للأدمن)",
+        "security": [{ "AdminToken": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/AdminHeader" }],
         "responses": {
-          "200": { "description": "قائمة الوظائف", "content": { "application/json": { "schema": { "type": "object", "properties": { "jobs": { "type": "array", "items": { "$ref": "#/components/schemas/JobStatus" } } } } } } }
+          "200": { "description": "عدّادات {concurrency, running, queued, tracked, maxQueued}" },
+          "401": { "description": "رمز إدارة خاطئ", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "503": { "description": "ADMIN_TOKEN غير مضبوط — المسار معطّل", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
         }
       }
     },
     "/api/jobs/{id}": {
       "get": {
         "tags": ["jobs"],
-        "summary": "حالة وظيفة",
+        "summary": "حالة وظيفة (رابط قدرة UUID — بلا مصادقة عمدًا، EventSource لا يرسل ترويسات)",
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
         "responses": {
           "200": { "description": "الحالة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobStatus" } } } },
@@ -752,11 +767,11 @@
       },
       "delete": {
         "tags": ["jobs"],
-        "summary": "إلغاء وظيفة قيد التنفيذ",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "summary": "إلغاء وظيفة قيد التنفيذ (وظائف المشاريع تتطلّب توكن المالك أو الأدمن)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/ProjectHeader" }],
         "responses": {
           "200": { "description": "أُلغيت أو كانت منتهية أصلًا" },
-          "404": { "description": "غير موجودة", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+          "404": { "description": "غير موجودة أو لست مالك مشروعها", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
         }
       }
     },

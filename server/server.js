@@ -212,23 +212,26 @@ const LOGIN_HARD_MS = 15 * 60000; // نافذة القفل الشديد (15 دق
 const LOGIN_SOFT_LIMIT = 5;
 const LOGIN_HARD_LIMIT = 10;
 
-// يزيد عدّادي الفشل ويقرر القفل. يُعيد { retryAfter } للقفل أو null للمتابعة.
-// أي خطأ في المتجر → fail-open (نفس سياسة حدود الطلبات في المشروع).
+// يزيد عدّادي الفشل ويقرر القفل. يُعيد { retryAfter } للقفل أو null للمتابعة
+// أو { storeError: true } عند تعذّر العدّ (fail-closed: مسار الأدمن يُغلق
+// بـ 503 بدل السماح بلا قفل — عكس سياسة fail-open في حد الطلبات العام، لأن
+// انقطاع Redis هنا كان يعني طريقًا مفتوحًا لتخمين ADMIN_TOKEN).
 // ملاحظة: مفتاحا النافذتين مستقلّان — لو اشتركا في مفتاح واحد، كان incr الثاني
 // يزيد نفس مدخلة الأول فيحسب كل محاولة مرتين ويحمل resetAt النافذة القصيرة.
-async function checkLoginLock(req) {
+// المعامل الثاني للحقن في الاختبارات فقط (الافتراضي مخزن القفل المشترك).
+async function checkLoginLock(req, store = loginFailStore) {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   const softKey = `login-fail:s:${ip}`; // عدّاد النافذة القصيرة (60 ثانية)
   const hardKey = `login-fail:h:${ip}`; // عدّاد النافذة الشديدة (15 دقيقة)
   let soft, hard;
   try {
     [soft, hard] = await Promise.all([
-      loginFailStore.incr(softKey, LOGIN_SOFT_MS),
-      loginFailStore.incr(hardKey, LOGIN_HARD_MS),
+      store.incr(softKey, LOGIN_SOFT_MS),
+      store.incr(hardKey, LOGIN_HARD_MS),
     ]);
   } catch (e) {
-    console.error('[admin-login] lockout store failed — allowing attempt:', e && e.message);
-    return null;
+    console.error('[admin-login] lockout store failed — rejecting attempt:', e && e.message);
+    return { storeError: true };
   }
   if (hard.count >= LOGIN_HARD_LIMIT) {
     return { retryAfter: Math.max(1, Math.ceil((hard.resetAt - Date.now()) / 1000)) };
@@ -244,6 +247,9 @@ app.post('/api/admin/login', heavyLimiter, async (req, res) => {
   if (!expected) return res.status(503).json({ error: 'settings-disabled' });
   try {
     const lock = await checkLoginLock(req);
+    if (lock && lock.storeError) {
+      return res.status(503).json({ error: 'service-unavailable' });
+    }
     if (lock) {
       res.setHeader('Retry-After', String(lock.retryAfter));
       return res.status(429).json({ error: 'rate-limited' });
@@ -352,4 +358,5 @@ if (require.main === module) {
 
 module.exports = app;
 module.exports.createRateLimiter = createRateLimiter; // للاختبار المباشر (وحدة بلا شبكة)
+module.exports.checkLoginLock = checkLoginLock; // للاختبار المباشر (حقن مخزن يرمي)
 module.exports.closeStore = closeStore;

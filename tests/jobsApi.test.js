@@ -9,10 +9,17 @@ const os = require('node:os');
 process.env.RATE_LIMIT_MAX = '1000';
 process.env.RATE_LIMIT_MAX_HEAVY = '1000';
 process.env.CACHE_FILE = path.join(os.tmpdir(), 'aralink-jobs-' + Date.now() + '.json');
+// عزل قاعدة المشاريع والتخزين: اختبارات الملكية أدناه تنشئ مشاريع حقيقية
+const jobsTmpDir = require('node:fs').mkdtempSync(path.join(os.tmpdir(), 'aralink-jobsdb-'));
+process.env.DB_FILE = path.join(jobsTmpDir, 'test.db');
+process.env.STORAGE_DIR = path.join(jobsTmpDir, 'storage');
+process.env.ADMIN_TOKEN = 'jobs-admin-token';
 
 const audioMod = require('../server/audio');
 const translateRoutes = require('../server/routes-translate');
 const localVideo = require('../server/routes-local-video');
+const pipeline = require('../server/projectPipeline');
+const db = require('../server/db');
 const jobs = require('../server/jobs');
 const app = require('../server/server');
 
@@ -47,6 +54,9 @@ after(async () => {
   translateRoutes.translateLines = origTranslateLines;
   localVideo.impl.probeDuration = origProbe;
   if (server) await new Promise((r) => server.close(r));
+  db.closeDb();
+  delete process.env.ADMIN_TOKEN;
+  try { require('node:fs').rmSync(jobsTmpDir, { recursive: true, force: true }); } catch { /* تنظيف */ }
 });
 
 const post = (p, body) => fetch(baseUrl + p, {
@@ -111,8 +121,11 @@ test('GET /api/jobs/:id: معرّف مجهول → 404', async () => {
   assert.equal((await res.json()).error, 'job-not-found');
 });
 
-test('GET /api/jobs: إحصاءات الطابور', async () => {
-  const res = await fetch(`${baseUrl}/api/jobs`);
+test('GET /api/jobs: إحصاءات الطابور للأدمن وحده', async () => {
+  const anon = await fetch(`${baseUrl}/api/jobs`);
+  assert.equal(anon.status, 401, 'إحصاءات الطابور مكشوفة بلا توكن أدمن');
+
+  const res = await fetch(`${baseUrl}/api/jobs`, { headers: { 'x-admin-token': 'jobs-admin-token' } });
   assert.equal(res.status, 200);
   const s = await res.json();
   assert.equal(typeof s.concurrency, 'number');
@@ -121,7 +134,7 @@ test('GET /api/jobs: إحصاءات الطابور', async () => {
   assert.ok(s.concurrency >= 1);
 });
 
-test('DELETE /api/jobs/:id: إلغاء، ومجهول → 404', async () => {
+test('DELETE /api/jobs/:id: وظيفة مجهولة المالك (video-local العام) — رابط قدرة', async () => {
   const res404 = await fetch(`${baseUrl}/api/jobs/ghost`, { method: 'DELETE' });
   assert.equal(res404.status, 404);
 
@@ -130,6 +143,43 @@ test('DELETE /api/jobs/:id: إلغاء، ومجهول → 404', async () => {
   assert.equal(del.status, 200);
   const body = await del.json();
   assert.ok(['cancelled', 'completed', 'running'].includes(body.status), `حالة غير متوقعة: ${body.status}`);
+});
+
+// ===== 3ب) ملكية حذف وظائف المشاريع =====
+
+async function newOwnedProject(name = 'وظيفة') {
+  const res = await post('/api/projects', { name });
+  assert.equal(res.status, 201);
+  return res.json(); // { id, ownerToken, ... }
+}
+
+test('DELETE /api/jobs/:id: وظيفة مشروع بلا توكن مالك → 404 (لا نؤكّد الوجود)', async () => {
+  const project = await newOwnedProject('حذف-مرفوض');
+  const job = jobs.enqueue(pipeline.JOB_TYPE, { projectId: project.id, assetId: 'nope', targetLang: 'ar' });
+
+  const denied = await fetch(`${baseUrl}/api/jobs/${job.id}`, { method: 'DELETE' });
+  assert.equal(denied.status, 404);
+
+  const wrong = await fetch(`${baseUrl}/api/jobs/${job.id}`, {
+    method: 'DELETE', headers: { 'X-Project-Token': 'wrong-token-123' },
+  });
+  assert.equal(wrong.status, 404);
+});
+
+test('DELETE /api/jobs/:id: مالك المشروع والأدمن يحذفان', async () => {
+  const project = await newOwnedProject('حذف-مسموح');
+  const job = jobs.enqueue(pipeline.JOB_TYPE, { projectId: project.id, assetId: 'nope', targetLang: 'ar' });
+
+  const ok = await fetch(`${baseUrl}/api/jobs/${job.id}`, {
+    method: 'DELETE', headers: { 'X-Project-Token': project.ownerToken },
+  });
+  assert.equal(ok.status, 200);
+
+  const job2 = jobs.enqueue(pipeline.JOB_TYPE, { projectId: project.id, assetId: 'nope', targetLang: 'ar' });
+  const admin = await fetch(`${baseUrl}/api/jobs/${job2.id}`, {
+    method: 'DELETE', headers: { 'x-admin-token': 'jobs-admin-token' },
+  });
+  assert.equal(admin.status, 200);
 });
 
 // ===== 4) بثّ SSE =====

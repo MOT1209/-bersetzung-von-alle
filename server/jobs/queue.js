@@ -9,6 +9,7 @@
 //   enqueue(type, payload)     → public job record (queued)
 //   run(type, payload)         → Promise<result> (bounded by concurrency)
 //   get(id) / cancel(id)       → public job record
+//   ownerProject(id)           → projectId من الحمولة أو null (لفحص الملكية)
 //   stats()                    → { concurrency, running, queued, tracked, maxQueued }
 //   subscribe(id, listener)    → unsubscribe fn (SSE)
 //   close()                    → graceful shutdown
@@ -238,6 +239,13 @@ function createQueue(opts = {}) {
     return toPublic(jobs.get(id));
   }
 
+  // معرّف المشروع المرتبط بالوظيفة (من الحمولة الداخلية — لا يُكشف عبر toPublic).
+  // تحتاجه routes-jobs لفحص ملكية الحذف دون تسريب الحمولة كاملة (قد تحوي base64).
+  function ownerProject(id) {
+    const job = jobs.get(id);
+    return (job && job.payload && job.payload.projectId) || null;
+  }
+
   function cancel(id) {
     const job = jobs.get(id);
     if (!job) return null;
@@ -277,6 +285,7 @@ function createQueue(opts = {}) {
 
   return {
     registerHandler, enqueue, run, get, cancel, stats, subscribe, close,
+    ownerProject,
     events: emitter,
     STATUS,
   };
